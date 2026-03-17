@@ -1,0 +1,2309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Calendario Postgrado UAI</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#f1f5f9;}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#1e293b;}::-webkit-scrollbar-thumb{background:#334155;border-radius:4px;}
+.apple-cal{font-family:inherit;background:#1e293b;border-radius:12px;border:1px solid #334155;overflow:hidden;}
+.apple-grid-header{display:grid;grid-template-columns:repeat(7,1fr);background:#0f172a;border-bottom:1px solid #334155;padding:8px 0;}
+.apple-weekday{text-align:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;}
+.apple-grid-body{display:grid;grid-template-columns:repeat(7,1fr);background:#334155;gap:1px;}
+.apple-cell{background:#1e293b;min-height:130px;padding:6px;overflow:hidden;}
+.apple-cell:hover{background:#1a2744;}
+.apple-day-num{text-align:right;font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:4px;}
+.apple-day-today{display:inline-block;background:#ef4444;color:white;width:22px;height:22px;border-radius:50%;text-align:center;line-height:22px;font-size:12px;font-weight:700;}
+.evt-card{border-left:3px solid #3b82f6;background:rgba(59,130,246,0.08);border-radius:4px;padding:3px 5px;margin-bottom:3px;cursor:default;}
+.evt-time{font-size:9px;color:#f87171;font-weight:700;line-height:1.3;}
+.evt-prog{font-size:9px;color:#7dd3fc;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.evt-sub{font-size:8.5px;color:#e2e8f0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.evt-meta{font-size:8px;color:#64748b;margin-top:1px;}
+.btn{padding:5px 14px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid;transition:all .2s;font-weight:600;}
+.btn-primary{background:linear-gradient(135deg,#0ea5e9,#2dd4bf);color:#fff;border-color:transparent;}
+.btn-ghost{background:transparent;color:#94a3b8;border-color:#334155;}
+.btn-ghost:hover{border-color:#0ea5e9;color:#0ea5e9;}
+.card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;}
+.table-base{width:100%;border-collapse:collapse;}
+.table-base th{padding:7px 10px;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;text-align:left;border-bottom:1px solid #334155;}
+.table-base td{padding:8px 10px;font-size:12px;border-bottom:1px solid rgba(51,65,85,0.4);}
+.kpi-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:14px;}
+input,select{background:#0f172a;color:#f1f5f9;border:1px solid #334155;border-radius:8px;padding:7px 10px;font-size:12px;outline:none;}
+input:focus,select:focus{border-color:#0ea5e9;}
+select option{background:#1e293b;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useMemo,useCallback,useRef,useEffect}=React;
+
+// ── Constantes ───────────────────────────────────────────────────────────
+const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const DIAS_SEMANA=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+const DIAS_CORTOS=["LUN","MAR","MIÉ","JUE","VIE","SÁB","DOM"];
+
+// ── Parsear fecha (compatible con Excel serial y texto español) ───────────
+// ── Parsear fecha — sin bug de timezone (UTC → Local) ───────────────────
+// JS interpreta new Date("2026-05-19") como UTC midnight.
+// En Chile (UTC-3) eso = 18/05 a las 21hs → aparece el día anterior.
+// CORRECCIÓN: siempre crear con constructor LOCAL new Date(year, month, day).
+function parseFecha(v){
+  try{
+    if(v===null||v===undefined||v==="") return null;
+    if(v instanceof Date){
+      // Si ya es Date, normalizar a medianoche local
+      if(isNaN(v.getTime())) return null;
+      return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+    }
+    // ── Excel serial date (número) ────────────────────────────────────────
+    if(typeof v==="number"){
+      // Convertir a UTC para extraer componentes, luego crear fecha local
+      const utcMs=Math.round((v-25569)*86400*1000);
+      const tmp=new Date(utcMs);
+      if(isNaN(tmp.getTime())) return null;
+      // Usar UTC* para obtener el día correcto en cualquier timezone
+      return new Date(tmp.getUTCFullYear(), tmp.getUTCMonth(), tmp.getUTCDate());
+    }
+    const s=String(v).trim();
+    if(!s||s==="nan"||s==="NaN"||s==="None"||s==="undefined") return null;
+    // ── Texto español: "lunes 5 de mayo 2026" / "19 de marzo de 2026" ────
+    const MESES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    const sl=s.toLowerCase();
+    for(let i=0;i<MESES_ES.length;i++){
+      if(sl.includes(MESES_ES[i])){
+        const nums=(sl.match(/\d+/g)||[]);
+        if(nums.length>=2){
+          const day=parseInt(nums[0]);
+          const year=nums[nums.length-1].length===4?parseInt(nums[nums.length-1]):parseInt(nums[1]);
+          if(year>2000&&year<2100&&day>=1&&day<=31){
+            // Constructor LOCAL — sin UTC offset bug
+            return new Date(year, i, day);
+          }
+        }
+      }
+    }
+    // ── dd/mm/yyyy ó dd-mm-yyyy ó dd.mm.yyyy ─────────────────────────────
+    const ddmm=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+    if(ddmm){
+      // Constructor LOCAL
+      return new Date(parseInt(ddmm[3]), parseInt(ddmm[2])-1, parseInt(ddmm[1]));
+    }
+    // ── ISO "2026-05-19" (viene como string de SheetJS) ──────────────────
+    // new Date("2026-05-19") = UTC midnight → bug en UTC-3
+    const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso){
+      // Extraer componentes y crear LOCAL
+      return new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3]));
+    }
+    // ── Último recurso (formatos raros) ───────────────────────────────────
+    const tmp=new Date(s);
+    if(isNaN(tmp.getTime())) return null;
+    // Si llegó aquí y es una fecha UTC, normalizar a local usando UTC components
+    return new Date(tmp.getUTCFullYear(), tmp.getUTCMonth(), tmp.getUTCDate());
+  }catch(e){return null;}
+}
+
+function calcMod(sede){
+  const s=String(sede||"").toUpperCase();
+  if(s.includes("ONLINE")||s.includes("ZOOM")||s.includes("VIRTUAL")) return "Online";
+  if(s.includes("HYBRID")||s.includes("HIBRID")) return "Híbrido";
+  return "Presencial";
+}
+
+// ── Alineado con utils.py _score_row() ────────────────────────────────
+const COLS_FECHA   =["FECHA","DIA","DATE","DÍAS","DIAS","DIAS/FECHAS"];
+const COLS_PROGRAMA=["PROGRAMA","DIPLOMA","MAGISTER","CURSO","COURSE","ASIGNATURA","MÓDULO","MODULO","NOMBRE PROGRAMA"];
+const COLS_COORD   =["COORDINADORA","RESPONSABLE","COORD","COORDINADOR"];
+const COLS_SEDE    =["SEDE","CAMPUS","LUGAR"];
+const COLS_SALA    =["SALA","ROOM","AULA"];
+const COLS_PROF    =["PROFESOR","DOCENTE","TEACHER","SASLAS"];
+const COLS_HORARIO =["HORARIO","HORA","SCHEDULE","HORA INICIO","HORA_INICIO"];
+// Mapeo extra (mismo EXTRA_MAP de utils.py)
+const EXTRA_MAP={"NOMBRE PROGRAMA":"programa","COORDINADOR":"coord","HORA INICIO":"horario","HORA TERMINO":"horafin","HORA DE TÉRMINO":"horafin"};
+
+function scoreHeaders(keys){
+  let s=0;
+  for(const v of keys){
+    const u=String(v).toUpperCase().trim();
+    if(COLS_FECHA.some(k=>u.includes(k)))    s+=3;
+    if(COLS_PROGRAMA.some(k=>u.includes(k))) s+=2;
+    if(COLS_COORD.some(k=>u.includes(k)))    s+=2;
+    if(COLS_SEDE.some(k=>u.includes(k)))     s+=1;
+    if(COLS_PROF.some(k=>u.includes(k)))     s+=1;
+    if(COLS_HORARIO.some(k=>u.includes(k)))  s+=1;
+  }
+  return s;
+}
+
+// Dado un array de objetos (rows de SheetJS), detecta la fila header si los
+// keys del objeto 0 no son buenos headers (igual que utils._find_header_row)
+function detectHeaderRow(rawRows){
+  if(!rawRows||!rawRows.length) return {rows:rawRows,kFecha:null};
+  // SheetJS ya nos da la fila 0 como keys; pero puede que el header real esté en una fila interior
+  // Los keys del objeto serán "__EMPTY", "__EMPTY_1"... cuando los encabezados están vacios en fila 0
+  const keys0=Object.keys(rawRows[0]);
+  let bestScore=scoreHeaders(keys0);
+  let bestRow=-1;
+  for(let i=0;i<Math.min(30,rawRows.length);i++){
+    const vals=Object.values(rawRows[i]).map(v=>String(v||""));
+    const sc=scoreHeaders(vals);
+    if(sc>bestScore){bestScore=sc;bestRow=i;}
+  }
+  if(bestRow>=0){
+    // La fila bestRow contiene los headers reales
+    const newKeys=Object.values(rawRows[bestRow]).map(v=>String(v||"Unknown").trim());
+    const data=rawRows.slice(bestRow+1).map(r=>{
+      const obj={};Object.values(r).forEach((v,i)=>{obj[newKeys[i]||`_${i}`]=v;});return obj;
+    });
+    return {rows:data,score:bestScore,detectedAt:bestRow};
+  }
+  return {rows:rawRows,score:bestScore,detectedAt:-1};
+}
+
+// Mapea columna raw (UPPER) al campo estándar, igual que utils._normalizar_df
+function mapCols(keys){
+  const mapped={fecha:null,programa:null,coord:null,sede:null,sala:null,horario:null,asig:null,prof:null};
+  // Extra map primero (more precise)
+  for(const k of keys){
+    const u=k.toUpperCase().trim();
+    if(u==="NOMBRE PROGRAMA"&&!mapped.programa) mapped.programa=k;
+    if((u==="COORDINADORA"||u==="RESPONSABLE"||u==="COORDINADOR")&&!mapped.coord) mapped.coord=k;
+    if(u==="HORA INICIO"&&!mapped.horario) mapped.horario=k;
+    if(u==="ASIGNATURA"&&!mapped.asig) mapped.asig=k;
+    if(u==="MODULO"||u==="MÓDULO"&&!mapped.asig) mapped.asig=k;
+  }
+  // Main mapping (same priority order as utils)
+  for(const k of keys){
+    const u=k.toUpperCase().trim();
+    if(!mapped.fecha    && COLS_FECHA.some(x=>u.includes(x))&&!u.includes("COORDINADORA")) mapped.fecha=k;
+    if(!mapped.programa && COLS_PROGRAMA.some(x=>u.includes(x))) mapped.programa=k;
+    if(!mapped.coord    && COLS_COORD.some(x=>u.includes(x)))    mapped.coord=k;
+    if(!mapped.sede     && (u.includes("SEDE")||u.includes("CAMPUS")))  mapped.sede=k;
+    if(!mapped.sala     && COLS_SALA.some(x=>u.includes(x)))     mapped.sala=k;
+    if(!mapped.prof     && COLS_PROF.some(x=>u.includes(x)))     mapped.prof=k;
+    if(!mapped.horario  && COLS_HORARIO.some(x=>u.includes(x)))  mapped.horario=k;
+    if(!mapped.asig     && (u.includes("ASIGNATURA")||u.includes("MODULO")||u.includes("MÓDULO"))) mapped.asig=k;
+  }
+  return mapped;
+}
+
+// ── parseFile: alineado con utils.load_data ────────────────────────────
+// data = array of plain objects (ya convertido por SheetJS en el Sidebar)
+function parseFile(data,filename){
+  if(!data||!data.length) return {error:"El archivo está vacío."};
+  try{
+    const {rows:cleanRows, detectedAt}=detectHeaderRow(data);
+    if(!cleanRows||!cleanRows.length) return {error:"No se encontraron filas de datos."};
+    const origKeys=Object.keys(cleanRows[0]);
+    const m=mapCols(origKeys);
+    if(!m.fecha) return {
+      error:`No se encontró columna de fecha. Columnas detectadas: ${origKeys.join(", ")}`,
+      cols:origKeys
+    };
+
+    // Parsear filas (usando cleanRows con header ya detectado)
+    const rows=[];
+    for(const r of cleanRows){
+      try{
+        const fecha=parseFecha(r[m.fecha]);
+        if(!fecha) continue;
+        const limpia=(k,fb)=>{
+          if(!k) return fb;
+          const v=r[k];
+          const s=String(v==null?"":v).trim();
+          return (s===""||s==="nan"||s==="None"||s==="NaN")?fb:s;
+        };
+        rows.push({
+          fecha,
+          programa:limpia(m.programa,"Sin programa"),
+          coord:   limpia(m.coord,"Sin coord"),
+          sede:    limpia(m.sede,""),
+          sala:    limpia(m.sala,""),
+          horario: limpia(m.horario,""),
+          asig:    limpia(m.asig,""),
+          profesor:limpia(m.prof,""),
+        });
+      }catch(e){}
+    }
+
+    if(rows.length===0) return {
+      error:`Se encontró la columna "${kFecha}" pero ninguna fila tiene fecha válida.`,
+      cols:origKeys, kFecha
+    };
+
+    // Agregar modalidad calculada
+    for(const r of rows) r.modalidad=calcMod(r.sede);
+
+    const hoy=new Date();
+    hoy.setHours(0,0,0,0);
+
+    // Stats básicas
+    const programas=[...new Set(rows.map(r=>r.programa).filter(p=>p&&p!=="nan"))];
+    const coords=[...new Set(rows.map(r=>r.coord).filter(c=>c&&c!=="nan"))];
+
+    const rowsHoy = rows.filter(r => {
+      const d = r.fecha;
+      return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth() && d.getDate() === hoy.getDate();
+    });
+    const sesHoy = rowsHoy.length;
+    const fin7 = new Date(hoy); fin7.setDate(fin7.getDate() + 7);
+    const sesProx7 = rows.filter(r => r.fecha >= hoy && r.fecha <= fin7).length;
+
+    // Tendencia mensual
+    const porMes=MESES.map((mes,i)=>({mes,sesiones:rows.filter(r=>r.fecha.getMonth()===i).length}));
+
+    // Por coordinadora
+    const coordMap={};
+    for(const r of rows){
+      const c=r.coord; if(!c||c==="nan") continue;
+      if(!coordMap[c]) coordMap[c]={name:c,sesiones:0,progsSet:new Set(),diasSet:new Set()};
+      coordMap[c].sesiones++;
+      coordMap[c].progsSet.add(r.programa);
+      coordMap[c].diasSet.add(`${r.fecha.getFullYear()}-${r.fecha.getMonth()}-${r.fecha.getDate()}`);
+    }
+    const porCoord=Object.values(coordMap).map(c=>({
+      name:c.name, sesiones:c.sesiones,
+      programas:c.progsSet.size, diasActivos:c.diasSet.size
+    })).sort((a,b)=>b.sesiones-a.sesiones);
+
+    // Por programa
+    const progMap={};
+    for(const r of rows){
+      const p=r.programa; if(!p||p==="nan") continue;
+      if(!progMap[p]) progMap[p]={nombre:p,coord:r.coord,sesiones:0,fechas:[]};
+      progMap[p].sesiones++;
+      progMap[p].fechas.push(r.fecha);
+    }
+    const porProg=Object.values(progMap).map(p=>{
+      const fs=p.fechas.sort((a,b)=>a-b);
+      const ini=fs[0],fin=fs[fs.length-1];
+      let avance=0;
+      if(ini&&fin&&fin>ini) avance=Math.min(100,Math.max(0,Math.round(((hoy-ini)/(fin-ini))*100)));
+      else if(fin&&fin<hoy) avance=100;
+      const estado=avance>=100?"✅ Finalizado":avance>0?"🔄 En Curso":"📅 Planificado";
+      return {nombre:p.nombre,coord:p.coord,sesiones:p.sesiones,avance,estado,inicio:ini,fin};
+    }).sort((a,b)=>b.sesiones-a.sesiones);
+
+    // Alertas exactas del Streamlit (calendario2.py)
+    const alertas=[];
+    const fin7b=new Date(hoy); fin7b.setDate(fin7b.getDate()+7);
+    // 1. Cursos finalizando esta semana
+    const terminando=porProg.filter(p=>p.fin&&p.fin>=hoy&&p.fin<=fin7b&&p.estado==="🔄 En Curso");
+    if(terminando.length>0) alertas.push({tipo:"⚠️ Cursos finalizando",detalle:`${terminando.length} programa(s) terminan esta semana: ${terminando.slice(0,2).map(p=>p.nombre.slice(0,25)).join(", ")}`,prioridad:"Alta"});
+    // 2. Sin profesor
+    const sinProf=rows.filter(r=>!r.profesor||r.profesor===""||r.profesor.toUpperCase()==="POR DEFINIR");
+    if(sinProf.length>0) alertas.push({tipo:"👨‍🏫 Sin Profesor",detalle:`${sinProf.length} sesiones sin docente asignado`,prioridad:"Media"});
+    // 3. Sin sala
+    const sinSala=rows.filter(r=>!r.sala||r.sala===""||r.sala.toUpperCase()==="POR ASIGNAR");
+    if(sinSala.length>0) alertas.push({tipo:"🏢 Sin Sala",detalle:`${sinSala.length} sesiones sin sala asignada`,prioridad:"Media"});
+    // 4. Días críticos (coord con >2 programas en un día — igual a Streamlit)
+    const cargaDiariaMap={};
+    for(const r of rows){
+      const k=`${r.coord}||${r.fecha.getFullYear()}-${r.fecha.getMonth()}-${r.fecha.getDate()}`;
+      if(!cargaDiariaMap[k]) cargaDiariaMap[k]={coord:r.coord,fecha:r.fecha,progs:new Set()};
+      cargaDiariaMap[k].progs.add(r.programa);
+    }
+    const diasCriticos=Object.values(cargaDiariaMap).filter(d=>d.progs.size>2);
+    if(diasCriticos.length>0) alertas.push({tipo:"🔥 Días Críticos",detalle:`${diasCriticos.length} días con >2 programas simultáneos`,prioridad:"Alta"});
+    // 5. Sin sesiones próximas
+    if(sesProx7===0&&rows.length>0) alertas.push({tipo:"📅 Sin sesiones próximas",detalle:"No hay clases en los próximos 7 días",prioridad:"Media"});
+    if(alertas.length===0) alertas.push({tipo:"✅ Todo al día",detalle:"Sin alertas críticas detectadas",prioridad:"Ok"});
+    // Guardar para otros tabs
+    const sinProfesor=sinProf.length;
+    const sinSalaCount=sinSala.length;
+
+    // Próximas sesiones
+    const proximas=rows.filter(r=>r.fecha>=hoy).sort((a,b)=>a.fecha-b.fecha).slice(0,8);
+
+    // Por sede
+    const sedeMap={};
+    for(const r of rows){const s=r.sede||"Sin sede";if(!sedeMap[s]) sedeMap[s]={sede:s,sesiones:0,progs:new Set()};sedeMap[s].sesiones++;sedeMap[s].progs.add(r.programa);}
+    const porSede=Object.values(sedeMap).map(s=>({sede:s.sede,sesiones:s.sesiones,programas:s.progs.size})).sort((a,b)=>b.sesiones-a.sesiones);
+    // Por modalidad
+    const modMap={};
+    for(const r of rows){const m=r.modalidad||"Presencial";if(!modMap[m]) modMap[m]={modalidad:m,sesiones:0,progs:new Set()};modMap[m].sesiones++;modMap[m].progs.add(r.programa);}
+    const porMod=Object.values(modMap).map(m=>({modalidad:m.modalidad,sesiones:m.sesiones,programas:m.progs.size})).sort((a,b)=>b.sesiones-a.sesiones);
+    // Por día semana
+    const diasN=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+    const porDia=diasN.map((d,i)=>({dia:d,sesiones:rows.filter(r=>(r.fecha.getDay()===0?6:r.fecha.getDay()-1)===i).length}));
+    // Heatmap coord x dia
+    const heatCoordDia={};
+    for(const r of rows){const c=r.coord;const di=(r.fecha.getDay()===0?6:r.fecha.getDay()-1);const k=`${c}||${di}`;if(!heatCoordDia[k]) heatCoordDia[k]=0;heatCoordDia[k]++;}
+    // Carga/puntaje por coord × programa (sesiones/4 × factor_alumnos=1)
+    // Igual que Streamlit get_factor_alumnos con alumnos=0 → factor=1
+    const cargaPuntaje={}; // {coord: {puntaje, progs:[{nombre,sesiones,puntaje}]}}
+    for(const p of porProg){
+      const c=p.coord;
+      if(!cargaPuntaje[c]) cargaPuntaje[c]={puntaje:0,progs:[]};
+      const ps=(p.sesiones/4)*1.0; // factor_alumnos=1 por defecto
+      cargaPuntaje[c].puntaje+=ps;
+      cargaPuntaje[c].progs.push({nombre:p.nombre,sesiones:p.sesiones,puntaje:ps});
+    }
+    // Por programa y asignatura summary
+    const progAsigMap = {};
+    for (const r of rows) {
+      const p = r.programa;
+      const a = r.asig || "General";
+      if (!p || p === "nan") continue;
+      const key = `${p}||${a}`;
+      if (!progAsigMap[key]) progAsigMap[key] = { programa: p, asig: a, fechas: [], coord: r.coord };
+      progAsigMap[key].fechas.push(r.fecha);
+    }
+    const porProgAsig = Object.values(progAsigMap).map(i => {
+      const fs = i.fechas.sort((a,b) => a-b);
+      return { programa: i.programa, asig: i.asig, inicio: fs[0], fin: fs[fs.length-1], coord: i.coord };
+    }).sort((a,b) => a.programa.localeCompare(b.programa) || a.inicio - b.inicio);
+
+    // Carga mensual (Puntaje) 
+    const mensualMap = {}; // { key: score }
+    for(const r of rows){
+      const y=r.fecha.getFullYear(), m=r.fecha.getMonth(), c=r.coord;
+      const k=`${y}||${m}||${c}`;
+      mensualMap[k] = (mensualMap[k]||0) + 0.25; // 1 sesión = 0.25 pts (ses/4)
+    }
+    const rankMensual = Object.entries(mensualMap).map(([k,v]) => {
+      const parts=k.split("||");
+      return { year:Number(parts[0]), month:Number(parts[1]), coord:parts[2], puntaje:v };
+    });
+
+    const rankCarga=Object.entries(cargaPuntaje).map(([c,v])=>({coord:c,...v})).sort((a,b)=>b.puntaje-a.puntaje);
+    return {
+      rows, programas, coords, sesHoy, rowsHoy, sesProx7,
+      porMes, porCoord, porProg, porProgAsig, alertas, proximas,
+      porSede, porMod, porDia, heatCoordDia,
+      diasCriticos, sinProfesor, sinSalaCount, rankCarga, rankMensual,
+      cols:origKeys,
+      kFecha:m.fecha, kProg:m.programa, kCoord:m.coord, kSede:m.sede, kHorario:m.horario,
+      detectedAt
+    };
+  }catch(e){
+    return {error:"Error procesando: "+e.message};
+  }
+}
+
+const abrevProg = (s) => {
+  const m = { "MAGISTER": "Mag.", "DIPLOMADO": "Dipl.", "GESTION": "Gest.", "NEGOCIOS": "Neg.", "DIRECCION": "Dir.", "MARKETING": "Mkt.", "FINANZAS": "Fin." };
+  let r = String(s || "").toUpperCase();
+  for (const [k, v] of Object.entries(m)) r = r.replace(k, v);
+  return r.length > 35 ? r.slice(0, 33) + "…" : r;
+};
+
+// ── Componentes base ─────────────────────────────────────────────────────
+function KpiCard({icon,label,value,color="#0ea5e9", children}){
+  return(
+    <div className="kpi-card" style={{borderTop:`3px solid ${color}`, minHeight:105, display:"flex", flexDirection:"column"}}>
+      <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
+      <div style={{fontSize:26,fontWeight:800,color:"#f1f5f9",fontFamily:"monospace"}}>{String(value)}</div>
+      <div style={{fontSize:11,color:"#94a3b8",marginTop:2, flex:1}}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function DownloadButton({label, description, onClick, variant="blue", icon="📥"}){
+    const [status, setStatus] = React.useState("idle");
+    const colors = {
+        blue: {bg: "rgba(14,165,233,0.08)", border: "rgba(14,165,233,0.2)", hover: "rgba(14,165,233,0.15)", text: "#0ea5e9"},
+        teal: {bg: "rgba(45,212,191,0.08)", border: "rgba(45,212,191,0.2)", hover: "rgba(45,212,191,0.15)", text: "#2dd4bf"},
+        orange: {bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)", hover: "rgba(245,158,11,0.15)", text: "#f59e0b"},
+        red: {bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", hover: "rgba(239,68,68,0.15)", text: "#ef4444"}
+    };
+    const c = colors[variant] || colors.blue;
+    
+    // IMPORTANTE: Llamada síncrona para preservar el 'User Gesture' en Safari/Mac
+    const handleAction = () => {
+        try {
+            setStatus("downloading");
+            onClick(); // Ejecución inmediata
+            setStatus("success");
+            setTimeout(() => setStatus("idle"), 2000);
+        } catch (e) {
+            console.error(e);
+            setStatus("error");
+            setTimeout(() => setStatus("idle"), 3000);
+        }
+    };
+
+    return (
+        <div 
+            onClick={status === "idle" ? handleAction : null}
+            style={{
+                background: c.bg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 16px",
+                cursor: status === "idle" ? "pointer" : "wait", transition: "all 0.2s", display: "flex", flexDirection: "column", gap: 4,
+                opacity: status === "downloading" ? 0.7 : 1
+            }}
+            onMouseOver={e => status === "idle" && (e.currentTarget.style.background = c.hover)}
+            onMouseOut={e => status === "idle" && (e.currentTarget.style.background = c.bg)}
+        >
+            <div style={{display: "flex", alignItems:"center", justifyContent: "space-between"}}>
+                <span style={{fontSize: 12, fontWeight: 800, color: c.text, letterSpacing:0.5}}>
+                    {status === "downloading" ? "⏳ Generando..." : status === "success" ? "✅ ¡Listo!" : label}
+                </span>
+                <span style={{fontSize: 14}}>{status === "success" ? "👍" : icon}</span>
+            </div>
+            <div style={{fontSize: 10, color: "#64748b", lineHeight:1.2}}>
+                {status === "downloading" ? "Procesando datos..." : status === "error" ? "❌ Error de bloqueo" : description}
+            </div>
+        </div>
+    );
+}
+
+function BarH({data,lk,vk,color="#0ea5e9"}){
+  if(!data||!data.length) return <div style={{color:"#64748b",fontSize:13,padding:12}}>Sin datos detectados</div>;
+  const max=Math.max(...data.map(d=>Number(d[vk])||0),1);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {data.slice(0,12).map((d,i)=>(
+        <div key={i} style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:110,fontSize:11,color:"#e2e8f0",textAlign:"right",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:500}} title={d[lk]}>
+            {String(d[lk]||"").split(" ").slice(0,2).join(" ")}
+          </div>
+          <div style={{flex:1,background:"#0f172a",borderRadius:6,height:22,overflow:"hidden",border:"1px solid #33415555"}}>
+            <div style={{
+              height:"100%",
+              borderRadius:5,
+              width:`${((Number(d[vk])||0)/max)*100}%`,
+              background:`linear-gradient(90deg,${color},${color}cc)`,
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"flex-end",
+              paddingRight:8,
+              transition:"width 0.8s ease-out"
+            }}>
+              <span style={{fontSize:11,color:"white",fontWeight:800,textShadow:"0 1px 2px rgba(0,0,0,0.5)"}}>{d[vk]}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrendLine({data}){
+  if(!data) return null;
+  const max=Math.max(...data.map(d=>d.sesiones),1);
+  const w=100,h=60;
+  const pts=data.map((d,i)=>({x:(i/(data.length-1))*w,y:h-(d.sesiones/max)*(h-8)-4,...d}));
+  const pathD=pts.map((p,i)=>`${i===0?"M":"L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const areaD=`M0,${h} ${pts.map(p=>`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")} L${w},${h} Z`;
+  return(
+    <div>
+      <svg viewBox={`0 0 100 ${h}`} style={{width:"100%",height:60}} preserveAspectRatio="none">
+        <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.4"/>
+          <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0"/>
+        </linearGradient></defs>
+        <path d={areaD} fill="url(#tg)"/>
+        <path d={pathD} fill="none" stroke="#2dd4bf" strokeWidth="1.5"/>
+        {pts.filter(p=>p.sesiones>0).map((p,i)=><circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="2" fill="#2dd4bf"/>)}
+      </svg>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+        {data.filter((_,i)=>i%3===0).map(d=><span key={d.mes} style={{fontSize:10,color:"#64748b"}}>{d.mes.slice(0,3)}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function Badge({estado}){
+  const m={"🔄 En Curso":{c:"#f59e0b",bg:"rgba(245,158,11,.15)"},"✅ Finalizado":{c:"#10b981",bg:"rgba(16,185,129,.15)"},"📅 Planificado":{c:"#0ea5e9",bg:"rgba(14,165,233,.15)"}};
+  const cfg=m[estado]||{c:"#94a3b8",bg:"#334155"};
+  return <span style={{background:cfg.bg,color:cfg.c,border:`1px solid ${cfg.c}55`,borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>{estado}</span>;
+}
+
+function NoData({onUpload}){
+  const [drag, setDrag] = React.useState(false);
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDrag(false);
+    if(e.dataTransfer.files[0]) onUpload(e.dataTransfer.files[0]);
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"75vh",gap:24,textAlign:"center",padding:40}}>
+      <div 
+        onDragOver={e=>{e.preventDefault(); setDrag(true);}}
+        onDragLeave={()=>setDrag(false)}
+        onDrop={handleDrop}
+        style={{
+          width:320, height:320, borderRadius:"50%", background:drag?"rgba(14,165,233,.1)":"rgba(14,165,233,.03)",
+          border:`2px dashed ${drag?"#0ea5e9":"#334155"}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+          cursor:"pointer", transition:"all 0.3s", boxShadow:drag?"0 0 40px rgba(14,165,233,0.1)":"none"
+        }}
+        onClick={() => document.getElementById("main-upload").click()}
+      >
+        <div style={{fontSize:80, marginBottom:10, filter:drag?"drop-shadow(0 0 10px #0ea5e9)":"none", transition:"all 0.3s"}}>📁</div>
+        <div style={{fontSize:18, fontWeight:800, color:"#f1f5f9"}}>Cargar Archivo Excel</div>
+        <div style={{fontSize:13, color:"#94a3b8", marginTop:8}}>Arrastra tu planilla aquí o haz clic</div>
+        <input id="main-upload" type="file" hidden onChange={e => {if(e.target.files[0]) onUpload(e.target.files[0]);}} />
+      </div>
+
+      <div style={{fontSize:13,color:"#64748b",maxWidth:400,lineHeight:1.7}}>
+        <strong style={{color:"#0ea5e9"}}>Formátos aceptados:</strong> .xlsx, .xls, .csv<br/>
+        <span style={{fontSize:11}}>Asegúrate de incluir las columnas de Fechas, Programas y Coordinadoras.</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab Home ─────────────────────────────────────────────────────────────
+function TabHome({st, onUpload}){
+  if(!st) return <NoData onUpload={onUpload}/>;
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+        <KpiCard icon="📚" label="Total Sesiones"    value={st.rows.length.toLocaleString()} color="#0ea5e9"/>
+        <KpiCard icon="🎓" label="Programas"         value={st.programas.length}              color="#2dd4bf"/>
+        <KpiCard icon="📅" label="Clases Hoy" value={st.sesHoy} color="#f59e0b">
+          {st.rowsHoy && st.rowsHoy.length > 0 && (
+            <div style={{marginTop:8, borderTop:"1px solid #33415555", paddingTop:6, display:"flex", flexDirection:"column", gap:3}}>
+              {st.rowsHoy.slice(0, 3).map((r, i) => (
+                <div key={i} style={{fontSize:9, color:"#94a3b8", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:4}} title={r.programa}>
+                  <div style={{width:4, height:4, borderRadius:"50%", background:"#f59e0b"}}/>
+                  {abrevProg(r.programa)}
+                </div>
+              ))}
+              {st.rowsHoy.length > 3 && <div style={{fontSize:8, color:"#64748b", marginLeft:8}}>+ {st.rowsHoy.length - 3} más...</div>}
+            </div>
+          )}
+        </KpiCard>
+        <KpiCard icon="📆" label="Próximos 7 días"   value={st.sesProx7}                      color="#8b5cf6"/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10}}>🚨 Alertas Activas</div>
+          {st.alertas.map((a,i)=>{
+            const bord=a.prioridad==="Alta"?"#ef4444":a.prioridad==="Media"?"#f59e0b":"#10b981";
+            const bg=a.prioridad==="Alta"?"rgba(239,68,68,.07)":a.prioridad==="Media"?"rgba(245,158,11,.07)":"rgba(16,185,129,.06)";
+            return(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",borderRadius:8,marginBottom:6,background:bg,border:`1px solid ${bord}44`}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>{a.tipo}</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>{a.detalle}</div>
+                </div>
+                <span style={{fontSize:9,padding:"2px 6px",borderRadius:10,fontWeight:700,background:`${bord}22`,color:bord}}>{a.prioridad}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10}}>📈 Tendencia Mensual</div>
+          <TrendLine data={st.porMes}/>
+        </div>
+      </div>
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span>🎓 Resumen de Programas y Cursos</span>
+            <span style={{fontSize:10,color:"#64748b",fontWeight:400}}>{st.porProgAsig.length} cursos detectados</span>
+          </div>
+          <button className="btn btn-ghost btn-export-home" onClick={(e) => {
+                const clean = st.porProgAsig.map(p => ({
+                    Programa: p.programa,
+                    "Curso / Asignatura": p.asig,
+                    "Fecha Inicio": p.inicio ? p.inicio.toLocaleDateString('es-CL') : "N/A",
+                    "Fecha Término": p.fin ? p.fin.toLocaleDateString('es-CL') : "N/A",
+                    Coordinadora: p.coord
+                }));
+                exportToExcel(clean, "Resumen_Programas_Cursos.xlsx");
+            }} style={{fontSize:10,padding:"4px 10px",borderColor:"#10b98133",color:"#10b981",transition:"all 0.3s"}}>
+            📥 Exportar Excel
+          </button>
+        </div>
+        <div style={{maxHeight:400,overflowY:"auto",border:"1px solid #33415555",borderRadius:8}}>
+          <table className="table-base">
+            <thead style={{position:"sticky",top:0,zIndex:1,background:"#1e293b"}}><tr>
+              {["Programa","Curso / Asignatura","Inicio","Término","Coord."].map(h=><th key={h}>{h}</th>)}
+            </tr></thead>
+            <tbody>{st.porProgAsig.map((p,i)=>(
+              <tr key={i} style={{borderBottom:"1px solid #33415544"}}>
+                <td style={{color:"#f1f5f9",fontSize:10,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={p.programa}>{p.programa}</td>
+                <td style={{color:"#7dd3fc",fontSize:10,fontWeight:600}}>{p.asig}</td>
+                <td style={{color:"#10b981",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{p.inicio.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"2-digit"})}</td>
+                <td style={{color:"#f87171",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{p.fin.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"2-digit"})}</td>
+                <td style={{color:"#94a3b8",fontSize:9,whiteSpace:"nowrap"}}>{p.coord.includes(" ") ? p.coord.split(" ").slice(0,2).join(" ") : p.coord}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* CENTRO DE DESCARGAS (NUEVO v3.4) */}
+      <div className="card" style={{border:"1px solid rgba(14,165,233,0.15)"}}>
+        <div style={{fontSize:15, fontWeight:800, color:"#f1f5f9", marginBottom:16, display:"flex", alignItems:"center", gap:8}}>
+           <span>📥 Centro de Extracción Blindado</span>
+           <span style={{fontSize:10, padding:"2px 8px", borderRadius:10, background:"rgba(14,165,233,0.1)", color:"#0ea5e9"}}>v3.8</span>
+        </div>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:12}}>
+          <DownloadButton 
+            label="Base Completa (.xlsx)" 
+            onClick={() => exportToExcel(st.rows, `Base_Completa_UAI_${new Date().toISOString().slice(0,10)}.xlsx`)}
+            description="Descarga directa a Excel."
+            variant="blue"
+          />
+          <DownloadButton 
+            label="Copiar Todo (Plan B)" 
+            onClick={() => copyToClipboard(st.rows)}
+            description="Copia al portapapeles para pegar en Excel."
+            variant="teal"
+          />
+          <DownloadButton 
+            label="Resumen Pgs (.xlsx)" 
+            onClick={() => exportToExcel(
+              st.porProg.map(p => ({
+                Programa: p.nombre,
+                Coordinadora: p.coord,
+                Sesiones: p.sesiones,
+                Avance: `${p.avance}%`,
+                Estado: p.estado,
+                Inicio: p.inicio ? p.inicio.toISOString().slice(0,10) : "",
+                Término: p.fin ? p.fin.toISOString().slice(0,10) : ""
+              })), `Resumen_Programas_${new Date().toISOString().slice(0,10)}.xlsx`
+            )}
+            description="Descarga de métricas."
+            variant="orange"
+          />
+          <DownloadButton 
+            label="⚠️ Panel de Emergencia" 
+            onClick={() => showManualExtractions(st.rows)}
+            description="SI NADA FUNCIONA: Use esto para copiar manual."
+            variant="red"
+            icon="🚨"
+          />
+        </div>
+      </div>
+
+      <div className="card">
+        {st.proximas.length===0
+          ?<div style={{textAlign:"center",color:"#64748b",fontSize:12,padding:"16px 0"}}>No hay sesiones próximas</div>
+          :<table className="table-base">
+            <thead><tr>
+              {["Fecha","Horario","Programa","Coordinadora","Sede"].map(h=><th key={h}>{h}</th>)}
+            </tr></thead>
+            <tbody>{st.proximas.map((r,i)=>(
+              <tr key={i}>
+                <td style={{color:"#0ea5e9",fontWeight:600,whiteSpace:"nowrap"}}>{r.fecha.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})}</td>
+                <td style={{color:"#94a3b8"}}>{r.horario||"—"}</td>
+                <td style={{color:"#f1f5f9",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={r.programa}>{r.programa}</td>
+                <td style={{color:"#94a3b8",whiteSpace:"nowrap"}}>{r.coord}</td>
+                <td style={{color:"#64748b"}}>{r.sede||"—"}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── Tab Coordinadoras (mejorado con gráfico de intensidad)
+function TabCoord({st}){
+  if(!st) return <NoData/>;
+  const [sel,setSel]=useState("Todas");
+  const all=st.porCoord;
+  const filtered=sel==="Todas"?all:all.filter(c=>c.name===sel);
+  const total=n=>filtered.reduce((a,c)=>a+(c[n]||0),0);
+  // Intensidad diaria: días con >N programas
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const rows=sel==="Todas"?st.rows:st.rows.filter(r=>r.coord===sel);
+  const cargaDia={};
+  for(const r of rows){
+    const k=r.fecha.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit"});
+    if(!cargaDia[k]) cargaDia[k]={fecha:k,n:new Set(),rawDate:r.fecha};
+    cargaDia[k].n.add(r.programa);
+  }
+  const allDaysData=Object.values(cargaDia).map(d=>({fecha:d.fecha,nProgs:d.n.size,rawDate:d.rawDate}));
+  const diasData=[...allDaysData].sort((a,b)=>b.nProgs-a.nProgs).slice(0,15).sort((a,b)=>a.rawDate-b.rawDate);
+  const totalDiasCrit=allDaysData.filter(d=>d.nProgs>2).length;
+  const listDiasCrit=allDaysData.filter(d=>d.nProgs>2).sort((a,b)=>a.rawDate-b.rawDate);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {["Todas",...all.map(c=>c.name)].map(c=>(
+          <button key={c} className={`btn ${sel===c?"btn-primary":"btn-ghost"}`} onClick={()=>setSel(c)} title={c}>
+            {c === "Todas" ? "Todas" : (c.includes(" ") ? c.split(" ").slice(0,2).join(" ") : c)}
+          </button>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+        <KpiCard icon="📅" label="Sesiones"     value={total("sesiones")}    color="#0ea5e9"/>
+        <KpiCard icon="🎓" label="Programas"    value={total("programas")}   color="#2dd4bf"/>
+        <KpiCard icon="📆" label="Días Activos" value={total("diasActivos")} color="#8b5cf6"/>
+        <KpiCard icon="🔥" label="Días Críticos" value={totalDiasCrit} color={totalDiasCrit>0?"#ef4444":"#10b981"}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🏆 Sesiones por Coordinadora</div>
+          <BarH data={filtered} lk="name" vk="sesiones" color="#0ea5e9"/>
+        </div>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🎓 Programas por Coordinadora</div>
+          <BarH data={filtered} lk="name" vk="programas" color="#2dd4bf"/>
+        </div>
+      </div>
+      <div className="card" style={{marginTop:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>⚡ Intensidad de Programas por Día (Top 15 Busiest)</div>
+          <div style={{fontSize:10,color:"#64748b"}}>Ordenado cronológicamente</div>
+        </div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:8,height:140,padding:"24px 0 12px",borderBottom:"1px solid #33415555"}}>
+          {diasData.map((d,i)=>{
+            const maxN=Math.max(...diasData.map(x=>x.nProgs),1);
+            const h=Math.round((d.nProgs/maxN)*90);
+            const col=d.nProgs>2?"#ef4444":d.nProgs>1?"#f59e0b":"#0ea5e9";
+            return(
+              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,minWidth:0}}>
+                <span style={{fontSize:10,color:col,fontWeight:800,marginBottom:2}}>{d.nProgs}</span>
+                <div style={{
+                  width:"100%",
+                  height:h,
+                  background:`linear-gradient(180deg, ${col}, ${col}aa)`,
+                  borderRadius:"4px 4px 0 0",
+                  minHeight:6,
+                  transition:"all 0.3s",
+                  boxShadow:d.nProgs>2?`0 0 12px ${col}44`:"none"
+                }}/>
+                <span style={{fontSize:9,color:"#94a3b8",writingMode:"vertical-rl",transform:"rotate(180deg)",height:45,marginTop:6,fontWeight:500}}>{d.fecha}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:12,marginTop:8}}>
+          <span style={{fontSize:10,color:"#ef4444"}}>■ Crítico (&gt;2)</span>
+          <span style={{fontSize:10,color:"#f59e0b"}}>■ Cargado (2)</span>
+          <span style={{fontSize:10,color:"#0ea5e9"}}>■ Normal (1)</span>
+          {totalDiasCrit > 0 && <span style={{fontSize:10,color:"#ef4444",fontWeight:700}}>⚠ {totalDiasCrit} días críticos detectados</span>}
+        </div>
+      </div>
+      {totalDiasCrit > 0 && (
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#ef4444",marginBottom:10}}>🚨 Detalle Días Críticos ({totalDiasCrit})</div>
+          <table className="table-base">
+            <thead><tr><th>Fecha</th><th>Nº Programas</th></tr></thead>
+            <tbody>{listDiasCrit.slice(0,30).map((d,i)=>(
+              <tr key={i}><td style={{color:"#f1f5f9"}}>{d.rawDate.toLocaleDateString("es-CL",{weekday:'long', day:'2-digit', month:'long'})}</td><td style={{color:"#ef4444",fontWeight:700,textAlign:"center"}}>{d.nProgs}</td></tr>
+            ))}</tbody>
+          </table>
+          {totalDiasCrit > 30 && <div style={{fontSize:10,color:"#64748b",marginTop:8,textAlign:"center"}}>Mostrando los primeros 30 días críticos</div>}
+        </div>
+      )}
+
+      {/* Tabla Detallada por Coordinadora */}
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>📋 Detalle por Coordinadora</div>
+        <div style={{overflowX:"auto"}}>
+          <table className="table-base">
+            <thead>
+              <tr>
+                <th>Coordinadora</th>
+                <th>Sesiones</th>
+                <th>Programas</th>
+                <th>Días Activos</th>
+                <th>Carga (Pts)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c,i) => (
+                <tr key={i}>
+                  <td style={{color:"#f1f5f9", fontWeight:600}}>{c.name}</td>
+                  <td style={{color:"#0ea5e9", textAlign:"center", fontWeight:700}}>{c.sesiones}</td>
+                  <td style={{color:"#2dd4bf", textAlign:"center"}}>{c.programas}</td>
+                  <td style={{color:"#94a3b8", textAlign:"center"}}>{c.diasActivos}</td>
+                  <td style={{color:"#f59e0b", textAlign:"center", fontWeight:700}}>{(c.sesiones/4).toFixed(1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab Programas ─────────────────────────────────────────────────────────
+function TabProgramas({st}){
+  if(!st) return <NoData/>;
+  const [filtro,setFiltro]=useState("");
+  const data=(st.porProg||[]).filter(p=>p.nombre.toLowerCase().includes(filtro.toLowerCase()));
+  const encurso=(st.porProg||[]).filter(p=>p.estado==="🔄 En Curso").length;
+  const finaliz=(st.porProg||[]).filter(p=>p.estado==="✅ Finalizado").length;
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        <KpiCard icon="📚" label="Total Programas" value={st.programas.length} color="#0ea5e9"/>
+        <KpiCard icon="🔄" label="En Curso"        value={encurso}             color="#f59e0b"/>
+        <KpiCard icon="✅" label="Finalizados"     value={finaliz}             color="#10b981"/>
+      </div>
+      <div className="card">
+        <input value={filtro} onChange={e=>setFiltro(e.target.value)} placeholder="🔍 Buscar programa..." style={{width:"100%",marginBottom:12}}/>
+        {data.length===0
+          ?<div style={{textAlign:"center",color:"#64748b",fontSize:12,padding:16}}>Sin resultados</div>
+          :<table className="table-base">
+            <thead><tr>
+              {["Programa","Coordinadora","Estado","Progreso","Sesiones"].map(h=><th key={h}>{h}</th>)}
+            </tr></thead>
+            <tbody>{data.slice(0,60).map((p,i)=>(
+              <tr key={i}>
+                <td style={{color:"#f1f5f9",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={p.nombre}>{p.nombre}</td>
+                <td style={{color:"#94a3b8",whiteSpace:"nowrap"}}>{p.coord}</td>
+                <td><Badge estado={p.estado}/></td>
+                <td style={{minWidth:110}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{flex:1,background:"#334155",borderRadius:4,height:6,overflow:"hidden"}}>
+                      <div style={{height:"100%",borderRadius:4,width:`${p.avance}%`,background:p.avance>=100?"#10b981":p.avance>60?"#f59e0b":"#0ea5e9"}}/>
+                    </div>
+                    <span style={{fontSize:10,color:"#64748b",minWidth:30}}>{p.avance}%</span>
+                  </div>
+                </td>
+                <td style={{color:"#0ea5e9",textAlign:"center",fontWeight:700}}>{p.sesiones}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── Export Excel Function (Solución Profesional FileSaver + Binary) ───────
+function exportToExcel(rows, filename="export.xlsx"){
+  if(!rows || !rows.length) return alert("No hay datos para exportar");
+  if (typeof XLSX === 'undefined') return alert("Error crítico: La librería Excel no se cargó. Verifique su conexión a internet.");
+
+  try {
+    const cleanRows = rows.map(r => {
+      const newRow = {};
+      Object.keys(r).forEach(k => {
+        let val = r[k];
+        if (val instanceof Date) {
+          val = `${val.getFullYear()}-${String(val.getMonth()+1).padStart(2,'0')}-${String(val.getDate()).padStart(2,'0')}`;
+        }
+        newRow[k] = val;
+      });
+      return newRow;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(cleanRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Datos");
+    
+    // Método oficial writeFile: Automáticamente maneja el Blob y la descarga nativa
+    // Es el más compatible con Mac, Safari y dispositivos móviles.
+    XLSX.writeFile(wb, filename);
+    
+    console.log("Exportación gatillada vía XLSX.writeFile.");
+  } catch (e) {
+    console.error("Error crítico export:", e);
+    alert("No se pudo generar el Excel: " + e.message);
+  }
+}
+
+function copyToClipboard(rows) {
+  if(!rows || !rows.length) return alert("No hay datos para copiar");
+  try {
+    const headers = Object.keys(rows[0]);
+    const tsv = [headers.join("\t"), ...rows.map(row => headers.map(h => String(row[h]||"")).join("\t"))].join("\n");
+    
+    // Intento 1: API moderna (solo funciona en sitios seguros o localhost)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsv).then(() => {
+        alert("✅ ¡Copiado! Ahora abre Excel y presiona Pegar (Cmd+V).");
+      }).catch(err => copyFallback(tsv));
+    } else {
+      copyFallback(tsv);
+    }
+  } catch(e) {
+    alert("Error al copiar datos: " + e.message);
+  }
+}
+
+function copyFallback(text) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed"; 
+  textArea.style.left = "-999999px";
+  textArea.style.top = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    const success = document.execCommand('copy');
+    if(success) alert("✅ ¡Copiado con éxito! Ahora ve a Excel y presiona Pegar (Cmd+V).");
+    else throw new Error("Comando bloqueado");
+  } catch (err) {
+    showManualExtractions(null, text);
+  }
+  document.body.removeChild(textArea);
+}
+
+function showManualExtractions(rows, customText=null) {
+    const text = customText || (()=>{
+        const headers = Object.keys(rows[0]);
+        return [headers.join("\t"), ...rows.map(row => headers.map(h => String(row[h]||"")).join("\t"))].join("\n");
+    })();
+
+    const overlay = document.createElement("div");
+    overlay.id = "manual-copy-overlay";
+    overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.98); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; color:#f1f5f9; font-family:sans-serif;";
+    
+    overlay.innerHTML = `
+        <div style="background:#1e293b; padding:30px; border-radius:20px; border:1px solid #334155; width:100%; max-width:900px; max-height:90vh; overflow:hidden; box-shadow:0 30px 60px rgba(0,0,0,0.6); display:flex; flex-direction:column">
+            <h2 style="margin-bottom:12px; color:#f43f5e; display:flex; align-items:center; gap:10px">🚨 Panel de Extracción Manual (Solución Final)</h2>
+            <p style="font-size:14px; color:#94a3b8; margin-bottom:20px; line-height:1.5">
+                Su Mac/Navegador ha bloqueado las descargas automáticas por seguridad. Use esto para sacar sus datos manualmente:
+            </p>
+            <div style="background:rgba(14,165,233,0.05); padding:15px; border-radius:12px; border:1px solid rgba(14,165,233,0.2); margin-bottom:20px">
+                <p style="font-size:13px; color:#0ea5e9; font-weight:800; margin-bottom:8px">PASOS PARA EXCEL:</p>
+                <ol style="font-size:13px; color:#cbd5e1; padding-left:20px; line-height:1.4">
+                    <li>Haga clic abajo (el texto ya debería estar seleccionado en azul).</li>
+                    <li>Presione <b>Cmd + C</b> para copiar al portapapeles.</li>
+                    <li>Vaya a Excel y presione <b>Cmd + V</b> para pegar.</li>
+                </ol>
+            </div>
+            <textarea id="manual-text-area" readonly style="width:100%; flex:1; min-height:200px; background:#0f172a; color:#7dd3fc; border:1px solid #334155; border-radius:10px; padding:15px; font-family:monospace; font-size:10px; white-space:pre; overflow:auto; cursor:text">${text}</textarea>
+            <button onclick="document.body.removeChild(document.getElementById('manual-copy-overlay'))" 
+                    style="margin-top:20px; width:100%; padding:15px; background:#334155; color:white; border:none; border-radius:12px; cursor:pointer; font-weight:700; transition:background 0.2s">
+                Entendido, Cerrar Panel
+            </button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => {
+        const ta = document.getElementById('manual-text-area');
+        if(ta) { ta.focus(); ta.select(); }
+    }, 300);
+}
+
+// ── Tab Calendario ────────────────────────────────────────────────────────
+function TabCalendario({st}){
+  if(!st) return <NoData/>;
+  const now=new Date();
+  const [year,setYear]=useState(now.getFullYear());
+  const [month,setMonth]=useState(now.getMonth()+1);
+  const [tipoFiltro, setTipoFiltro]=useState("coord"); // "coord" o "sede"
+  const [filtro,setFiltro]=useState("Todas");
+
+  // Opciones filtro
+  const opciones = tipoFiltro==="coord" ? ["Todas",...st.coords] : ["Todas",...st.porSede.map(s=>s.sede)];
+
+  // Filtro
+  let rows = tipoFiltro==="coord"
+      ? (filtro==="Todas"?st.rows:st.rows.filter(r=>r.coord===filtro))
+      : (filtro==="Todas"?st.rows:st.rows.filter(r=>r.sede===filtro));
+
+  // Mes actual del calendario
+  const mesRows=useMemo(()=>rows.filter(r=>r.fecha.getFullYear()===year&&r.fecha.getMonth()===month-1),[rows,year,month]);
+
+  // Eventos por día
+  const eventsMap=useMemo(()=>{
+    const m={};
+    for(const r of mesRows){
+      const d=r.fecha.getDate();
+      if(!m[d]) m[d]=[];
+      m[d].push(r);
+    }
+    return m;
+  },[mesRows]);
+
+  // Calendario grid (lunes primero)
+  const getDaysGrid=()=>{
+    const firstDay=new Date(year,month-1,1).getDay();
+    const offset=(firstDay===0?6:firstDay-1);
+    const lastDay=new Date(year,month,0).getDate();
+    const grid=[];
+    let day=1-offset;
+    for(let w=0;w<6;w++){
+      const week=[];
+      for(let d=0;d<7;d++){week.push(day>0&&day<=lastDay?day:0);day++;}
+      grid.push(week);
+      if(day>lastDay) break;
+    }
+    return grid;
+  };
+
+  const grid=getDaysGrid();
+  const prevMonth=()=>{if(month===1){setMonth(12);setYear(y=>y-1);}else setMonth(m=>m-1);};
+  const nextMonth=()=>{if(month===12){setMonth(1);setYear(y=>y+1);}else setMonth(m=>m+1);};
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {/* Controles, Filtros y Botón de exportar */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,background:"#1e293b",padding:"10px 14px",borderRadius:12,border:"1px solid #334155"}}>
+        
+        {/* Controles de Mes */}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <button className="btn btn-ghost" onClick={prevMonth} style={{padding:"6px 12px",fontSize:13}}>‹ Mes Ant.</button>
+          <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",minWidth:140,textAlign:"center"}}>
+            {MESES[month-1]} {year}
+          </div>
+          <button className="btn btn-ghost" onClick={nextMonth} style={{padding:"6px 12px",fontSize:13}}>Mes Sig. ›</button>
+          <button className="btn btn-ghost" onClick={()=>{setYear(now.getFullYear());setMonth(now.getMonth()+1);}}>Ir a Hoy</button>
+        </div>
+
+        {/* Filtros dinámicos y Botones */}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <select value={tipoFiltro} onChange={e=>{setTipoFiltro(e.target.value);setFiltro("Todas");}} style={{background:"#0f172a",borderColor:"#334155"}}>
+            <option value="coord">Coordinadora</option>
+            <option value="sede">Sede</option>
+          </select>
+          <select value={filtro} onChange={e=>setFiltro(e.target.value)} style={{maxWidth:200,background:"#0f172a",borderColor:"#334155"}}>
+            {opciones.map(o=><option key={o} value={o}>{String(o).split(" ")[0]}</option>)}
+          </select>
+          <span style={{fontSize:12,color:"#10b981",fontWeight:700,marginLeft:8}}>{mesRows.length} sesiones</span>
+          
+          <button className="btn btn-primary" onClick={()=>exportToExcel(mesRows,`Calendario_${MESES[month-1]}_${year}.xlsx`)}
+            title="Descargar este mes como archivo Excel (.xlsx)"
+            style={{padding:"6px 14px",display:"flex",alignItems:"center",gap:4,boxShadow:"0 4px 12px rgba(14,165,233,0.3)"}}>
+            <span style={{fontSize:16}}>📊</span> Exportar Mes a Excel
+          </button>
+        </div>
+      </div>
+
+      {/* Calendario Grilla */}
+      <div className="apple-cal">
+        <div className="apple-grid-header">
+          {DIAS_CORTOS.map(d=><div key={d} className="apple-weekday">{d}</div>)}
+        </div>
+        <div className="apple-grid-body">
+          {grid.map((week,wi)=>week.map((day,di)=>{
+            if(!day) return <div key={`${wi}-${di}`} className="apple-cell" style={{background:"#0a0f1e"}}/>;
+            const isToday=day===now.getDate()&&month===now.getMonth()+1&&year===now.getFullYear();
+            const evts=(eventsMap[day]||[]).sort((a,b)=>a.horario.localeCompare(b.horario));
+            return(
+              <div key={`${wi}-${di}`} className="apple-cell" style={{background:isToday?"#1a2842":""}}>
+                <div className="apple-day-num">
+                  <span className={isToday?"apple-day-today":""} style={{color:isToday?"#fff":""}}>{day}</span>
+                </div>
+                {evts.slice(0,4).map((e,ei)=>(
+                  <div key={ei} className="evt-card">
+                    <div className="evt-time">{e.horario||""}</div>
+                    <div className="evt-prog" title={e.programa}>{abrevProg(e.programa)}</div>
+                    {e.asig&&<div className="evt-sub">{e.asig}</div>}
+                    <div className="evt-meta">
+                      {e.sala&&`📍${e.sala} `}{e.sede&&`🏢${e.sede.slice(0,8)}`}
+                    </div>
+                  </div>
+                ))}
+                {evts.length>4&&<div style={{fontSize:9,color:"#64748b",textAlign:"center"}}>+{evts.length-4} más</div>}
+              </div>
+            );
+          }))}
+        </div>
+      </div>
+
+      {/* Tabla detalle del mes debajo del calendario */}
+      {mesRows.length>0&&(
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span>📋 Agenda Detallada | {MESES[month-1]} {year}</span>
+          </div>
+          <div style={{overflowX:"auto"}}>
+            <table className="table-base">
+              <thead><tr>
+                {["Fecha","Horario","Programa","Asignatura","Profesor","Coord.","Sede","Sala"].map(h=><th key={h}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {[...mesRows].sort((a,b)=>a.fecha-b.fecha).map((r,i)=>(
+                  <tr key={i}>
+                    <td style={{color:"#0ea5e9",fontWeight:600,whiteSpace:"nowrap"}}>{r.fecha.toLocaleDateString("es-CL",{weekday:"short",day:"2-digit",month:"short"})}</td>
+                    <td style={{color:"#94a3b8",whiteSpace:"nowrap"}}>{r.horario||"—"}</td>
+                    <td style={{color:"#f1f5f9",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={r.programa}>{r.programa}</td>
+                    <td style={{color:"#94a3b8",maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.asig||"—"}</td>
+                    <td style={{color:"#94a3b8",whiteSpace:"nowrap"}}>{r.profesor||"—"}</td>
+                    <td style={{color:"#64748b",whiteSpace:"nowrap"}}>{r.coord.includes(" ") ? r.coord.split(" ").slice(0,2).join(" ") : r.coord}</td>
+                    <td style={{color:"#64748b"}}>{r.sede||"—"}</td>
+                    <td style={{color:"#64748b"}}>{r.sala||"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tab Columnas ──────────────────────────────────────────────────────────
+// ── Tab Kanban ────────────────────────────────────────────────────────────
+function TabKanban({st}){
+  if(!st) return <NoData/>;
+  const [estados,setEstados]=useState({});
+  const [busq,setBusq]=useState("");
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const configs=[{e:"📅 Planificado",c:"#3b82f6"},{e:"🔄 En Curso",c:"#f59e0b"},{e:"✅ Finalizado",c:"#10b981"},{e:"📝 Declarado",c:"#8b5cf6"}];
+  const getEstado=(p)=>{
+    if(estados[p.nombre]) return estados[p.nombre];
+    return p.estado;
+  };
+  const progs=(busq?st.porProg.filter(p=>p.nombre.toLowerCase().includes(busq.toLowerCase())):st.porProg);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="🔍 Buscar programa..." style={{flex:1,minWidth:200}}/>
+        <button className="btn btn-ghost" onClick={()=>setEstados({})}>↺ Reset</button>
+        {configs.map(cfg=>(<span key={cfg.e} style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:`${cfg.c}22`,color:cfg.c,border:`1px solid ${cfg.c}44`}}>{cfg.e} {progs.filter(p=>getEstado(p)===cfg.e).length}</span>))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        {configs.map(({e,c})=>(
+          <div key={e}>
+            <div style={{background:c,borderRadius:10,padding:"8px 12px",textAlign:"center",fontWeight:700,fontSize:12,color:"#fff",marginBottom:10}}>{e} · {progs.filter(p=>getEstado(p)===e).length}</div>
+            {progs.filter(p=>getEstado(p)===e).map((p,i)=>(
+              <div key={i} style={{background:"#1e2d3d",border:`1px solid #2d3f52`,borderLeft:`4px solid ${c}`,borderRadius:10,padding:"10px 12px",marginBottom:8}}>
+                <div style={{fontSize:11,color:"#e2e8f0",fontWeight:700,lineHeight:1.4,marginBottom:4}} title={p.nombre}>{p.nombre.length>45?p.nombre.slice(0,43)+"…":p.nombre}</div>
+                <div style={{fontSize:10,color:"#64748b",marginBottom:4}}>👩‍💼 {p.coord}</div>
+                <div style={{fontSize:10,color:"#38bdf8",marginBottom:6}}>📚 {p.sesiones} ses · {p.avance}% avance</div>
+                <div style={{background:"#0f172a",borderRadius:4,height:4,overflow:"hidden"}}><div style={{background:c,height:"100%",width:`${p.avance}%`}}/></div>
+                <div style={{display:"flex",gap:4,marginTop:8,flexWrap:"wrap"}}>
+                  {configs.filter(x=>x.e!==getEstado(p)).map(x=>(
+                    <button key={x.e} onClick={()=>setEstados(s=>({...s,[p.nombre]:x.e}))} style={{fontSize:9,padding:"1px 6px",borderRadius:8,background:`${x.c}22`,color:x.c,border:`1px solid ${x.c}44`,cursor:"pointer"}}>{x.e.split(" ")[0]}</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {progs.filter(p=>getEstado(p)===e).length===0&&<div style={{textAlign:"center",color:"#334155",fontSize:12,padding:20,border:"1px dashed #334155",borderRadius:10}}>Sin programas</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+// ── Tab Global ────────────────────────────────────────────────────────────
+function TabGlobal({st}){
+  if(!st) return <NoData/>;
+  const [selCoord,setSelCoord]=useState("Todas");
+  const rows=selCoord==="Todas"?st.rows:st.rows.filter(r=>r.coord===selCoord);
+  // Distribución por mes y coordinadora
+  const mesCoordMap={};
+  for(const r of rows){
+    const m=MESES[r.fecha.getMonth()];
+    const c=r.coord;
+    const k=`${m}||${c}`;
+    if(!mesCoordMap[k]) mesCoordMap[k]=0;
+    mesCoordMap[k]++;
+  }
+  const mesesConDatos=MESES.filter(m=>rows.some(r=>MESES[r.fecha.getMonth()]===m));
+  // Heatmap coord x dia
+  const diasC=["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  const heatData=st.coords.map(c=>diasC.map((_,di)=>st.heatCoordDia[`${c}||${di}`]||0));
+  const heatMax=Math.max(...heatData.flat(),1);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <select value={selCoord} onChange={e=>setSelCoord(e.target.value)}>
+          {["Todas",...st.coords].map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <span style={{fontSize:11,color:"#64748b"}}>{rows.length} sesiones</span>
+      </div>
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>📅 Distribución Mensual</div>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {mesesConDatos.map(mes=>{
+            const tot=rows.filter(r=>MESES[r.fecha.getMonth()]===mes).length;
+            const maxT=Math.max(...mesesConDatos.map(m=>rows.filter(r=>MESES[r.fecha.getMonth()]===m).length),1);
+            return(
+              <div key={mes} style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:80,fontSize:11,color:"#94a3b8",textAlign:"right"}}>{mes}</div>
+                <div style={{flex:1,background:"#334155",borderRadius:4,height:20,overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:4,width:`${(tot/maxT)*100}%`,background:"linear-gradient(90deg,#0ea5e9,#2dd4bf)",display:"flex",alignItems:"center",paddingLeft:6}}>
+                    <span style={{fontSize:11,color:"white",fontWeight:700}}>{tot}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🔥 Mapa de Calor Coordinadora × Día</div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{borderCollapse:"collapse",width:"100%"}}>
+            <thead><tr>
+              <th style={{padding:"4px 8px",fontSize:10,color:"#64748b"}}>Coord.</th>
+              {diasC.map(d=><th key={d} style={{padding:"4px 8px",fontSize:10,color:"#64748b",textAlign:"center"}}>{d}</th>)}
+            </tr></thead>
+            <tbody>{st.coords.map((c,ci)=>(
+              <tr key={c}>
+                <td style={{padding:"3px 8px",fontSize:10,color:"#94a3b8",whiteSpace:"nowrap"}}>{c.split(" ").slice(0,2).join(" ")}</td>
+                {diasC.map((_,di)=>{
+                  const v=st.heatCoordDia[`${c}||${di}`]||0;
+                  const int=Math.round((v/heatMax)*255);
+                  const bg=v===0?"#0f172a":`rgba(14,165,233,${(v/heatMax).toFixed(2)})`;
+                  return <td key={di} style={{padding:"3px 6px",textAlign:"center",background:bg,fontSize:11,color:v>0?"#fff":"#334155",fontWeight:700}}>{v||""}</td>;
+                })}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>📆 Sesiones por Día</div>
+          <BarH data={st.porDia} lk="dia" vk="sesiones" color="#8b5cf6"/>
+        </div>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🏢 Top Sedes</div>
+          <BarH data={st.porSede} lk="sede" vk="sesiones" color="#2dd4bf"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── Tab Analytics ─────────────────────────────────────────────────────────
+function TabAnalytics({st}){
+  if(!st) return <NoData/>;
+  const [busq,setBusq]=useState("");
+  const [selCoord,setSelCoord]=useState("Todas");
+  const [selYearCarga, setSelYearCarga] = useState(new Date().getFullYear());
+  
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const rows=selCoord==="Todas"?st.rows:st.rows.filter(r=>r.coord===selCoord);
+  const realizadas=rows.filter(r=>r.fecha<hoy).length;
+  const pendientes=rows.filter(r=>r.fecha>=hoy).length;
+  const tasa=rows.length>0?Math.round((realizadas/rows.length)*100):0;
+  const resultados=busq.length>=2?rows.filter(r=>{
+    const s=busq.toLowerCase();
+    return r.programa.toLowerCase().includes(s)||r.coord.toLowerCase().includes(s)||
+           r.sede.toLowerCase().includes(s)||r.profesor.toLowerCase().includes(s)||
+           r.asig.toLowerCase().includes(s);
+  }).slice(0,20):[];
+
+  const anosDisp = [...new Set(st.rankMensual.map(d=>d.year))].sort((a,b)=>b-a);
+  const dataCarga = st.rankMensual.filter(d=>d.year === Number(selYearCarga) && (selCoord==="Todas" || d.coord===selCoord));
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <select value={selCoord} onChange={e=>setSelCoord(e.target.value)} style={{minWidth:180}}>
+          {["Todas",...st.coords].map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <span style={{fontSize:11,color:"#64748b"}}>{rows.length} sesiones</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+        <KpiCard icon="📅" label="Planificadas" value={rows.length} color="#0ea5e9"/>
+        <KpiCard icon="✅" label="Realizadas" value={realizadas} color="#10b981"/>
+        <KpiCard icon="⏳" label="Pendientes" value={pendientes} color="#f59e0b"/>
+        <KpiCard icon="📈" label="Cumplimiento" value={`${tasa}%`} color="#8b5cf6"/>
+      </div>
+
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10}}>📊 Cumplimiento por Coordinadora</div>
+          {st.coords.map(c=>{
+            const cr=rows.filter(r=>r.coord===c);
+            const done=cr.filter(r=>r.fecha<hoy).length;
+            const pct=cr.length>0?Math.round((done/cr.length)*100):0;
+            return(
+              <div key={c} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <div style={{width:130,fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c}</div>
+                <div style={{flex:1,background:"#334155",borderRadius:4,height:18,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:pct>80?"#10b981":pct>50?"#f59e0b":"#ef4444",borderRadius:4,display:"flex",alignItems:"center",paddingLeft:6}}>
+                    <span style={{fontSize:10,color:"white",fontWeight:700}}>{pct>10?`${pct}%`:""}</span>
+                  </div>
+                </div>
+                <span style={{fontSize:11,color:"#64748b",minWidth:40}}>{done}/{cr.length}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10}}>🔍 Búsqueda Global</div>
+          <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar programa..." style={{width:"100%",marginBottom:12}}/>
+          {busq.length>=2 && resultados.length>0 && (
+            <div style={{maxHeight:150, overflowY:"auto"}}>
+              {resultados.map((r,i)=>(
+                <div key={i} style={{fontSize:10, padding:"4px 0", borderBottom:"1px solid #334155"}}>
+                  <span style={{color:"#0ea5e9"}}>{r.fecha.toLocaleDateString()}</span> · <strong>{r.programa.slice(0,30)}</strong> · <span style={{color:"#64748b"}}>{r.asig}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>📊 Análisis de Carga Mensual</div>
+          <select value={selYearCarga} onChange={e=>setSelYearCarga(e.target.value)} style={{padding:"2px 8px", fontSize:11}}>
+             {anosDisp.map(y=><option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        
+        <div style={{display:"flex", flexDirection:"column", gap:20}}>
+          {/* Gráfico de barras mensual de carga */}
+          <div style={{height:180, display:"flex", alignItems:"flex-end", gap:2, padding:"0 10px", borderBottom:"1px solid #334155"}}>
+            {MESES.map((m, idx) => {
+              const mesData = dataCarga.filter(d => d.month === idx);
+              const totalP = mesData.reduce((sum, d) => sum + d.puntaje, 0);
+              const maxP = Math.max(...st.rankMensual.filter(d=>d.year===Number(selYearCarga)).reduce((acc,d)=>{
+                 const k = d.month; acc[k]=(acc[k]||0)+d.puntaje; return acc;
+              },[]).filter(Boolean), 1);
+              
+              const h = (totalP / maxP) * 100;
+              return (
+                <div key={idx} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
+                  <div style={{width:"80%", height:`${Math.max(2, h)}%`, background:totalP>20?"#ef4444":"#0ea5e9", borderRadius:"4px 4px 0 0", transition:"height 0.3s", position:"relative"}} title={`${m}: ${totalP.toFixed(1)} pts`}>
+                    {totalP > 0 && <span style={{position:"absolute", top:-12, left:0, right:0, textAlign:"center", fontSize:8, color:"#94a3b8"}}>{totalP.toFixed(1)}</span>}
+                  </div>
+                  <span style={{fontSize:9, color:"#64748b"}}>{m.slice(0,3)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <table className="table-base" style={{width:"100%"}}>
+            <thead>
+              <tr>
+                <th>Coordinadora</th>
+                {MESES.slice(2, 11).map((m, i)=><th key={i} style={{fontSize:9}}>{m.slice(0,3)}</th>)}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {st.coords.filter(c => selCoord==="Todas" || c===selCoord).map(c => {
+                const meses = MESES.slice(2, 11).map((_, i) => {
+                  const val = st.rankMensual.find(d => d.coord === c && d.year === Number(selYearCarga) && d.month === (i+2));
+                  return val ? val.puntaje : 0;
+                });
+                const total = meses.reduce((a,b)=>a+b, 0);
+                if (total === 0) return null;
+                return (
+                  <tr key={c}>
+                    <td style={{fontSize:11, color:"#f1f5f9"}}>{c}</td>
+                    {meses.map((p, i) => (
+                      <td key={i} style={{textAlign:"center", fontSize:10, background: p > 2 ? "rgba(239,68,68,0.1)" : "transparent", color: p > 0 ? "#0ea5e9" : "#334155"}}>
+                        {p > 0 ? p.toFixed(1) : "—"}
+                      </td>
+                    ))}
+                    <td style={{textAlign:"center", fontWeight:800, color:"#10b981"}}>{total.toFixed(1)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── Tab Calidad/Sede ───────────────────────────────────────────────────────
+function TabCalidad({st}){
+  if(!st) return <NoData/>;
+  // Pie SVG simple
+  const PieSVG=({data,labelKey,valueKey})=>{
+    const total=data.reduce((s,d)=>s+(d[valueKey]||0),0)||1;
+    const colors=["#0ea5e9","#2dd4bf","#f59e0b","#8b5cf6","#ef4444","#10b981"];
+    let cum=0;
+    const slices=data.map((d,i)=>{
+      const pct=(d[valueKey]||0)/total;
+      const startAngle=cum*2*Math.PI;
+      cum+=pct;
+      const endAngle=cum*2*Math.PI;
+      const x1=50+45*Math.sin(startAngle),y1=50-45*Math.cos(startAngle);
+      const x2=50+45*Math.sin(endAngle),y2=50-45*Math.cos(endAngle);
+      const large=pct>0.5?1:0;
+      return {path:`M50,50 L${x1.toFixed(2)},${y1.toFixed(2)} A45,45 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`,color:colors[i%colors.length],label:d[labelKey],value:d[valueKey],pct:Math.round(pct*100)};
+    });
+    return(
+      <div style={{display:"flex",alignItems:"center",gap:16}}>
+        <svg viewBox="0 0 100 100" style={{width:130,height:130,flexShrink:0}}>
+          {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="#0f172a" strokeWidth="1"/>)}
+          <circle cx="50" cy="50" r="28" fill="#1e293b"/>
+          <text x="50" y="55" textAnchor="middle" fill="#f1f5f9" fontSize="14" fontWeight="bold">{total}</text>
+        </svg>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {slices.map((s,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}/>
+              <span style={{fontSize:11,color:"#f1f5f9"}}>{s.label}</span>
+              <span style={{fontSize:11,color:"#64748b"}}>{s.value} ({s.pct}%)</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🌐 Distribución por Modalidad</div>
+          <PieSVG data={st.porMod} labelKey="modalidad" valueKey="sesiones"/>
+          <table className="table-base" style={{marginTop:12}}>
+            <thead><tr><th>Modalidad</th><th>Sesiones</th><th>Programas</th></tr></thead>
+            <tbody>{st.porMod.map((r,i)=>(
+              <tr key={i}><td style={{color:"#f1f5f9"}}>{r.modalidad}</td><td style={{color:"#0ea5e9",textAlign:"center"}}>{r.sesiones}</td><td style={{color:"#64748b",textAlign:"center"}}>{r.programas}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🏢 Sesiones por Sede</div>
+          <BarH data={st.porSede.slice(0,10)} lk="sede" vk="sesiones" color="#2dd4bf"/>
+        </div>
+      </div>
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🧹 Calidad de Datos</div>
+        <table className="table-base">
+          <thead><tr><th>Campo</th><th>Total</th><th>Con dato</th><th>Faltantes</th><th>Calidad</th></tr></thead>
+          <tbody>{[
+            ["Programa","programa"],["Coordinadora","coord"],["Sede","sede"],["Horario","horario"],["Asignatura","asig"],["Profesor","profesor"],["Sala","sala"]
+          ].map(([label,key])=>{
+            const total=st.rows.length;
+            const conDato=st.rows.filter(r=>r[key]&&r[key]!=""&&r[key]!="nan"&&r[key]!="Sin programa"&&r[key]!="Sin coord").length;
+            const falt=total-conDato;
+            const pct=Math.round((conDato/total)*100)||0;
+            return(
+              <tr key={key}>
+                <td style={{color:"#f1f5f9"}}>{label}</td>
+                <td style={{color:"#64748b",textAlign:"center"}}>{total}</td>
+                <td style={{color:"#10b981",textAlign:"center"}}>{conDato}</td>
+                <td style={{color:falt>0?"#ef4444":"#10b981",textAlign:"center"}}>{falt}</td>
+                <td style={{minWidth:100}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{flex:1,background:"#334155",borderRadius:4,height:6}}><div style={{height:"100%",borderRadius:4,width:`${pct}%`,background:pct>80?"#10b981":pct>50?"#f59e0b":"#ef4444"}}/></div>
+                    <span style={{fontSize:10,color:"#64748b"}}>{pct}%</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+// ── Tab Comparativa ───────────────────────────────────────────────────────
+function TabComparativa({st}){
+  if(!st) return <NoData/>;
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const years=[...new Set(st.rows.map(r=>r.fecha.getFullYear()))].sort();
+  const [y1,setY1]=useState(years[years.length-1]||new Date().getFullYear());
+  const [y2,setY2]=useState(years[years.length-2]||years[0]||new Date().getFullYear()-1);
+  const rowsY1=st.rows.filter(r=>r.fecha.getFullYear()===y1);
+  const rowsY2=st.rows.filter(r=>r.fecha.getFullYear()===y2);
+  const delta=(a,b)=>b>0?((a-b)/b*100).toFixed(1):"N/A";
+  // Ranking coordinadoras con carga
+  const rankCoords=st.porCoord.map(c=>{
+    const realizadas=st.rows.filter(r=>r.coord===c.name&&r.fecha<hoy).length;
+    const pct=c.sesiones>0?Math.round((realizadas/c.sesiones)*100):0;
+    return{...c,realizadas,pct};
+  });
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:10}}>📊 Comparativa Año vs Año</div>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <select value={y1} onChange={e=>setY1(Number(e.target.value))} style={{flex:1}}>{years.map(y=><option key={y} value={y}>{y}</option>)}</select>
+            <select value={y2} onChange={e=>setY2(Number(e.target.value))} style={{flex:1}}>{years.map(y=><option key={y} value={y}>{y}</option>)}</select>
+          </div>
+          {[{label:"Sesiones",a:rowsY1.length,b:rowsY2.length},
+            {label:"Programas",a:new Set(rowsY1.map(r=>r.programa)).size,b:new Set(rowsY2.map(r=>r.programa)).size},
+            {label:"Profesores",a:new Set(rowsY1.map(r=>r.profesor).filter(Boolean)).size,b:new Set(rowsY2.map(r=>r.profesor).filter(Boolean)).size},
+            {label:"Días activos",a:new Set(rowsY1.map(r=>r.fecha.toDateString())).size,b:new Set(rowsY2.map(r=>r.fecha.toDateString())).size}
+          ].map(({label,a,b})=>(
+            <div key={label} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #334155"}}>
+              <span style={{color:"#94a3b8",fontSize:12}}>{label}</span>
+              <span style={{color:"#0ea5e9",fontSize:12,fontWeight:700}}>{a}</span>
+              <span style={{color:"#64748b",fontSize:12}}>{b} (anterior)</span>
+              <span style={{color:a>b?"#10b981":"#ef4444",fontSize:11,fontWeight:700}}>{a>b?"+":""}{delta(a,b)}%</span>
+            </div>
+          ))}
+        </div>
+        <div className="card">
+          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🏆 Ranking de Carga</div>
+          <BarH data={rankCoords} lk="name" vk="sesiones" color="#0ea5e9"/>
+        </div>
+      </div>
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>⚖️ Cumplimiento por Coordinadora</div>
+        <table className="table-base">
+          <thead><tr><th>Coordinadora</th><th>Sesiones</th><th>Programas</th><th>Días Activos</th><th>Realizadas</th><th>Cumplimiento</th></tr></thead>
+          <tbody>{rankCoords.map((c,i)=>(
+            <tr key={i}>
+              <td style={{color:"#f1f5f9",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</td>
+              <td style={{color:"#0ea5e9",textAlign:"center",fontWeight:700}}>{c.sesiones}</td>
+              <td style={{color:"#2dd4bf",textAlign:"center"}}>{c.programas}</td>
+              <td style={{color:"#64748b",textAlign:"center"}}>{c.diasActivos}</td>
+              <td style={{color:"#94a3b8",textAlign:"center"}}>{c.realizadas}</td>
+              <td style={{minWidth:100}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{flex:1,background:"#334155",borderRadius:4,height:8}}><div style={{height:"100%",borderRadius:4,width:`${c.pct}%`,background:c.pct>80?"#10b981":c.pct>50?"#f59e0b":"#ef4444"}}/></div>
+                  <span style={{fontSize:11,color:"#64748b",minWidth:35}}>{c.pct}%</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+function TabGestion({st, auth, setAuth, sim, setSim, excluidasSim, setExcluidasSim, fijasSim, setFijasSim, activeSubTab, setActiveSubTab}){
+  const [pass, setPass] = useState("");
+  const [busqSim, setBusqSim] = useState("");
+  const [mesFiltro, setMesFiltro] = useState(new Date().getMonth());
+  const [errorLogin, setErrorLogin] = useState(false);
+  const inputRef = useRef(null);
+  const PASS = "uai2024";
+
+  useEffect(() => {
+    if (!auth && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [auth]);
+
+  const handleSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (pass.trim().toLowerCase() === PASS) {
+      setAuth(true);
+      setErrorLogin(false);
+    } else {
+      setErrorLogin(true);
+      setPass("");
+      setTimeout(() => setErrorLogin(false), 2000);
+    }
+  };
+
+  if(!auth) return(
+    <div style={{display:"flex", justifyContent:"center", alignItems:"center", height:"60vh", padding:20}}>
+      <div className="card" style={{width:360, textAlign:"center", padding:30, border:"1px solid #334155", boxShadow:"0 20px 50px rgba(0,0,0,0.5)"}}>
+        <div style={{background:"linear-gradient(135deg,#0ea5e9,#2dd4bf)", width:60, height:60, borderRadius:15, display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, margin:"0 auto 20px", boxShadow:"0 10px 20px rgba(14,165,233,0.3)"}}>🔐</div>
+        <h2 style={{fontSize:20, fontWeight:800, color:"#f1f5f9", marginBottom:10}}>Área de Gestión</h2>
+        <p style={{fontSize:13, color:"#94a3b8", marginBottom:24}}>Ingrese su contraseña maestra para acceder a las herramientas de planificación administrativa.</p>
+        
+        <form onSubmit={handleSubmit} style={{display:"flex", flexDirection:"column", gap:12}}>
+          <div style={{position:"relative"}}>
+            <input 
+              ref={inputRef}
+              type="password" 
+              value={pass} 
+              onChange={e => setPass(e.target.value)}
+              placeholder="Contraseña..." 
+              style={{
+                width:"100%", 
+                padding:"12px 16px", 
+                textAlign:"center", 
+                fontSize:16, 
+                letterSpacing:4, 
+                borderColor: errorLogin ? "#ef4444" : "#334155",
+                background: "#0f172a"
+              }}
+            />
+            {errorLogin && <div style={{color:"#ef4444", fontSize:10, fontWeight:700, marginTop:6}}>❌ Contraseña incorrecta</div>}
+          </div>
+          <button type="submit" className="btn btn-primary" style={{width:"100%", height:45, fontSize:13, fontWeight:700}}>
+            Desbloquear Panel
+          </button>
+        </form>
+        
+        <div style={{marginTop:30, paddingTop:20, borderTop:"1px solid #334155", fontSize:11, color:"#64748b"}}>
+          UAI Postgrado Ejecutivos · Sistema de Planificación
+        </div>
+      </div>
+    </div>
+  );
+
+  const resetSim = () => {
+    if(!st) return;
+    const initial = {};
+    st.porProg.forEach(p => { initial[p.nombre] = p.coord; });
+    setSim(initial);
+  };
+
+  // Función de normalización robusta (Desarrollador Grade)
+  const norm = (s) => (s || "").toString().trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const autoBalance = () => {
+    if(!st) return;
+    
+    // 1. Normalización y Filtros base
+    const omitNorm = excluidasSim.map(c => norm(c));
+    const fijasNorm = fijasSim.map(c => norm(c));
+    const espNorm = ["Sin coord", "POR ASIGNAR", "Por definir", "N/A", "Sin programa", "None", "nan", ""].map(e => norm(e));
+
+    // Equipo Activo Real (Gente que NO está omitida y NO es placeholder)
+    const equipoActivo = st.coords.filter(c => {
+      const cn = norm(c);
+      return !omitNorm.includes(cn) && !espNorm.includes(cn);
+    });
+
+    // Receptores (Activos que NO están congelados/fijas)
+    const receptores = equipoActivo.filter(c => !fijasNorm.includes(norm(c)));
+
+    if (receptores.length === 0) return;
+
+    const newSim = {...sim};
+    const currentLoads = {};
+    const progsRepartir = [];
+
+    // Mapeo para normalización de nombres (Preservar nombres originales para el renderizado)
+    const coordMap = {};
+    st.coords.forEach(c => { 
+      currentLoads[c] = 0; 
+      coordMap[norm(c)] = c; 
+    });
+
+    // 2. Clasificación de Carga (Prioridad: Estado Simulado -> Original)
+    st.porProg.forEach(p => {
+      const resActual = (sim[p.nombre] || p.coord || "Sin coord");
+      const resNorm = norm(resActual);
+      
+      const isPlaceholder = espNorm.includes(resNorm);
+      
+      if (!isPlaceholder) {
+        // PERMANENCIA: Se queda con su responsable actual (Activa, Fija u Omitida)
+        newSim[p.nombre] = resActual;
+        const mappedName = coordMap[resNorm] || resActual;
+        if (currentLoads.hasOwnProperty(mappedName)) {
+          currentLoads[mappedName] += p.sesiones;
+        }
+      } else {
+        // ORFANDAD: El programa es huérfano, hay que repartirlo
+        progsRepartir.push(p);
+      }
+    });
+
+    // 3. Distribución Balanceada
+    progsRepartir.sort((a,b) => b.sesiones - a.sesiones).forEach(p => {
+      const bestCoord = receptores.reduce((a, b) => currentLoads[a] < currentLoads[b] ? a : b);
+      newSim[p.nombre] = bestCoord;
+      currentLoads[bestCoord] += p.sesiones;
+    });
+
+    setSim(newSim);
+  };
+
+  // HEADER DE GESTIÓN (Siempre visible si está autenticado)
+  const header = (
+    <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",marginBottom:16,background:"rgba(14,165,233,0.05)",padding:"10px 14px",borderRadius:12,border:"1px solid rgba(14,165,233,0.1)"}}>
+      <div style={{display:"flex",gap:8}}>
+        <button className={`btn ${activeSubTab==="analisis"?"btn-primary":"btn-ghost"}`} 
+          onClick={()=>setActiveSubTab("analisis")} style={{fontSize:11,padding:"6px 16px"}}>📊 Análisis Actual</button>
+        <button className={`btn ${activeSubTab==="simulador"?"btn-primary":"btn-ghost"}`} 
+          onClick={()=>{setActiveSubTab("simulador"); autoBalance();}} style={{fontSize:11,padding:"6px 16px"}}>🧩 Simulador Reasignación</button>
+        <button className={`btn ${activeSubTab==="mensual"?"btn-primary":"btn-ghost"}`} 
+          onClick={()=>setActiveSubTab("mensual")} style={{fontSize:11,padding:"6px 16px"}}>📅 Análisis Mensual</button>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <span style={{fontSize:10,color:"#0ea5e9",fontWeight:700,letterSpacing:1}}>SESIÓN ACTIVA</span>
+        <button className="btn btn-ghost" onClick={()=>setAuth(false)} style={{fontSize:11,padding:"6px 14px",borderColor:"#ef444433",color:"#ef4444"}}>🔒 Salir</button>
+      </div>
+    </div>
+  );
+
+  if(!st) return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {header}
+      <div className="card" style={{textAlign:"center",padding:40}}>
+        <div style={{fontSize:40,marginBottom:12}}>📂</div>
+        <div style={{fontSize:14,color:"#f1f5f9",fontWeight:700}}>Cargue un archivo para ver métricas</div>
+        <div style={{fontSize:11,color:"#64748b",marginTop:4}}>El panel de gestión requiere datos procesados.</div>
+      </div>
+    </div>
+  );
+
+  const calcCargaSim = () => {
+    const counts = {};
+    const omitNormList = excluidasSim.map(c => norm(c));
+    
+    st.coords.forEach(c => { counts[c] = 0; });
+    st.porProg.forEach(p => {
+      const coord = sim[p.nombre] || p.coord;
+      if(!counts[coord]) counts[coord] = 0;
+      counts[coord] += p.sesiones;
+    });
+
+    return st.coords.map(c => {
+      const rcFound = st.rankCarga.find(rc => rc.coord === c);
+      const originalP = rcFound ? rcFound.puntaje : 0;
+      return {
+        name: c,
+        puntaje: (counts[c] || 0) / 4,
+        original: originalP
+      };
+    }).filter(c => !omitNormList.includes(norm(c.name)))
+      .sort((a,b) => b.puntaje - a.puntaje);
+  };
+
+  const cargaSim = calcCargaSim();
+  const maxPSim = Math.max(...cargaSim.map(c => Math.max(c.puntaje, c.original)), 0) || 1;
+  const progsSim = st.porProg.filter(p => {
+    const isOmitida = excluidasSim.some(e => e.trim().toUpperCase() === (sim[p.nombre] || p.coord).trim().toUpperCase());
+    return !isOmitida && p.nombre.toLowerCase().includes(busqSim.toLowerCase());
+  });
+  const maxPActual = Math.max(...st.rankCarga.map(r=>r.puntaje),1);
+
+  const valRows=[
+    {campo:"Sin profesor",  count:st.sinProfesor,  color:"#f59e0b"},
+    {campo:"Sin sala",      count:st.sinSalaCount, color:"#f59e0b"},
+    {campo:"Días críticos", count:st.diasCriticos.length, color:"#ef4444"},
+    {campo:"Sin programa",  count:st.rows.filter(r=>r.programa==="Sin programa").length, color:"#ef4444"},
+    {campo:"Sin coordinadora",count:st.rows.filter(r=>r.coord==="Sin coord").length, color:"#ef4444"},
+  ];
+
+  const rowsMes = st.rows.filter(r => r.fecha.getMonth() === Number(mesFiltro));
+  const omitNormList = excluidasSim.map(c => norm(c));
+  const loadMesCoord = st.coords.filter(c => !omitNormList.includes(norm(c))).map(c => {
+    const ses = rowsMes.filter(r => r.coord === c).length;
+    return { name: c, sesiones: ses };
+  }).sort((a,b) => b.sesiones - a.sesiones);
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {header}
+
+      {activeSubTab === "mensual" && (
+        <div style={{display:"flex", flexDirection:"column", gap:12}}>
+          <div className="card" style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+            <div style={{fontSize:13, fontWeight:700, color:"#f1f5f9"}}>📊 Carga Mensual por Coordinadora</div>
+            <select value={mesFiltro} onChange={e=>setMesFiltro(Number(e.target.value))} 
+              style={{padding:"4px 12px", borderRadius:8, background:"#1e293b", color:"#fff", border:"1px solid #334155", fontSize:12, cursor:"pointer"}}>
+              {MESES.map((m,i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+          </div>
+          
+          <div className="card">
+            <div style={{fontSize:11, color:"#94a3b8", marginBottom:16}}>Visualización de registros filtrados para <strong>{MESES[Number(mesFiltro)] || "Seleccione..."}</strong></div>
+            <div style={{display:"flex", flexDirection:"column", gap:10}}>
+              {loadMesCoord.map((lc, i) => {
+                const maxSes = Math.max(...loadMesCoord.map(x=>x.sesiones), 1);
+                const pct = (lc.sesiones / maxSes) * 100;
+                return (
+                  <div key={i} style={{display:"flex", alignItems:"center", gap:12}}>
+                    <div style={{width:130, fontSize:11, color:"#f1f5f9", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={lc.name}>{lc.name}</div>
+                    <div style={{flex:1, height:22, background:"#0f172a", borderRadius:11, overflow:"hidden", position:"relative"}}>
+                      <div style={{height:"100%", width:`${pct}%`, background:lc.sesiones > 20 ? "linear-gradient(90deg, #ef4444, #f87171)" : "linear-gradient(90deg, #0ea5e9, #2dd4bf)", borderRadius:11, transition:"width 0.6s cubic-bezier(0.4, 0, 0.2, 1)"}}/>
+                      <div style={{position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"flex-end", paddingRight:12, fontSize:10, fontWeight:800, color:"#fff", textShadow:"0 1px 2px rgba(0,0,0,0.5)"}}>
+                        {lc.sesiones} ses
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === "analisis" && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div className="card">
+              <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>⚖️ Carga por Coordinadora</div>
+              {st.rankCarga.filter(c => !omitNormList.includes(norm(c.coord))).map((c,i)=>{
+                const pct=Math.round((c.puntaje/maxPActual)*100);
+                const col=pct>80?"#ef4444":pct>60?"#f59e0b":"#10b981";
+                return(
+                  <div key={i} style={{marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                      <span style={{fontSize:11,color:"#f1f5f9"}}>{c.coord}</span>
+                      <span style={{fontSize:11,color:col,fontWeight:700}}>{c.puntaje.toFixed(1)} pts</span>
+                    </div>
+                    <div style={{background:"#334155",borderRadius:4,height:8}}><div style={{height:"100%",borderRadius:4,width:`${pct}%`,background:col}}/></div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="card">
+              <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🧹 Calidad de Datos</div>
+              <table className="table-base">
+                <thead><tr><th>Problema</th><th>Cant.</th><th>Estado</th></tr></thead>
+                <tbody>{valRows.map((r,i)=>(
+                  <tr key={i}>
+                    <td>{r.campo}</td>
+                    <td style={{color:r.count>0?r.color:"#10b981",fontWeight:700,textAlign:"center"}}>{r.count}</td>
+                    <td style={{textAlign:"center"}}>{r.count>0?"⚠":"✅"}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+          <div className="card">
+            <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>📊 Detalles de Asignación Actual</div>
+            <div style={{maxHeight:400,overflowY:"auto"}}>
+              <table className="table-base">
+                <thead style={{position:"sticky",top:0,zIndex:5,background:"#1e2d3d"}}>
+                  <tr><th>Coordinadora</th><th>Programa</th><th>Pts</th></tr>
+                </thead>
+                <tbody>{st.rankCarga.filter(c => !omitNormList.includes(norm(c.coord))).map(c => 
+                  c.progs.map((p,idx) => (
+                    <tr key={`${c.coord}-${idx}`}>
+                      {idx===0?<td rowSpan={c.progs.length} style={{color:"#0ea5e9",fontWeight:700,verticalAlign:"top",paddingTop:8}}>{c.coord}</td>:null}
+                      <td>{p.nombre}</td>
+                      <td style={{textAlign:"center",fontWeight:700}}>{p.puntaje.toFixed(1)}</td>
+                    </tr>
+                  ))
+                ).reduce((acc, val) => acc.concat(val), [])}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === "simulador" && (
+        <div style={{display:"grid",gridTemplateColumns:"1.2fr 1.8fr",gap:12}}>
+          <div className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>📊 Simulador de Impacto</div>
+              <div style={{display:"flex",gap:6}}>
+                <button className="btn btn-ghost" onClick={autoBalance} style={{fontSize:10,padding:"2px 10px",borderColor:"#10b98133",color:"#10b981"}}>🪄 Auto-Equilibrar</button>
+                <button className="btn btn-ghost" onClick={resetSim} style={{fontSize:10,padding:"2px 8px"}}>↺ Reset</button>
+              </div>
+            </div>
+
+            <div style={{background:"rgba(14,165,233,0.03)", padding:12, borderRadius:12, border:"1px solid rgba(14,165,233,0.1)", marginBottom:16}}>
+              <div style={{fontSize:11, fontWeight:700, color:"#0ea5e9", marginBottom:10}}>⚙️ Configuración del Simulador</div>
+              
+              <div style={{display:"flex", flexDirection:"column", gap:10}}>
+                <div>
+                  <div style={{fontSize:10, color:"#94a3b8", marginBottom:4}}>🚪 OMITIR (Fuera del Simulador - No participan / Conservan su carga)</div>
+                  <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
+                    {st.coords.map(c => (
+                      <label key={c} style={{display:"flex", alignItems:"center", gap:4, fontSize:10, background:excluidasSim.includes(c)?"#ef444422":"#0f172a", padding:"2px 8px", borderRadius:4, cursor:"pointer", border:excluidasSim.includes(c)?"1px solid #ef444444":"1px solid #334155"}}>
+                        <input type="checkbox" checked={excluidasSim.includes(c)} onChange={()=>{
+                          if(excluidasSim.includes(c)) setExcluidasSim(excluidasSim.filter(x=>x!==c));
+                          else { setExcluidasSim([...excluidasSim, c]); setFijasSim(fijasSim.filter(x=>x!==c)); }
+                        }} />
+                        {c}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{fontSize:10, color:"#94a3b8", marginBottom:4}}>📌 FIJAS (Congeladas - No cambian su carga)</div>
+                  <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
+                    {st.coords.map(c => {
+                      const isFuera = excluidasSim.some(e => e.trim().toUpperCase() === c.trim().toUpperCase());
+                      const isFija = fijasSim.some(f => f.trim().toUpperCase() === c.trim().toUpperCase());
+                      return (
+                        <label key={c} style={{display:"flex", alignItems:"center", gap:4, fontSize:10, background:isFija?"#f59e0b22":"#0f172a", padding:"2px 8px", borderRadius:4, cursor:"pointer", border:isFija?"1px solid #f59e0b44":"1px solid #334155", opacity:isFuera?0.5:1}}>
+                          <input type="checkbox" disabled={isFuera} checked={isFija} onChange={()=>{
+                            if(isFija) setFijasSim(fijasSim.filter(x=>x.trim().toUpperCase() !== c.trim().toUpperCase()));
+                            else setFijasSim([...fijasSim, c]);
+                          }} />
+                          {c}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Gráfico Radar de Equilibrio */}
+            {cargaSim.length >= 3 && (
+              <div style={{padding:"10px 0",background:"rgba(14,165,233,0.03)",borderRadius:12,marginBottom:16,border:"1px solid rgba(14,165,233,0.08)"}}>
+                <div style={{textAlign:"center",fontSize:10,color:"#94a3b8",marginBottom:4,fontWeight:700}}>EQUILIBRIO DE CARGA (PROMEDIO: {(cargaSim.reduce((a,b)=>a+b.puntaje,0)/cargaSim.length).toFixed(1)} pts)</div>
+                <div style={{display:"flex",justifyContent:"center",position:"relative"}}>
+                  <svg viewBox="0 0 100 100" style={{width:220,height:180}}>
+                    {/* Grid de círculos */}
+                    {[0.2, 0.4, 0.6, 0.8, 1].map(lvl => (
+                      <circle key={lvl} cx="50" cy="50" r={lvl*40} fill="none" stroke="#334155" strokeWidth="0.5" strokeDasharray="2,2" />
+                    ))}
+                    {/* Ejes */}
+                    {cargaSim.map((_, i) => {
+                      const ang = (i / cargaSim.length) * 2 * Math.PI;
+                      return <line key={i} x1="50" y1="50" x2={50 + 40 * Math.sin(ang)} y2={50 - 40 * Math.cos(ang)} stroke="#334155" strokeWidth="0.5" />;
+                    })}
+                    {/* Polígono Original */}
+                    <polygon points={cargaSim.map((c, i) => {
+                      const ang = (i / cargaSim.length) * 2 * Math.PI;
+                      const r = Math.min(1, (c.original / maxPSim)) * 40;
+                      return `${(50 + r * Math.sin(ang)).toFixed(1)},${(50 - r * Math.cos(ang)).toFixed(1)}`;
+                    }).join(" ")} fill="rgba(148,163,184,0.1)" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3,2" />
+                    {/* Polígono Simulado */}
+                    <polygon points={cargaSim.map((c, i) => {
+                      const ang = (i / cargaSim.length) * 2 * Math.PI;
+                      const r = Math.min(1, (c.puntaje / maxPSim)) * 40;
+                      return `${(50 + r * Math.sin(ang)).toFixed(1)},${(50 - r * Math.cos(ang)).toFixed(1)}`;
+                    }).join(" ")} fill="rgba(14,165,233,0.2)" stroke="#0ea5e9" strokeWidth="1.5" style={{transition:"all 0.4s"}} />
+                  </svg>
+                  <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",justifyContent:"center",gap:12,fontSize:9}}>
+                    <span style={{color:"#94a3b8"}}>--- Original</span>
+                    <span style={{color:"#0ea5e9"}}>▬ Simulado</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Gráfico de Barras Comparativo */}
+            <div style={{padding:"14px", background:"rgba(15,23,42,0.3)", borderRadius:12, marginBottom:16, border:"1px solid #334155"}}>
+              <div style={{fontSize:11, fontWeight:800, color:"#f1f5f9", marginBottom:15, display:"flex", alignItems:"center", gap:6}}>
+                <span>📈 Distribución de Carga: Original vs Simulado</span>
+              </div>
+              <div style={{height:100, display:"flex", alignItems:"flex-end", gap:8, paddingBottom:5}}>
+                {cargaSim.map((c, i) => {
+                  const hSim = Math.min(100, (c.puntaje / maxPSim) * 100);
+                  const hOri = Math.min(100, (c.original / maxPSim) * 100);
+                  return (
+                    <div key={i} style={{flex:1, height:"100%", display:"flex", flexDirection:"column", gap:2, justifyContent:"flex-end", position:"relative"}}>
+                      <div style={{width:"100%", display:"flex", justifyContent:"center", alignItems:"flex-end", gap:2, height:"100%"}}>
+                         {/* Original */}
+                         <div style={{width:6, height:`${hOri}%`, background:"rgba(148,163,184,0.15)", borderRadius:"2px 2px 0 0", border:"1px solid rgba(148,163,184,0.3)"}} title="Original"/>
+                         {/* Simulado */}
+                         <div style={{width:6, height:`${hSim}%`, background:c.puntaje>8?"#ef4444":"#0ea5e9", borderRadius:"2px 2px 0 0", boxShadow:c.puntaje>8?"0 0 10px rgba(239,68,68,0.2)":"0 0 10px rgba(14,165,233,0.2)", transition:"height 0.3s"}} title="Simulado"/>
+                      </div>
+                      <div style={{fontSize:8, color:"#64748b", textAlign:"center", marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                        {c.name.split(" ")[0]}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex", gap:12, marginTop:10, justifyContent:"center"}}>
+                <div style={{display:"flex", alignItems:"center", gap:4}}><div style={{width:8, height:8, background:"rgba(148,163,184,0.3)", borderRadius:2}}/><span style={{fontSize:9, color:"#64748b"}}>Actual</span></div>
+                <div style={{display:"flex", alignItems:"center", gap:4}}><div style={{width:8, height:8, background:"#0ea5e9", borderRadius:2}}/><span style={{fontSize:9, color:"#64748b"}}>Simulado</span></div>
+              </div>
+            </div>
+            {/* Resumen de Cambios Automáticos */}
+            {Object.keys(sim).some(k => sim[k] !== st.porProg.find(p=>p.nombre===k)?.coord) && (
+              <div style={{marginBottom:16, background:"rgba(16,185,129,0.05)", padding:10, borderRadius:8, border:"1px solid rgba(16,185,129,0.1)"}}>
+                <div style={{fontSize:11, fontWeight:700, color:"#10b981", marginBottom:6}}>✅ Reasignaciones Sugeridas / Realizadas</div>
+                <div style={{maxHeight:120, overflowY:"auto", fontSize:10}}>
+                  {st.porProg.filter(p => {
+                    const isOmitida = excluidasSim.some(e => e.trim().toUpperCase() === p.coord.trim().toUpperCase());
+                    return !isOmitida && sim[p.nombre] && sim[p.nombre] !== p.coord;
+                  }).map(p => (
+                    <div key={p.nombre} style={{display:"flex", justifyContent:"space-between", padding:"2px 0", borderBottom:"1px solid #33415522"}}>
+                      <span style={{color:"#f1f5f9", maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{p.nombre}</span>
+                      <span style={{color:"#94a3b8"}}>{p.coord.split(" ")[0]} → <strong style={{color:"#10b981"}}>{sim[p.nombre].split(" ")[0]}</strong></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {cargaSim.map((c, i) => {
+              const pctSim = (c.puntaje / maxPSim) * 100;
+              const pctOri = (c.original / maxPSim) * 100;
+              const diff = c.puntaje - c.original;
+              return(
+                <div key={i} style={{marginBottom:12, paddingBottom:4, borderBottom:"1px solid #33415533"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+                    <span style={{color:"#f1f5f9"}}>{c.name}</span>
+                    <span style={{color:diff>0?"#ef4444":diff<0?"#10b981":"#94a3b8",fontWeight:700}}>
+                      {c.puntaje.toFixed(1)} {diff!==0 ? "(" + (diff>0?"+":"") + diff.toFixed(1) + ")" : ""}
+                    </span>
+                  </div>
+                  <div style={{height:10,position:"relative",background:"#334155",borderRadius:5,overflow:"hidden"}}>
+                    <div style={{position:"absolute",top:0,left:0,height:"100%",width:`${pctOri}%`,background:"rgba(255,255,255,0.05)",borderRight:"2px solid rgba(255,255,255,0.1)",zIndex:1}}/>
+                    <div style={{position:"absolute",top:0,left:0,height:"100%",width:`${pctSim}%`,background:c.puntaje>8?"#ef4444":c.puntaje>6?"#f59e0b":"#0ea5e9",transition:"width 0.3s",zIndex:2}}/>
+                  </div>
+                </div>
+              );
+            })}
+            <button className="btn btn-primary" style={{width:"100%",marginTop:12,height:38}} onClick={() => exportToExcel(
+              st.porProg.map(p => ({
+                Programa: p.nombre, Original: p.coord, Simulado: sim[p.nombre] || p.coord,
+                Sesiones: p.sesiones, Cambio: (sim[p.nombre] !== p.coord ? "SÍ" : "NO")
+              })), "Propuesta_Reasignacion_Carga.xlsx"
+            )}>📥 Descargar Propuesta Excel</button>
+          </div>
+          <div className="card" style={{display:"flex",flexDirection:"column"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>📋 Mesa de Control de Asignaciones</div>
+            <input value={busqSim} onChange={e=>setBusqSim(e.target.value)} placeholder="🔍 Buscar programa..." style={{width:"100%",marginBottom:10,fontSize:12,padding:8}}/>
+            <div style={{maxHeight:450,overflowY:"auto"}}>
+              <table className="table-base">
+                <thead style={{position:"sticky",top:0,zIndex:5,background:"#1e2d3d"}}>
+                  <tr><th>Programa</th><th>Responsable Actual / Nuevo</th></tr>
+                </thead>
+                <tbody>{progsSim.map((p, i) => (
+                  <tr key={i}>
+                    <td style={{fontSize:10,maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={p.nombre}>{p.nombre}</td>
+                    <td>
+                      <select value={sim[p.nombre] || p.coord} onChange={e => setSim({...sim, [p.nombre]: e.target.value})}
+                        style={{fontSize:10,padding:"2px 6px",width:"100%",background:sim[p.nombre] && sim[p.nombre] !== p.coord ? "rgba(245,158,11,0.1)" : "transparent",
+                               border:sim[p.nombre] && sim[p.nombre] !== p.coord ? "1px solid #f59e0b" : "1px solid #334155"}}>
+                        {st.coords.filter(c => {
+                          const cu = c.trim().toUpperCase();
+                          return !excluidasSim.map(ex => ex.trim().toUpperCase()).includes(cu) && 
+                                 !["Sin coord", "POR ASIGNAR", "Por definir", "N/A", "Sin programa", "None", "nan", ""].map(e => e.toUpperCase()).includes(cu);
+                        }).map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabColumnas({st,cols}){
+
+  return(
+    <div style={{display:"flex", flexDirection:"column", gap:20}}>
+      <div className="card">
+        <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:12}}>🔍 Diagnóstico de Columnas</div>
+        {st&&!st.error&&(
+          <>
+            {st.detectedAt>=0&&(
+              <div style={{fontSize:11,color:"#f59e0b",background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"8px 12px",marginBottom:10}}>
+                ⚠️ Header detectado en fila {st.detectedAt+1}
+              </div>
+            )}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+              {[["📅 DIAS/FECHAS",st.kFecha],["📚 PROGRAMA",st.kProg],["👩‍💼 COORDINADORA",st.kCoord]].map(([l,v])=>(
+                <div key={l} style={{background:"#0f172a",borderRadius:8,padding:"8px 12px",display:"flex",justifyContent:"space-between",gap:8}}>
+                  <span style={{fontSize:11,color:"#64748b"}}>{l}</span>
+                  <span style={{fontSize:11,color:v?"#10b981":"#ef4444",fontWeight:700}}>{v?`✓`:"❌"}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="card" style={{border:"1px solid #10b98144", background:"rgba(16,185,129,.03)"}}>
+        <div style={{fontSize:14,fontWeight:800,color:"#10b981",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+          <span>🚀 Guía para Compartir (Solución Definitiva)</span>
+        </div>
+        <p style={{fontSize:12, color:"#94a3b8", marginBottom:20, lineHeight:1.5}}>
+          Para que su jefatura vea el dashboard y el botón de Excel funcione con su nombre correcto, el archivo DEBE estar alojado en internet (Link HTTPS). Siga estos 3 pasos exactos:
+        </p>
+        
+        <div style={{display:"flex", flexDirection:"column", gap:16}}>
+          <div style={{background:"#0f172a", padding:12, borderRadius:12, border:"1px solid #334155"}}>
+            <div style={{color:"#0ea5e9", fontSize:11, fontWeight:800, marginBottom:4}}>1. PREPARACIÓN</div>
+            <div style={{fontSize:11, color:"#cbd5e1"}}>
+              En su Mac, cambie el nombre de este archivo de <code>Calendario_1.html</code> a <strong><code>index.html</code></strong>.
+            </div>
+          </div>
+
+          <div style={{background:"#0f172a", padding:12, borderRadius:12, border:"1px solid #334155"}}>
+            <div style={{color:"#0ea5e9", fontSize:11, fontWeight:800, marginBottom:4}}>2. CREAR CARPETA</div>
+            <div style={{fontSize:11, color:"#cbd5e1"}}>
+              Cree una carpeta nueva llamada <code>dashboard_uai</code> y meta su archivo <code>index.html</code> dentro.
+            </div>
+          </div>
+
+          <div style={{background:"#0f172a", padding:12, borderRadius:12, border:"1px solid #10b98144"}}>
+            <div style={{color:"#10b981", fontSize:11, fontWeight:800, marginBottom:4}}>3. EL LINK MÁGICO</div>
+            <div style={{fontSize:11, color:"#cbd5e1", lineHeight:1.4}}>
+              Abra <a href="https://app.netlify.com/drop" target="_blank" style={{color:"#10b981", textDecoration:"underline"}}>Netlify Drop</a> y arrastre la <strong>CARPETA COMPLETA</strong> allí. 
+              <br/><br/>
+              <strong>¿Por qué?</strong> Netlify solo acepta carpetas. Al subirla, le darán un link (ej: <code>uai-postgrado.netlify.app</code>). Ese es el link que debe enviarle a su jefa.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Sidebar con Íconos y App Layout ──────────────────────────────────────────
+function App(){
+  const [rawData,setRawData]=useState(null);
+  const [cols,setCols]=useState([]);
+  const [fileInfo,setFileInfo]=useState(null);
+  const [tab,setTab]=useState("home");
+  const [parseErr,setParseErr]=useState(null);
+  const [cat,setCat]=useState(0);
+  const [auth,setAuth]=useState(false);
+  const [sim, setSim] = useState({});
+  const [excluidasSim, setExcluidasSim] = useState([]);
+  const [fijasSim, setFijasSim] = useState([]);
+  const [activeSubTab, setActiveSubTab] = useState("analisis");
+  const [loading, setLoading] = useState(false);
+
+  // Pre-cargar excluidas con valores por defecto (Sin coord, etc)
+  useEffect(() => {
+    if (goodStats && goodStats.coords && excluidasSim.length === 0) {
+      const especiales = ["Sin coord", "POR ASIGNAR", "Por definir", "N/A", "Sin programa"];
+      const defaults = goodStats.coords.filter(c => especiales.some(e => c.toLowerCase().trim() === e.toLowerCase().trim()));
+      if (defaults.length > 0) setExcluidasSim(defaults);
+    }
+  }, [goodStats]);
+
+  // Categorías con iconos limpios
+  const cats=[
+    {icon:"📊", label:"Dashboard",tabs:[{id:"home",label:"🏠 Home"},{id:"coord",label:"👩‍💼 Coordinadoras"},{id:"comp",label:"📊 Comparativa"}]},
+    {icon:"📋", label:"Programas",tabs:[{id:"progs",label:"📋 Programas"},{id:"kanban",label:"📌 Kanban"},{id:"calidad",label:"🏫 Calidad"}]},
+    {icon:"📅", label:"Calendarios",tabs:[{id:"cal",label:"📅 Calendario"},{id:"global",label:"🌐 Global"}]},
+    {icon:"📈", label:"Analytics",tabs:[{id:"analytics",label:"📈 Analytics"}]},
+    {icon:"⚙️", label:"Gestión",tabs:[{id:"gestion",label:"⚙️ Gestión"}]},
+    {icon:"🔍", label:"Info",tabs:[{id:"cols",label:"🔍 Columnas"}]},
+  ];
+
+  const handleLoad=useCallback((data,name)=>{
+    setRawData(data);
+    setCols(data.length>0?Object.keys(data[0]):[]);
+    setFileInfo({name,rows:data.length,allRows:data});
+    setParseErr(null);
+    setTab("home");
+  },[]);
+
+  const processFile = (file) => {
+    if(!file) return;
+    setLoading(true); setParseErr(null);
+    const reader = new FileReader();
+    reader.onerror = () => { setParseErr("Error al leer archivo"); setLoading(false); };
+    reader.onload = e => {
+      try {
+        let data;
+        if(file.name.toLowerCase().endsWith(".csv")){
+          const wb = XLSX.read(e.target.result, {type:"string"});
+          data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:""});
+        } else {
+          const wb = XLSX.read(new Uint8Array(e.target.result), {type:"array"});
+          let combined = [];
+          for(const sn of wb.SheetNames){
+            try {
+              const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:""});
+              if(rows.length > 0){
+                const keys = Object.keys(rows[0]).map(k => k.toUpperCase());
+                if(keys.some(k => k.includes("FECHA") || k.includes("DIA"))) combined = combined.concat(rows);
+              }
+            } catch(e2){}
+          }
+          data = combined.length > 0 ? combined : XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:""});
+        }
+        if(!data || !data.length) throw new Error("Archivo vacío");
+        handleLoad(data, file.name);
+      } catch(ex){ setParseErr(ex.message); }
+      setLoading(false);
+    };
+    if(file.name.toLowerCase().endsWith(".csv")) reader.readAsText(file, "UTF-8");
+    else reader.readAsArrayBuffer(file);
+  };
+
+  const stats = useMemo(() => {
+    if(!rawData) return null;
+    try { return parseFile(rawData); }
+    catch(e) { return {error: "Error: " + e.message}; }
+  }, [rawData]);
+
+  const goodStats = stats && !stats.error ? stats : null;
+
+  useEffect(() => {
+    if(Object.keys(sim).length === 0 && goodStats && goodStats.porProg) {
+      const initial = {};
+      goodStats.porProg.forEach(p => { initial[p.nombre] = p.coord; });
+      setSim(initial);
+    }
+  }, [goodStats]);
+
+  return(
+    <div style={{height:"100vh",display:"flex",background:"#0f172a",overflow:"hidden"}}>
+      
+      {/* SIDEBAR LATERAL DE ICONOS */}
+      <div style={{width:64,background:"#1e293b",borderRight:"1px solid #334155",display:"flex",flexDirection:"column",alignItems:"center",padding:"20px 0",gap:16,flexShrink:0,zIndex:100,boxShadow:"4px 0 10px rgba(0,0,0,0.2)"}}>
+        <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#0ea5e9,#2dd4bf)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,marginBottom:20,boxShadow:"0 4px 12px rgba(14,165,233,0.3)"}}>🎓</div>
+        {cats.map((c,i)=>(
+          <button key={i} onClick={()=>{setCat(i); setTab(c.tabs[0].id);}}
+            title={c.label}
+            style={{
+              width:44, height:44, borderRadius:12, fontSize:20, cursor:"pointer", border:"none",
+              background:cat===i?"#334155":"transparent",
+              color:cat===i?"#0ea5e9":"#64748b",
+              transition:"all 0.2s",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              position:"relative"
+            }}>
+            {c.icon}
+            {cat===i && <div style={{position:"absolute",left:0,width:3,height:24,background:"#0ea5e9",borderRadius:"0 4px 4px 0"}}/>}
+          </button>
+        ))}
+
+        <div style={{marginTop:"auto", display:"flex", flexDirection:"column", gap:14, alignItems:"center"}}>
+          {fileInfo && (
+            <div style={{background:"rgba(15,23,42,0.4)", padding:12, borderRadius:16, border:"1px solid #334155", display:"flex", flexDirection:"column", gap:10, boxShadow:"0 4px 20px rgba(0,0,0,0.2)"}}>
+              <button onClick={()=>exportToExcel(fileInfo.allRows, `Calendario_UAI_${new Date().toISOString().slice(0,10)}.xlsx`)}
+                title="Exportar a Excel"
+                style={{width:40, height:40, borderRadius:10, background:"linear-gradient(135deg,#0ea5e9,#2dd4bf)", color:"#fff", border:"none", cursor:"pointer", fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", transition:"transform 0.2s"}}
+                onMouseOver={e=>e.currentTarget.style.transform="scale(1.05)"}
+                onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
+                📊
+              </button>
+              <button onClick={()=>{setCat(5); setTab("cols");}}
+                title="Compartir con Jefatura"
+                style={{width:40, height:40, borderRadius:10, background:"rgba(16,185,129,0.2)", color:"#10b981", border:"1px solid rgba(16,185,129,0.3)", cursor:"pointer", fontSize:20, display:"flex", alignItems:"center", justifyContent:"center", transition:"transform 0.2s"}}
+                onMouseOver={e=>e.currentTarget.style.transform="scale(1.05)"}
+                onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
+                🚀
+              </button>
+            </div>
+          )}
+          <div style={{fontSize:10, color:"#64748b", fontWeight:700}}>v3.8</div>
+        </div>
+      </div>
+
+      {/* CONTENIDO PRINCIPAL */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
+        
+        {/* HEADER SUPERIOR (Subtabs) */}
+        <div style={{background:"#1e293b",borderBottom:"1px solid #334155",padding:"0 20px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+            <span style={{fontSize:12,fontWeight:800,color:"#94a3b8",marginRight:16,textTransform:"uppercase",letterSpacing:1}}>{cats[cat].label}</span>
+            {cats[cat].tabs.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)}
+                style={{
+                  padding:"6px 16px",borderRadius:8,fontSize:11,cursor:"pointer",border:"none",
+                  background:tab===t.id?"rgba(14,165,233,.1)":"transparent",
+                  color:tab===t.id?"#0ea5e9":"#94a3b8",
+                  fontWeight:tab===t.id?700:500,
+                  transition:"all .2s"
+                }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            {auth && <button onClick={()=>{setAuth(false); setTab("home"); setCat(0);}} className="btn" style={{background:"#ef444422", color:"#ef4444", border:"1px solid #ef444444", padding:"4px 12px", fontSize:10}}>🔒 Cerrar Gestión</button>}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end"}}>
+              <span style={{fontSize:10,color:fileInfo?"#10b981":"#64748b",fontWeight:700}}>{fileInfo?"● EN LÍNEA":"○ SIN DATOS"}</span>
+              {fileInfo && <span style={{fontSize:9,color:"#64748b"}}>{fileInfo.name}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* ÁREA DE VISTA */}
+        <div style={{flex:1,overflow:"auto",padding:20,position:"relative"}}>
+          {loading && <div style={{position:"absolute",inset:0,background:"rgba(15,23,42,0.8)",zIndex:1000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+            <div style={{fontSize:40,animation:"spin 2s linear infinite"}}>⏳</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#0ea5e9"}}>Procesando Archivo...</div>
+          </div>}
+
+          {(parseErr||(stats&&stats.error))&&(
+            <div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:12,padding:16,marginBottom:20}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#ef4444",marginBottom:4}}>⚠️ Error en los datos</div>
+              <div style={{fontSize:12,color:"#94a3b8"}}>{parseErr||(stats&&stats.error)}</div>
+            </div>
+          )}
+
+          {tab==="home"     && <TabHome st={goodStats} onUpload={processFile}/>}
+          {tab==="cal"      && <TabCalendario st={goodStats}/>}
+          {tab==="coord"    && <TabCoord st={goodStats}/>}
+          {tab==="progs"    && <TabProgramas st={goodStats}/>}
+          {tab==="kanban"   && <TabKanban st={goodStats}/>}
+          {tab==="global"   && <TabGlobal st={goodStats}/>}
+          {tab==="analytics"&& <TabAnalytics st={goodStats}/>}
+          {tab==="calidad"  && <TabCalidad st={goodStats}/>}
+          {tab==="comp"     && <TabComparativa st={goodStats}/>}
+          {tab==="gestion"  && <TabGestion st={goodStats} auth={auth} setAuth={setAuth} sim={sim} setSim={setSim} excluidasSim={excluidasSim} setExcluidasSim={setExcluidasSim} fijasSim={fijasSim} setFijasSim={setFijasSim} activeSubTab={activeSubTab} setActiveSubTab={setActiveSubTab}/>}
+          {tab==="cols"     && <TabColumnas st={stats} cols={cols}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
