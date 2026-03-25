@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Módulo Docentes · UAI Postgrados</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables y reset ── */
+    :root{
+      --blue:#378ADD; --purple:#7F77DD; --teal:#1D9E75;
+      --bg:#F7F6F3; --surface:#FFFFFF;
+      --border:rgba(0,0,0,0.08); --border-sec:rgba(0,0,0,0.14);
+      --text:#1A1A1A; --muted:#6B6B6B; --subtle:#A0A0A0;
+      --border-radius-md:8px; --border-radius-lg:14px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem;}
+    .page{max-width:1200px;margin:0 auto;}
+
+    /* ── Header ── */
+    .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);}
+    .eyebrow{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;}
+    .h-title{font-size:26px;font-weight:300;letter-spacing:-.5px;}
+    .h-meta{font-family:'DM Mono',monospace;font-size:11px;color:var(--subtle);text-align:right;line-height:1.8;}
+    .h-meta strong{color:var(--muted);font-weight:500;}
+
+    /* ── Upload ── */
+    .upload-zone{border:1.5px dashed var(--border);border-radius:14px;padding:1.25rem;text-align:center;
+      background:var(--surface);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:1rem;}
+    .upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:#E6F1FB22;}
+    .upload-zone input{display:none;}
+    .upload-icon{width:26px;height:26px;margin:0 auto 7px;opacity:.25;}
+    .upload-title{font-size:13px;font-weight:500;margin-bottom:3px;}
+    .upload-sub{font-size:11px;color:var(--subtle);}
+    .upload-btn{display:inline-block;margin-top:8px;padding:5px 14px;background:var(--blue);color:white;
+      border-radius:7px;font-size:11px;font-weight:500;cursor:pointer;border:none;}
+    .file-status{display:none;align-items:center;gap:10px;padding:9px 14px;background:#E6F1FB;
+      border-radius:10px;margin-bottom:1rem;font-size:12px;color:#0C447C;}
+    .file-status.show{display:flex;}
+    .fsdot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;}
+    .sheet-tabs{display:none;flex-wrap:wrap;gap:6px;margin-bottom:1rem;}
+    .sheet-tabs.show{display:flex;}
+    .stab{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid var(--border);
+      background:var(--surface);color:var(--muted);cursor:pointer;transition:all .15s;}
+    .stab.active{background:var(--blue);color:white;border-color:var(--blue);}
+
+    /* ── Utilities ── */
+    .metric{background:var(--bg);border-radius:var(--border-radius-md);padding:.875rem;}
+    .metric-label{font-size:11px;color:var(--subtle);margin-bottom:3px;}
+    .metric-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;}
+    .metric-sub{font-size:10px;color:var(--subtle);margin-top:2px;}
+    .metric.hi{background:#E6F1FB;}
+    .metric.hi .metric-label{color:#185FA5;opacity:.8;}
+    .metric.hi .metric-val{color:#0C447C;}
+    .metric.hi .metric-sub{color:#185FA5;opacity:.7;}
+    .g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+    .prog-table-wrap{overflow-x:auto;border-radius:var(--border-radius-lg);border:1px solid var(--border);}
+    .prog-table{border-collapse:collapse;width:100%;font-size:12px;}
+    .prog-table th{background:var(--bg);padding:8px 12px;text-align:left;color:var(--subtle);font-weight:500;
+      font-size:10px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;}
+    .prog-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+    .prog-table tr:last-child td{border-bottom:none;}
+    .prog-table tr:hover td{background:#fafaf8;}
+
+    @media(max-width:700px){
+      body{padding:1rem;}
+      .g4{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .header{flex-direction:column;align-items:flex-start;gap:10px;}
+      #docGrid{grid-template-columns:1fr !important;}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="eyebrow">Historial docente · UAI Postgrados</div>
+      <div class="h-title">Módulo Docentes 2018–2026</div>
+    </div>
+    <div class="h-meta">
+      Fuente: <strong id="fname">sin archivo cargado</strong><br>
+      Unidades: <strong>EN · FIC</strong>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="upload-zone" id="dz" onclick="document.getElementById('fi').click()"
+       ondragover="dzEv(event,'drag')" ondragleave="dzEv(event,'')" ondrop="dzDrop(event)">
+    <input type="file" id="fi" accept=".xlsx,.xls,.csv" onchange="loadFile(this.files[0])">
+    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12V4M8 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="upload-title">Arrastra el archivo Excel aquí o haz clic para seleccionar</div>
+    <div class="upload-sub">Compatible con .xlsx · .xls · .csv &nbsp;·&nbsp; Lee todas las pestañas automáticamente</div>
+    <button class="upload-btn" onclick="event.stopPropagation();document.getElementById('fi').click()">Seleccionar archivo</button>
+  </div>
+  <div class="file-status" id="fstat"><div class="fsdot"></div><span id="fstatTxt"></span></div>
+  <div class="sheet-tabs" id="stabs"></div>
+
+  <!-- KPIs -->
+  <div class="g4" style="margin-bottom:1.5rem;">
+    <div class="metric"><div class="metric-label">Total docentes</div><div class="metric-val" id="kpi_doc_total">—</div><div class="metric-sub">EN + FIC · historial</div></div>
+    <div class="metric"><div class="metric-label">Activos en 2026</div><div class="metric-val" id="kpi_doc_2026">—</div><div class="metric-sub">secciones vigentes</div></div>
+    <div class="metric"><div class="metric-label">Activos en 2025</div><div class="metric-val" id="kpi_doc_2025">—</div><div class="metric-sub">periodo anterior</div></div>
+    <div class="metric hi"><div class="metric-label">Mayor carga</div><div class="metric-val" id="kpi_doc_top">—</div><div class="metric-sub" id="kpi_doc_top_nm">Carga el archivo Excel</div></div>
+  </div>
+
+  <!-- FILTROS -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;margin-bottom:1rem;">
+    <div style="font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:10px;">Filtros de búsqueda</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:10px;align-items:end;">
+      <div>
+        <div style="font-size:10px;font-weight:500;color:var(--subtle);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">RUT</div>
+        <input type="text" id="fRut" placeholder="ej. 12345678-9" oninput="applyFilters()"
+          style="width:100%;font-family:DM Mono,monospace;font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:500;color:var(--subtle);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Nombre</div>
+        <input type="text" id="fNombre" placeholder="ej. Ricardo" oninput="applyFilters()"
+          style="width:100%;font-family:DM Sans,sans-serif;font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:500;color:var(--subtle);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Apellido</div>
+        <input type="text" id="fApellido" placeholder="ej. Ubeda" oninput="applyFilters()"
+          style="width:100%;font-family:DM Sans,sans-serif;font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;">
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:500;color:var(--subtle);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Año</div>
+        <select id="fAnio" onchange="applyFilters()"
+          style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-family:DM Sans,sans-serif;font-size:12px;background:var(--bg);color:var(--text);cursor:pointer;">
+          <option value="">Todos</option>
+          <option>2026</option><option>2025</option><option>2024</option>
+          <option>2023</option><option>2022</option><option>2021</option>
+          <option>2020</option><option>2019</option><option>2018</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:500;color:var(--subtle);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">&nbsp;</div>
+        <button onclick="clearFilters()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);font-family:DM Sans,sans-serif;font-size:12px;background:var(--bg);color:var(--muted);cursor:pointer;">Limpiar</button>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--subtle);" id="docCount">Carga el archivo Excel para comenzar</div>
+  </div>
+
+  <!-- TABLA + DETALLE -->
+  <div id="docGrid" style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:12px;">
+    <div class="prog-table-wrap" style="max-height:560px;overflow-y:auto;">
+      <table class="prog-table">
+        <thead style="position:sticky;top:0;z-index:1;background:var(--bg);">
+          <tr>
+            <th>Nombre completo</th>
+            <th>RUT</th>
+            <th>Correo</th>
+            <th>Secc.</th>
+            <th>Años</th>
+          </tr>
+        </thead>
+        <tbody id="docBody"></tbody>
+      </table>
+    </div>
+    <div id="docDetail" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;min-height:320px;overflow-y:auto;max-height:560px;">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--subtle);font-size:13px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;opacity:.25;">👤</div>
+        Selecciona un docente para ver su historial completo
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+/* ── FILE UPLOAD ── */
+function dzEv(e,c){e.preventDefault();document.getElementById('dz').className='upload-zone '+c;}
+function dzDrop(e){e.preventDefault();dzEv(e,'');const f=e.dataTransfer.files[0];if(f)loadFile(f);}
+let wb=null;
+function loadFile(file){
+  if(!file)return;
+  document.getElementById('fname').textContent=file.name;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const data=new Uint8Array(e.target.result);
+    wb=XLSX.read(data,{type:'array'});
+    const sheets=wb.SheetNames;
+    const fs=document.getElementById('fstat');
+    fs.className='file-status show';
+    document.getElementById('fstatTxt').textContent=
+      file.name+' · '+sheets.length+' pestaña(s): '+sheets.join(' · ');
+    buildTabs(sheets);
+    // Auto-load first sheet that has docentes data
+    for(const s of sheets){
+      const ws=wb.Sheets[s];
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(loadDocentesFromSheet(data)){
+        document.querySelectorAll('.stab').forEach((t,i)=>t.classList.toggle('active',wb.SheetNames[i]===s));
+        break;
+      }
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function buildTabs(sheets){
+  const el=document.getElementById('stabs');
+  el.className='sheet-tabs show';
+  el.innerHTML=sheets.map((s,i)=>
+    `<div class="stab ${i===0?'active':''}" onclick="selTab(this,'${s.replace(/'/g,"\\'")}')">${s}</div>`
+  ).join('');
+}
+function selTab(el,name){
+  document.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const ws=wb.Sheets[name];
+  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  loadDocentesFromSheet(data);
+}
+
+/* ─── DOCENTES ─── */
+let DOCENTES_DATA = [];
+let docFiltered   = [];
+
+function loadDocentesFromSheet(data){
+  const flat=data.map(r=>r.map(c=>String(c||'').trim()));
+  const hi=flat.findIndex(r=>r.some(c=>/nombre.u/i.test(c))&&r.some(c=>/rut.instructor/i.test(c)));
+  if(hi===-1)return false;
+  const h=flat[hi];
+  const col=n=>h.findIndex(c=>n.test(c));
+  const iU=col(/nombre.u/i),iR=col(/rut.instructor/i),iPat=col(/a\.?\s*paterno/i),
+        iMat=col(/a\.?\s*materno/i),iNom=col(/^nombres$/i),iS=col(/^sigla$/i),
+        iA=col(/nombre.asignatura/i),iP=col(/perido|periodo/i),
+        iAn=col(/a.+o.periodo/i),iM=col(/mail/i);
+  const byR={};
+  flat.slice(hi+1).forEach(row=>{
+    const u=iU!==-1?row[iU]:'';
+    if(!/EN -|FIC -/i.test(u))return;
+    const rut=iR!==-1?row[iR]:'';
+    if(!rut)return;
+    const nom=[iNom!==-1?row[iNom]:'',iPat!==-1?row[iPat]:'',iMat!==-1?row[iMat]:'']
+      .join(' ').trim().replace(/\(en blanco\)/gi,'').replace(/\s+/g,' ');
+    const sig=iS!==-1?row[iS]:'', asig=iA!==-1?row[iA]:'',
+          per=iP!==-1?row[iP]:'', anR=iAn!==-1?parseInt(row[iAn]):0,
+          mail=iM!==-1?row[iM]:'';
+    if(!byR[rut]) byR[rut]={r:rut,nm:nom,m:String(mail),u,ts:0,ay:new Set(),as:[]};
+    const d=byR[rut];
+    if(!d.m&&mail) d.m=String(mail);
+    d.ts++; if(anR>0) d.ay.add(anR);
+    if(sig) d.as.push({s:sig,n:asig,p:per,a:anR});
+  });
+  DOCENTES_DATA=Object.values(byR).map(d=>({...d,ay:[...d.ay].sort()}));
+  docFiltered=[...DOCENTES_DATA];
+  return DOCENTES_DATA.length>0;
+}
+
+function updateDocentesKPIs(){
+  const tot=DOCENTES_DATA.length;
+  const a26=DOCENTES_DATA.filter(d=>d.ay.includes(2026)).length;
+  const a25=DOCENTES_DATA.filter(d=>d.ay.includes(2025)).length;
+  const top=DOCENTES_DATA.reduce((a,b)=>b.ts>a.ts?b:a,{ts:0,nm:'—'});
+  const kv=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  kv('kpi_doc_total',tot.toLocaleString('es-CL'));
+  kv('kpi_doc_2026',a26.toLocaleString('es-CL'));
+  kv('kpi_doc_2025',a25.toLocaleString('es-CL'));
+  kv('kpi_doc_top',top.ts);
+  kv('kpi_doc_top_nm',top.nm.split(' ').slice(0,3).join(' '));
+}
+
+function applyFilters(){
+  const rut    = (document.getElementById('fRut')?.value||'').toLowerCase().trim();
+  const nombre = (document.getElementById('fNombre')?.value||'').toLowerCase().trim();
+  const apell  = (document.getElementById('fApellido')?.value||'').toLowerCase().trim();
+  const anio   = document.getElementById('fAnio')?.value||'';
+  docFiltered=DOCENTES_DATA.filter(d=>{
+    const parts = d.nm.toLowerCase().split(' ');
+    const matchRut    = !rut    || d.r.toLowerCase().includes(rut);
+    const matchNombre = !nombre || parts.slice(0,2).some(p=>p.startsWith(nombre));
+    const matchApell  = !apell  || parts.slice(2).some(p=>p.startsWith(apell));
+    const matchAnio   = !anio   || d.ay.includes(parseInt(anio));
+    return matchRut && matchNombre && matchApell && matchAnio;
+  });
+  renderDocTable();
+}
+
+function clearFilters(){
+  ['fRut','fNombre','fApellido'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const fa=document.getElementById('fAnio'); if(fa) fa.value='';
+  docFiltered=[...DOCENTES_DATA];
+  renderDocTable();
+}
+
+function renderDocTable(){
+  const tbody=document.getElementById('docBody');
+  if(!tbody)return;
+  const cnt=document.getElementById('docCount');
+  if(!DOCENTES_DATA.length){
+    if(cnt) cnt.textContent='Carga el archivo Excel para ver los docentes';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--subtle);padding:2rem;font-size:13px;">Sube el archivo en la pestaña Cargar archivo</td></tr>';
+    return;
+  }
+  if(cnt) cnt.textContent=docFiltered.length+' de '+DOCENTES_DATA.length+' docentes';
+  const show=docFiltered.slice(0,300);
+  if(!show.length){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--subtle);padding:1.5rem;">Sin resultados — prueba con otros filtros</td></tr>';
+    return;
+  }
+  tbody.innerHTML=show.map((d,i)=>{
+    const badge26=d.ay.includes(2026)?'<span style="background:#E1F5EE;color:#085041;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:500;margin-left:3px;">2026</span>':'';
+    const aniosPills=d.ay.slice(-3).map(a=>`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:${a===2026?'#E6F1FB':a===2025?'#EEEDFE':'var(--bg)'};color:${a===2026?'#0C447C':a===2025?'#3C3489':'var(--muted)'};font-family:DM Mono,monospace;">${a}</span>`).join(' ');
+    return `<tr style="cursor:pointer;" onclick="showDocDetail(${i})" id="drow${i}">
+      <td>
+        <div style="font-size:12px;font-weight:500;color:var(--text);">${d.nm}${badge26}</div>
+        <div style="font-size:10px;color:var(--subtle);margin-top:1px;">${d.u.replace('EN - ','').replace('FIC - ','')}</div>
+      </td>
+      <td><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--muted);">${d.r}</span></td>
+      <td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.m||'—'}</td>
+      <td style="text-align:center;"><span style="font-family:DM Mono,monospace;font-size:12px;font-weight:500;">${d.ts}</span></td>
+      <td>${aniosPills}</td>
+    </tr>`;
+  }).join('');
+  if(docFiltered.length>300){
+    tbody.innerHTML+=`<tr><td colspan="5" style="text-align:center;font-size:11px;color:var(--subtle);padding:10px;">Mostrando 300 de ${docFiltered.length} · Usa los filtros para afinar</td></tr>`;
+  }
+}
+
+function showDocDetail(idx){
+  document.querySelectorAll('[id^=drow]').forEach(r=>r.style.background='');
+  const row=document.getElementById('drow'+idx);
+  if(row)row.style.background='#E6F1FB';
+  const d=docFiltered[idx];
+  if(!d)return;
+  const ini=d.nm.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  const byAnio={};
+  d.as.forEach(a=>{if(!byAnio[a.a])byAnio[a.a]=[];byAnio[a.a].push(a);});
+  const aniosDesc=Object.keys(byAnio).sort((a,b)=>b-a);
+  const years=[2018,2019,2020,2021,2022,2023,2024,2025,2026];
+  const barHtml=years.map(a=>{
+    const cnt=d.as.filter(x=>x.a===a).length;
+    const h=cnt?Math.max(6,Math.round(cnt/Math.max(...years.map(yr=>d.as.filter(x=>x.a===yr).length),1)*36)):0;
+    return `<div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+      <div style="height:36px;display:flex;align-items:flex-end;">
+        <div style="width:14px;height:${h}px;background:${a===2026?'#378ADD':a===2025?'#7F77DD':'#B4B2A9'};border-radius:2px;opacity:.8;"></div>
+      </div>
+      <div style="font-size:8px;color:${cnt?'var(--text)':'var(--subtle)'};font-family:DM Mono,monospace;margin-top:2px;">${String(a).slice(2)}</div>
+    </div>`;
+  }).join('');
+  const asigHtml=aniosDesc.map(a=>`
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">${a} · ${byAnio[a].length} sección(es)</div>
+      ${byAnio[a].map(x=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">
+        <span style="font-family:DM Mono,monospace;font-size:9px;background:var(--bg);padding:2px 6px;border-radius:5px;flex-shrink:0;color:var(--muted);white-space:nowrap;">${x.s}</span>
+        <div style="font-size:11px;">
+          <div style="font-weight:500;color:var(--text);line-height:1.3;">${x.n}</div>
+          <div style="color:var(--subtle);font-size:10px;">${x.p}</div>
+        </div>
+      </div>`).join('')}
+    </div>`).join('');
+  document.getElementById('docDetail').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+      <div style="width:42px;height:42px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:13px;color:#0C447C;flex-shrink:0;">${ini}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:500;color:var(--text);">${d.nm}</div>
+        <div style="font-size:11px;color:var(--subtle);margin-top:1px;">${d.u}</div>
+        ${d.m&&d.m!=='nan'?`<div style="font-size:11px;color:#378ADD;margin-top:1px;">${d.m}</div>`:''}
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-family:DM Mono,monospace;font-size:22px;font-weight:500;">${d.ts}</div>
+        <div style="font-size:10px;color:var(--subtle);">secciones</div>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--subtle);margin-bottom:6px;">RUT: <span style="font-family:DM Mono,monospace;color:var(--text);">${d.r}</span></div>
+    <div style="display:flex;gap:6px;justify-content:space-between;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">${barHtml}</div>
+    ${asigHtml}
+  `;
+}
+
+/* Init docentes */
+renderDocTable();
+</script>
+</body>
+</html>
