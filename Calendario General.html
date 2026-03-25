@@ -1,0 +1,2746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎓 Calendario Postgrado Ejecutivos</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════ RESET & VARIABLES ══════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#060d1a;--bg1:#0f1d2e;--bg2:#172337;--bg3:#1e2f44;--bg4:#253550;
+  --border:#2a3f5a;--border2:#1d3050;
+  --blue:#38bdf8;--blue2:#0ea5e9;--blue3:#075985;
+  --green:#10b981;--green2:#059669;
+  --red:#ef4444;--red2:#dc2626;
+  --orange:#f59e0b;--orange2:#d97706;
+  --purple:#8b5cf6;
+  --t1:#f1f5f9;--t2:#cbd5e1;--t3:#94a3b8;--t4:#64748b;--t5:#475569;
+  --r:10px;--r2:6px;--shadow:0 4px 24px rgba(0,0,0,.5);
+}
+html{height:100%}
+body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t1);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+button{font-family:'Outfit',sans-serif;cursor:pointer}
+select,input{font-family:'Outfit',sans-serif}
+
+/* ══════════════════════ LAYOUT ══════════════════════ */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:260px;min-width:260px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;transition:transform .3s;z-index:200}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:199}
+
+/* ══════════════════════ SIDEBAR ══════════════════════ */
+.sb-logo{padding:18px 16px 12px;font-size:18px;font-weight:800;color:var(--blue);border-bottom:1px solid var(--border);letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.sb-section{padding:12px 14px 4px;font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.1em}
+.sb-caption{font-size:11px;color:var(--t3);line-height:1.5;padding:0 14px 8px}
+.sb-divider{height:1px;background:var(--border2);margin:6px 0}
+.sb-body{flex:1;overflow-y:auto;overflow-x:hidden}
+.sb-footer{padding:10px 14px;border-top:1px solid var(--border)}
+
+/* ══════════════════════ UPLOAD ZONE ══════════════════════ */
+.upload-zone{margin:4px 12px 8px;border:2px dashed var(--border);border-radius:var(--r2);padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--bg2)}
+.upload-zone:hover,.upload-zone.over{border-color:var(--blue);background:rgba(56,189,248,.05)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone-ico{font-size:24px;margin-bottom:4px}
+.upload-zone-txt{font-size:11px;color:var(--t3)}
+.file-status{padding:2px 14px 6px;font-size:11px}
+.file-status.ok{color:var(--green)}
+.file-status.err{color:var(--red)}
+
+/* ══════════════════════ SIDEBAR CONTROLS ══════════════════════ */
+/* sidebar extras: controlados solo por inline style desde JS */
+
+/* ══════════════════════ TOP NAV ══════════════════════ */
+.topnav{background:var(--bg1);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+.topnav-label{font-size:10px;font-weight:800;color:var(--blue);letter-spacing:.15em;margin-right:4px;white-space:nowrap}
+.ham{background:none;border:none;color:var(--t1);font-size:20px;padding:4px;display:none;margin-right:4px}
+.nav-pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--t3);transition:all .2s;white-space:nowrap}
+.nav-pill:hover{color:var(--t1);border-color:var(--blue)}
+.nav-pill.active{background:var(--blue);color:#0f172a;border-color:var(--blue);font-weight:700}
+
+/* ══════════════════════ SUBTABS ══════════════════════ */
+.subtabs{background:var(--bg1);border-bottom:1px solid var(--border);padding:0 16px;display:flex;gap:2px;flex-wrap:wrap}
+.stab{padding:10px 14px;font-size:12px;font-weight:600;border:none;background:none;color:var(--t3);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;cursor:pointer}
+.stab:hover{color:var(--t1)}
+.stab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* ══════════════════════ PAGE ══════════════════════ */
+.page{flex:1;overflow-y:auto;padding:20px}
+.page-title{font-size:20px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.page-subtitle{font-size:13px;font-weight:700;color:var(--t2);margin:18px 0 10px;display:flex;align-items:center;gap:6px}
+
+/* ══════════════════════ CARDS ══════════════════════ */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:700;color:var(--blue);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em}
+
+/* ══════════════════════ KPI GRID ══════════════════════ */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 14px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--blue);transform:scaleX(0);transition:transform .2s;transform-origin:left}
+.kpi:hover::after,.kpi.active::after{transform:scaleX(1)}
+.kpi:hover,.kpi.active{border-color:var(--blue);background:var(--bg3)}
+.kpi-ico{font-size:20px;margin-bottom:6px}
+.kpi-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}
+.kpi-lbl{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.08em}
+
+/* ══════════════════════ BUTTONS ══════════════════════ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:var(--r2);font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;text-decoration:none}
+.btn-primary{background:linear-gradient(135deg,var(--blue2),var(--blue));color:#0a1628}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(56,189,248,.35)}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{background:var(--green2)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:var(--red2)}
+.btn-ghost{background:var(--bg3);border:1px solid var(--border);color:var(--t2)}
+.btn-ghost:hover{border-color:var(--blue);color:var(--t1)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-full{width:100%}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* ══════════════════════ FORM CONTROLS ══════════════════════ */
+.frow{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px}
+.flabel{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em}
+.fsel,.finput{background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:7px 10px;border-radius:var(--r2);font-size:12px;outline:none;transition:border-color .2s;width:100%}
+.fsel:focus,.finput:focus{border-color:var(--blue)}
+.fsel option{background:var(--bg2)}
+.fsel[multiple]{height:auto}
+.fsel[size]{resize:none}
+.finput::placeholder{color:var(--t4)}
+
+/* ══════════════════════ TABLES ══════════════════════ */
+.tbl-wrap{overflow-x:auto}
+.tbl-wrap.mh{max-height:380px;overflow-y:auto}
+table.dt{width:100%;border-collapse:collapse;font-size:12px}
+table.dt th{padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t4);letter-spacing:.07em;border-bottom:1px solid var(--border);background:var(--bg1);text-align:left;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
+table.dt th:hover{color:var(--blue)}
+table.dt td{padding:7px 12px;border-bottom:1px solid var(--border2);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+table.dt tr:hover td{background:rgba(56,189,248,.03)}
+table.dt td.wrap{white-space:normal;max-width:300px}
+table.dt td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ══════════════════════ PILLS / BADGES ══════════════════════ */
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.pill-online{background:rgba(16,185,129,.15);color:#34d399}
+.pill-pres{background:rgba(56,189,248,.15);color:var(--blue)}
+.pill-hibr{background:rgba(139,92,246,.15);color:#a78bfa}
+.pill-alta{background:rgba(245,158,11,.15);color:var(--orange)}
+.pill-media{background:rgba(59,130,246,.15);color:#60a5fa}
+.badge{display:inline-flex;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+
+/* ══════════════════════ ALERTS / BANNERS ══════════════════════ */
+.alert{border-radius:var(--r2);padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.alert-high{background:rgba(245,158,11,.08);border-left:3px solid var(--orange)}
+.alert-med{background:rgba(59,130,246,.08);border-left:3px solid #3b82f6}
+.alert-title{font-weight:700;font-size:12px}
+.alert-detail{font-size:11px;color:var(--t3);margin-top:2px}
+.banner{padding:10px 14px;border-radius:var(--r2);font-size:12px;font-weight:600;margin-bottom:10px}
+.b-ok{background:rgba(16,185,129,.1);color:#34d399;border:1px solid rgba(16,185,129,.2)}
+.b-warn{background:rgba(245,158,11,.1);color:var(--orange);border:1px solid rgba(245,158,11,.2)}
+.b-err{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.b-info{background:rgba(56,189,248,.1);color:var(--blue);border:1px solid rgba(56,189,248,.2)}
+
+/* ══════════════════════ METRICS ══════════════════════ */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px}
+.metric-lbl{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;margin-bottom:4px}
+.metric-val{font-size:22px;font-weight:800}
+.metric-delta{font-size:11px;margin-top:2px}
+.delta-up{color:var(--green)}
+.delta-dn{color:var(--red)}
+
+/* ══════════════════════ HEATMAP TABLE ══════════════════════ */
+table.ht{border-collapse:collapse;width:100%;font-size:11px}
+table.ht th,table.ht td{border:1px solid var(--border);padding:5px 8px;text-align:center}
+table.ht th{background:var(--bg1);color:var(--t3);font-size:10px;font-weight:700}
+table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+
+/* ══════════════════════ PROGRESS BAR ══════════════════════ */
+.pb-wrap{width:100%;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pb-fill{height:100%;border-radius:3px;background:var(--blue);transition:width .5s}
+.score-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2)}
+.score-lbl{font-size:11px;color:var(--t2);width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score-track{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.score-bar{height:100%;border-radius:3px}
+.score-val{font-size:11px;font-weight:700;width:36px;text-align:right}
+
+/* ══════════════════════ CALENDAR ══════════════════════ */
+.cal-wrap{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--bg2)}
+.cal-head{display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg1);border-bottom:1px solid var(--border)}
+.cal-dow{text-align:center;padding:9px 4px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t4);letter-spacing:.07em}
+.cal-body{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-cell{min-height:100px;padding:5px;border-right:1px solid var(--border2);border-bottom:1px solid var(--border2);vertical-align:top;background:var(--bg2)}
+.cal-cell:nth-child(7n){border-right:none}
+.cal-cell.today{background:rgba(56,189,248,.04)}
+.cal-cell.empty{background:var(--bg1);opacity:.4}
+.cal-num{font-size:12px;font-weight:600;color:var(--t3);margin-bottom:3px}
+.cal-cell.today .cal-num span{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;background:var(--blue);color:#0a1628;border-radius:50%;font-weight:800;font-size:11px}
+.cal-events{display:flex;flex-direction:column;gap:2px}
+.ev-card{background:rgba(14,165,233,.1);border-left:2px solid var(--blue);border-radius:3px;padding:3px 5px;cursor:pointer;transition:background .15s}
+.ev-card:hover{background:rgba(14,165,233,.2)}
+.ev-time{font-size:9px;color:var(--blue);font-weight:700}
+.ev-prog{font-size:9px;color:var(--t1);font-weight:600;white-space:normal;line-height:1.3}
+.ev-sub{font-size:9px;color:var(--t3);white-space:normal}
+.ev-meta{font-size:9px;color:var(--t4)}
+.ev-more{font-size:9px;text-align:center;color:var(--t4);padding:2px}
+
+/* ══════════════════════ EXPANDER ══════════════════════ */
+.exp{border:1px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden}
+.exp-hd{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:12px;font-weight:600;color:var(--t2);user-select:none;background:var(--bg2)}
+.exp-hd:hover{color:var(--t1)}
+.exp-arrow{transition:transform .2s;font-size:10px}
+.exp.open .exp-arrow{transform:rotate(180deg)}
+.exp-body{display:none;padding:12px;border-top:1px solid var(--border);background:var(--bg2)}
+.exp.open .exp-body{display:block}
+
+/* ══════════════════════ EMPTY STATE ══════════════════════ */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:12px}
+.empty-ico{font-size:72px;filter:drop-shadow(0 0 24px rgba(56,189,248,.3))}
+.empty-title{font-size:28px;font-weight:800}
+.empty-sub{font-size:15px;color:var(--t3);max-width:400px;line-height:1.6}
+.empty-ico{font-size:72px;filter:drop-shadow(0 0 24px rgba(56,189,248,.3))}
+
+/* ══════════════════════ GRIDS ══════════════════════ */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+
+/* ══════════════════════ CHART ══════════════════════ */
+.chart-box{position:relative}
+.chart-box canvas{max-width:100%}
+
+/* ══════════════════════ PASSWORD ══════════════════════ */
+.pwd-wrap{max-width:340px;margin-bottom:14px}
+.pwd-wrap input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);color:var(--t1);font-size:13px;outline:none}
+.pwd-wrap input:focus{border-color:var(--blue)}
+
+/* ══════════════════════ FAQ ══════════════════════ */
+.faq{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px;margin-bottom:10px}
+.faq-q{color:var(--blue);font-weight:700;font-size:13px;margin-bottom:6px}
+.faq-a{color:var(--t2);font-size:12px;line-height:1.7}
+
+/* ══════════════════════ RESPONSIVE ══════════════════════ */
+@media(max-width:900px){
+  .sidebar{position:fixed;left:0;top:0;height:100%;transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay{display:block}
+  .sidebar-overlay.active{display:block}
+  .ham{display:flex}
+  .kpi-grid,.metrics{grid-template-columns:repeat(2,1fr)}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .frow{flex-direction:column}
+  .cal-cell{min-height:60px}
+  .cal-dow{font-size:8px;padding:6px 2px}
+  .page{padding:12px}
+}
+@media(max-width:500px){
+  .kpi-grid,.metrics{grid-template-columns:1fr 1fr}
+  .kpi-val{font-size:20px}
+}
+
+/* ══ DROPDOWN FILTER COMPONENT ══════════════════════════════════ */
+.df-wrap{position:relative;min-width:110px;flex:1}
+.df-btn{width:100%;text-align:left;padding:6px 28px 6px 9px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);color:var(--t2);font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;position:relative;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border-color .15s}
+.df-btn:hover,.df-btn.open{border-color:var(--blue);color:var(--t1)}
+.df-btn::after{content:'▾';position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none;font-size:10px}
+.df-btn.open::after{content:'▴'}
+.df-badge{display:inline-block;background:var(--blue);color:#0a1628;border-radius:10px;font-size:8px;font-weight:800;padding:1px 5px;margin-left:4px;vertical-align:middle;line-height:14px}
+.df-panel{display:none;position:absolute;top:calc(100% + 3px);left:0;min-width:220px;max-width:320px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:500;overflow:hidden}
+.df-panel.open{display:block}
+.df-search{padding:7px 8px;border-bottom:1px solid var(--border2)}
+.df-search input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--t1);padding:4px 7px;font-size:11px;font-family:'Outfit',sans-serif;outline:none}
+.df-search input:focus{border-color:var(--blue)}
+.df-actions{display:flex;gap:0;border-bottom:1px solid var(--border2)}
+.df-act{flex:1;padding:5px;font-size:10px;font-weight:600;background:none;border:none;color:var(--t4);cursor:pointer;font-family:'Outfit',sans-serif;transition:color .15s}
+.df-act:hover{color:var(--blue)}
+.df-act+.df-act{border-left:1px solid var(--border2)}
+.df-list{max-height:220px;overflow-y:auto;padding:3px 0}
+.df-item{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;transition:background .1s;font-size:11px;color:var(--t2)}
+.df-item:hover{background:rgba(56,189,248,.07);color:var(--t1)}
+.df-item input[type=checkbox]{accent-color:var(--blue);width:13px;height:13px;flex-shrink:0;cursor:pointer}
+.df-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.df-empty{padding:10px;font-size:11px;color:var(--t4);text-align:center}
+
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sbOverlay"></div>
+
+<div class="app">
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-logo"><strong>Calendario UAI</strong></div>
+  <div class="sb-body">
+    <div class="sb-section">📥 Archivo Académico</div>
+    <div class="sb-caption">Drag &amp; drop o haz clic — Excel / CSV</div>
+    <div class="upload-zone" id="uzMain">
+      <input type="file" id="fiMain" accept=".xlsx,.xls,.csv">
+      <div class="upload-zone-ico">📊</div>
+      <div class="upload-zone-txt">xlsx · xls · csv</div>
+    </div>
+    <div class="file-status" id="stMain" style="min-height:18px"></div>
+
+    <div class="sb-divider"></div>
+    <div class="sb-section">📅 Reservas (Opcional)</div>
+    <div class="upload-zone" id="uzRes">
+      <input type="file" id="fiRes" accept=".xlsx,.xls,.csv">
+      <div class="upload-zone-ico">🏢</div>
+      <div class="upload-zone-txt">Reservas de salas</div>
+    </div>
+    <div class="file-status" id="stRes" style="min-height:18px"></div>
+
+    <!-- Actions (show after load) -->
+    <div class="sb-divider" id="sbDivAct" style="display:none"></div>
+    <div id="sbAct" style="display:none;padding:6px 12px;gap:6px;display:none">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="resetAll()">🧹 Reiniciar</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="refreshView()">🔄 Actualizar</button>
+    </div>
+
+    <!-- Downloads (show after load) -->
+    <div class="sb-divider" id="sbDivDl" style="display:none"></div>
+    <div id="sbDl" style="display:none;padding:4px 12px 12px">
+      <div class="sb-section" style="padding:8px 0 6px">📤 Descargas</div>
+      <button class="btn btn-ghost btn-full btn-sm" style="margin-bottom:6px" onclick="DL.excel(APP.df,'Gestion_Postgrado.xlsx')">💾 Base Completa (Excel)</button>
+      <div class="flabel" style="margin-bottom:4px">Informe por:</div>
+      <select class="fsel" id="dlType" style="margin-bottom:6px" onchange="updateDlSel()">
+        <option value="coord">Coordinadora</option>
+        <option value="prog">Programa</option>
+      </select>
+      <select class="fsel" id="dlVal" style="margin-bottom:6px"></select>
+      <button class="btn btn-success btn-full btn-sm" onclick="downloadFiltered()">⬇ Descargar Filtrado</button>
+    </div>
+
+    <!-- Global filter -->
+    <div class="sb-divider" id="sbDivGF" style="display:none"></div>
+    <div id="sbGF" style="display:none;padding:4px 12px 12px">
+      <div class="sb-section" style="padding:8px 0 6px">🔎 Filtro Global</div>
+      <div id="gfDropWrap" style="padding:2px 0 4px"></div>
+      <div class="sb-caption" id="gfStatus" style="padding:3px 0 0"></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
+  <nav class="topnav">
+    <button class="ham" onclick="toggleSB()">&#9776;</button>
+    <span class="topnav-label">DASHBOARD V2</span>
+    <button class="nav-pill active" data-cat="dashboard" onclick="setCat('dashboard',this)">Dashboard</button>
+    <button class="nav-pill" data-cat="programas" onclick="setCat('programas',this)">Programas</button>
+    <button class="nav-pill" data-cat="calendarios" onclick="setCat('calendarios',this)">Calendarios</button>
+    <button class="nav-pill" data-cat="admin" onclick="setCat('admin',this)">Admin</button>
+    <button class="nav-pill" data-cat="ayuda" onclick="setCat('ayuda',this)">Ayuda</button>
+  </nav>
+  <div class="subtabs" id="subtabs"></div>
+  <div class="page" id="page"></div>
+</div>
+</div>
+
+<!-- CDN libraries loaded before inline script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL STATE
+══════════════════════════════════════════════════════ */
+// Safety guards - show friendly error if CDN failed to load
+if (typeof Chart === 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f1f5f9;min-height:100vh"><h2 style="color:#ef4444">Error de carga</h2><p style="margin-top:12px;color:#94a3b8">No se pudo cargar Chart.js desde CDN.<br>Verifica tu conexión a internet e intenta recargar la página.</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 20px;background:#38bdf8;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">🔄 Recargar</button></div>';
+  });
+}
+if (typeof XLSX === 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f1f5f9;min-height:100vh"><h2 style="color:#ef4444">Error de carga</h2><p style="margin-top:12px;color:#94a3b8">No se pudo cargar SheetJS (XLSX) desde CDN.<br>Verifica tu conexión a internet e intenta recargar la página.</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 20px;background:#38bdf8;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">🔄 Recargar</button></div>';
+  });
+}
+
+const APP = {
+  df: [],
+  dfRes: [],
+  globalFilter: [],
+  cat: 'dashboard',
+  tab: 'home',          // simple ASCII key — NO emoji
+  charts: {},
+  adminOk: false,
+  simCambios: {},
+  propuesta: null,
+};
+
+// Tab keys: simple ASCII only — no emoji, no special chars
+const CATS = {
+  dashboard:   ['home','global','coord','comp','analytics'],
+  programas:   ['resumen','calidad'],
+  calendarios: ['calendario','reservas'],
+  admin:       ['gestion','turnos','validaciones'],
+  ayuda:       ['manual','faqs'],
+};
+
+// Display labels for each tab key
+const TAB_LABELS = {
+  home:         'Home',
+  global:       'Global',
+  coord:        'Coordinadoras',
+  comp:         'Comparativa',
+  analytics:    'Analytics',
+  resumen:      'Resumen',
+  calidad:      'Calidad & Sede',
+  calendario:   'Calendario',
+  reservas:     'Reservas',
+  gestion:      'Gestión',
+  turnos:       'Turnos',
+  validaciones: 'Validaciones',
+  manual:       'Manual',
+  faqs:         'FAQs',
+};
+
+// Display labels for nav categories
+const CAT_LABELS = {
+  dashboard:   'Dashboard',
+  programas:   'Programas',
+  calendarios: 'Calendarios',
+  admin:       'Admin',
+  ayuda:       'Ayuda',
+};
+
+const MESES = {1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'};
+const MESES_ABR = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DIAS_ES = {0:'Domingo',1:'Lunes',2:'Martes',3:'Miércoles',4:'Jueves',5:'Viernes',6:'Sábado'};
+const DAYS_MON = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const DAYS_ABR = ['Lun','Mar','Mié','Jue','Vie','Sáb'];
+const COLORS = ['#38bdf8','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a3e635','#6366f1','#fb923c','#34d399'];
+const IGNORE_VALS = new Set(['','nan','none','n/a','por definir','sin asignar','s/d','-','nat','na']);
+
+/* ══════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════ */
+const $  = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = n => Number(n).toLocaleString('es-CL');
+const today = () => { const d=new Date(); d.setHours(0,0,0,0); return d; }
+
+function fmtDate(d) {
+  if (!d || !(d instanceof Date) || isNaN(d)) return '';
+  return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function fmtDateShort(d) {
+  if (!d || !(d instanceof Date) || isNaN(d)) return '';
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+// Parse any date representation coming from SheetJS or raw text
+function parseDate(v) {
+  if (v === null || v === undefined || v === '') return null;
+
+  // ✅ Ya es un Date object (SheetJS con cellDates:true lo entrega así)
+  if (v instanceof Date) {
+    return isNaN(v.getTime()) ? null : v;
+  }
+
+  // ✅ Número — puede ser serial Excel (entero) o número de JS
+  if (typeof v === 'number') {
+    if (!isFinite(v) || v < 1) return null;
+    // Serial Excel: días desde 1899-12-30
+    // SheetJS con raw:true puede dar seriales para fechas no convertidas
+    if (v > 1000 && v < 100000) {
+      // Corregir bug de Excel 1900 (leap year bug): seriales >= 60 son correctos
+      const serial = v >= 60 ? v : v + 1; // raro pero seguro
+      const ms = (serial - 25569) * 86400 * 1000;
+      const d = new Date(ms);
+      // Normalizar a medianoche local para evitar desfases de zona horaria
+      const local = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      return isNaN(local.getTime()) ? null : local;
+    }
+    return null;
+  }
+
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (!s) return null;
+
+    // dd/mm/yyyy  dd-mm-yyyy  dd.mm.yyyy
+    let m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+    if (m) {
+      const day = parseInt(m[1]), mon = parseInt(m[2]);
+      const y = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+      // Decidir si es dd/mm o mm/dd: si primer número > 12, forzar dd/mm
+      if (day > 12) {
+        const d = new Date(y, mon - 1, day);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      // Asumir dd/mm (formato latinoamericano)
+      const d = new Date(y, mon - 1, day);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // yyyy-mm-dd (ISO)
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) {
+      const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // m/d/yyyy o mm/dd/yyyy (formato americano que puede venir de SheetJS raw:false)
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      // En este caso SheetJS usa formato americano: mes/día/año
+      const dAm = new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
+      return isNaN(dAm.getTime()) ? null : dAm;
+    }
+
+    // Último recurso: Date.parse (puede ser ambiguo)
+    const dp = new Date(s);
+    return isNaN(dp.getTime()) ? null : dp;
+  }
+
+  return null;
+}
+
+function calcMod(sede) {
+  const s = String(sede||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (s.includes('ONLINE')||s.includes('ZOOM')||s.includes('VIRTUAL')||s.includes('ON-LINE')) return 'Online';
+  if (s.includes('HIBRID')||s.includes('HYBRID')||s.includes('BLENDED')) return 'Híbrido';
+  return 'Presencial';
+}
+
+// Normalizar valor de MODALIDAD del archivo a categoría limpia
+function normalizeModalidad(raw) {
+  if (!raw) return 'Presencial';
+  const s = String(raw).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  if (s.includes('ONLINE')||s.includes('ZOOM')||s.includes('VIRTUAL')||s.includes('ON-LINE')||s==='ON LINE') return 'Online';
+  if (s.includes('HIBRID')||s.includes('HYBRID')||s.includes('BLENDED')||
+      s.includes('STGO. PRESENCIAL + ONLINE')||s.includes('PRESENCIAL + ONLINE')) return 'Híbrido';
+  if (s.includes('PRESENCIAL')||s.includes('PRES')) return 'Presencial';
+  // Fallback para valores raros (SEMINARIO, EXAMEN, FERIADO, etc.) → Presencial
+  return s || 'Presencial';
+}
+
+function uniq(arr) {
+  const out=[];
+  const seen=new Set();
+  for (const v of arr) {
+    const s = String(v??'').trim();
+    if (s && !IGNORE_VALS.has(s.toLowerCase()) && !seen.has(s)) { seen.add(s); out.push(s); }
+  }
+  return out.sort((a,b)=>a.localeCompare(b,'es'));
+}
+
+function abbr(name, max=40) {
+  if (!name) return '';
+  if (name.length<=max) return name;
+  const words = name.trim().split(/\s+/);
+  if (words.length===1) return name.substring(0,max)+'...';
+  // Try first 3 meaningful words
+  const first3 = words.slice(0,3).join(' ');
+  if (first3.length<=max) return first3;
+  // Acronym from capitals
+  const acr = words.filter(w=>w.length>2).map(w=>w[0].toUpperCase()).join('');
+  return acr.length>2 ? acr : name.substring(0,max)+'...';
+}
+
+function groupBy(arr, key) {
+  return arr.reduce((acc,r)=>{
+    const k = r[key]??'__null';
+    (acc[k]=acc[k]||[]).push(r);
+    return acc;
+  },{});
+}
+
+function hashStr(s) {
+  let h=0; for (let i=0;i<s.length;i++) h=Math.imul(31,h)+s.charCodeAt(i)|0;
+  return Math.abs(h);
+}
+
+function showToast(msg, type='info') {
+  const t = document.createElement('div');
+  const c = type==='ok'?'b-ok':type==='err'?'b-err':type==='warn'?'b-warn':'b-info';
+  t.className=`banner ${c}`;
+  t.style.cssText='position:fixed;top:12px;right:12px;z-index:9999;min-width:200px;max-width:320px;box-shadow:var(--shadow)';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+
+/* ══════════════════════════════════════════════════════
+   FILE UPLOAD & PARSING
+══════════════════════════════════════════════════════ */
+function normalizeKey(k) {
+  return String(k).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+}
+
+function findCol(obj, candidates) {
+  const keys = Object.keys(obj).map(k=>({orig:k, norm:normalizeKey(k)}));
+  for (const cand of candidates) {
+    const cn = normalizeKey(cand);
+    // 1. Exact match (highest priority)
+    let found = keys.find(k=>k.norm===cn);
+    if (found) return found.orig;
+    // 2. Column contains candidate (e.g. "DIAS/FECHAS INICIO" contains "DIAS/FECHAS")
+    found = keys.find(k=>k.norm.includes(cn) && cn.length >= 4);
+    if (found) return found.orig;
+    // 3. Candidate contains column (e.g. candidate "COORDINADORA RESPONSABLE" contains col "COORDINADORA")
+    // Only if column name is at least 5 chars to avoid false matches with "N", "ID", etc.
+    found = keys.find(k=>cn.includes(k.norm) && k.norm.length >= 5);
+    if (found) return found.orig;
+  }
+  return null;
+}
+
+function normalizeRow(rawRow) {
+  const nr={};
+  for (const [k,v] of Object.entries(rawRow)) { nr[normalizeKey(k)] = v; }
+  return nr;
+}
+
+function processMain(rawRows, fileName) {
+  if (!rawRows.length) { showToast('Archivo vacío — sin filas de datos','err'); return; }
+
+  const sample = normalizeRow(rawRows[0]);
+  const allNormKeys = Object.keys(sample);
+
+  // ── Detección de columnas — incluye nombres EXACTOS del archivo real ──────
+  // Fecha: columna real = "FECHAS"
+  const dateCol  = findCol(sample,[
+    'FECHAS','DIAS/FECHAS','FECHA','FECHA CLASE','FECHA DE CLASE','DATE',
+  ]);
+  // Coordinadora
+  const coordCol = findCol(sample,[
+    'COORDINADORA RESPONSABLE','COORDINADORA','RESPONSABLE','COORD',
+  ]);
+  // Programa
+  const progCol  = findCol(sample,[
+    'PROGRAMA','PROGRAM','CURSO','COURSE','NOMBRE PROGRAMA',
+  ]);
+  // Nombre abreviado del programa
+  const abrevCol = findCol(sample,[
+    'NOMBRE ABREVIADO','ABREVIADO','ABREV','SIGLA PROGRAMA',
+  ]);
+  // Sede
+  const sedeCol  = findCol(sample,[
+    'SEDE','CAMPUS','LOCATION','LUGAR',
+  ]);
+  // Horario
+  const horCol   = findCol(sample,[
+    'HORARIO','HORA','SCHEDULE','HORARIOS','HORA CLASE',
+  ]);
+  // Profesor
+  const profCol  = findCol(sample,[
+    'PROFESOR','DOCENTE','PROFESSOR','TEACHER','NOMBRE PROFESOR',
+  ]);
+  // Asignatura
+  const asigCol  = findCol(sample,[
+    'ASIGNATURA','SUBJECT','MATERIA','ASIG','NOMBRE ASIGNATURA',
+  ]);
+  // Sala
+  const salaCol  = findCol(sample,[
+    'SALA','ROOM','AULA',
+  ]);
+  // Nº Alumnos: columna real = "Nº ALUMNOS"
+  const alumCol  = findCol(sample,[
+    'N° ALUMNOS','Nº ALUMNOS','N ALUMNOS','NALUMNOS','ALUMNOS','STUDENTS',
+    'NUM ALUMNOS','NUMERO ALUMNOS','N ALUMNOS MATRICULADOS',
+  ]);
+  // Modalidad: columna real = "MODALIDAD" — ya viene del archivo, no calcular
+  const modalCol = findCol(sample,[
+    'MODALIDAD','MODALITY','MODALIDAD CLASE','TIPO MODALIDAD',
+  ]);
+  // Día semana: columna real = "DIA SEMANA"
+  const diaCol   = findCol(sample,[
+    'DIA SEMANA','DIA DE SEMANA','DIA','DAY','DIASEMANA',
+  ]);
+  // Mes: columna real = "MES"
+  const mesCol   = findCol(sample,[
+    'MES','MONTH','MES CLASE',
+  ]);
+  // Tema de la sesión
+  const temaCol  = findCol(sample,[
+    'TEMA','TOPIC','CONTENIDO','TEMA CLASE',
+  ]);
+  // Horas
+  const horasCol = findCol(sample,[
+    'HORAS','HOURS','HORA DURACION','DURACION',
+  ]);
+  // Año
+  const anoCol   = findCol(sample,[
+    'AÑO IMPARTE','ANO IMPARTE','AÑO','ANO','YEAR','PERIODO',
+  ]);
+  // Nº sesiones
+  const nSesCol  = findCol(sample,[
+    'N° SESIONES','Nº SESIONES','N SESIONES','NUM SESIONES','Nº: SESIONES',
+  ]);
+  // Sigla
+  const siglaCol = findCol(sample,[
+    'SIGLA-','SIGLA- ','SIGLA','SIGLA ASIGNATURA','SIGLA-N° SESIONES','SIGLA-Nº SESIONES','SIGLA SESIONES',
+  ]);
+  // CC y SPA
+  const ccCol    = findCol(sample,['CC','CENTRO COSTO','CENTRO DE COSTO']);
+  const spaCol   = findCol(sample,['SPA','CODIGO SPA']);
+
+  // ── Diagnóstico si no encuentra fecha ────────────────────────────────────
+  if (!dateCol) {
+    const colList = allNormKeys.slice(0,15).join(', ');
+    showToast(` Columna de fecha no detectada. Columnas: ${colList}`, 'warn');
+    console.warn('[Dashboard] Columnas normalizadas:', allNormKeys);
+  }
+
+  const getVal = (r, col) => col ? String(r[normalizeKey(col)]??'').trim() : '';
+
+  APP.df = rawRows.map(raw=>{
+    const r = normalizeRow(raw);
+
+    // Fecha
+    const rawDateVal = dateCol ? r[normalizeKey(dateCol)] : null;
+    const dt = parseDate(rawDateVal);
+
+    // Valores base
+    const prog  = getVal(r, progCol);
+    const sede  = getVal(r, sedeCol).toUpperCase().trim();
+    const coord = getVal(r, coordCol);
+
+    // Modalidad: usar columna directa si existe, sino calcular desde sede
+    const modalRaw = modalCol ? getVal(r, modalCol) : '';
+    const modalidad = modalRaw ? normalizeModalidad(modalRaw) : calcMod(sede);
+
+    // Día semana: usar columna directa si existe, sino calcular desde fecha
+    let diaSemana = diaCol ? getVal(r, diaCol) : '';
+    // Normalizar abreviaciones del archivo real (LUN→Lunes, MAR→Martes, etc.)
+    const DIA_MAP = {
+      'LUN':'Lunes','MON':'Lunes',
+      'MAR':'Martes','TUE':'Martes',
+      'MIE':'Miércoles','MIÉ':'Miércoles','WED':'Miércoles','MIERCOLES':'Miércoles','MIÉRCOLES':'Miércoles',
+      'JUE':'Jueves','THU':'Jueves',
+      'VIE':'Viernes','FRI':'Viernes',
+      'SAB':'Sábado','SÁB':'Sábado','SAT':'Sábado',
+      'DOM':'Domingo','SUN':'Domingo',
+    };
+    if (diaSemana) {
+      const dKey = diaSemana.trim().toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      diaSemana = DIA_MAP[dKey] || (DAYS_MON.includes(diaSemana) ? diaSemana : '');
+    }
+    if (!diaSemana && dt) {
+      const dow = dt.getDay(); // 0=Dom
+      const dowMon = dow===0 ? 6 : dow-1;
+      diaSemana = DAYS_MON[dowMon];
+    }
+
+    // Mes: usar columna directa si existe, sino calcular desde fecha
+    let mes = mesCol ? getVal(r, mesCol) : '';
+    // Normalizar abreviaciones del archivo real (ENE→Enero, SEPT→Septiembre, etc.)
+    const MES_MAP = {
+      'ENE':'Enero','JAN':'Enero',
+      'FEB':'Febrero',
+      'MAR':'Marzo',
+      'ABR':'Abril','APR':'Abril',
+      'MAY':'Mayo',
+      'JUN':'Junio',
+      'JUL':'Julio',
+      'AGO':'Agosto','AUG':'Agosto',
+      'SEP':'Septiembre','SEPT':'Septiembre',
+      'OCT':'Octubre',
+      'NOV':'Noviembre',
+      'DIC':'Diciembre','DEC':'Diciembre',
+    };
+    if (mes) {
+      const mKey = mes.trim().toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      mes = MES_MAP[mKey] || (Object.values(MESES).includes(mes) ? mes : '');
+    }
+    if (!mes && dt) mes = MESES[dt.getMonth()+1];
+
+    return {
+      // ── Campos principales ────────────────────────────────────────────
+      'DIAS/FECHAS':              dt,
+      'PROGRAMA':                 prog,
+      'COORDINADORA RESPONSABLE': coord,
+      'SEDE':                     sede,
+      'HORARIO':                  getVal(r, horCol),
+      'PROFESOR':                 getVal(r, profCol),
+      'ASIGNATURA':               getVal(r, asigCol),
+      'SALA':                     getVal(r, salaCol),
+      'N_ALUMNOS':                parseFloat(alumCol ? r[normalizeKey(alumCol)] : 0)||0,
+      // ── Campos calculados / derivados ────────────────────────────────
+      'Modalidad_Calc':           modalidad,
+      'Dia_Semana':               diaSemana,
+      'Mes':                      mes,
+      'Programa_Abrev':           abrevCol ? getVal(r, abrevCol) : abbr(prog, 40),
+      // ── Campos adicionales del archivo ───────────────────────────────
+      'NOMBRE ABREVIADO':         abrevCol ? getVal(r, abrevCol) : abbr(prog, 40),
+      'TEMA':                     getVal(r, temaCol),
+      'HORAS':                    getVal(r, horasCol),
+      'AÑO IMPARTE':              getVal(r, anoCol),
+      'Nº SESIONES':              getVal(r, nSesCol),
+      'SIGLA':                    getVal(r, siglaCol),
+      'CC':                       getVal(r, ccCol),
+      'SPA':                      getVal(r, spaCol),
+    };
+  }).filter(r=>r['DIAS/FECHAS']!==null);
+
+  if (!APP.df.length) {
+    // Diagnóstico detallado — mostrar las columnas reales del archivo y valores de muestra
+    const firstRaw = normalizeRow(rawRows[0]);
+    const rawDateVal = dateCol ? firstRaw[normalizeKey(dateCol)] : 'COLUMNA NO DETECTADA';
+    const rawType = typeof rawDateVal;
+    const parsedTry = parseDate(rawDateVal);
+
+    // Mostrar todas las columnas y sus valores en la primera fila
+    const colSamples = Object.entries(firstRaw)
+      .filter(([k]) => !k.startsWith('__COL'))
+      .slice(0, 12)
+      .map(([k, v]) => `  "${k}" → "${v}" (${typeof v})`)
+      .join('\n');
+
+    const msg = [
+      `Columna fecha detectada: "${dateCol || 'NO ENCONTRADA'}"`,
+      `Valor en fila 1: "${rawDateVal}" (tipo: ${rawType})`,
+      `Resultado parse: ${parsedTry}`,
+      ``,
+      `Columnas encontradas en el archivo:`,
+      colSamples,
+    ].join('\n');
+
+    console.error('[Dashboard] Error fechas:\n', msg);
+
+    $('page').innerHTML = `<div style="padding:20px">
+      <div class="banner b-err" style="font-size:14px;font-weight:700">❌ No se pudieron leer las fechas del archivo</div>
+      <div class="card" style="margin-top:12px;font-size:11.5px;font-family:monospace;white-space:pre-wrap;color:var(--t2);line-height:1.7">${esc(msg)}</div>
+      <div class="banner b-warn" style="margin-top:10px">
+        <strong>¿Qué hacer?</strong><br><br>
+        1. La columna de fechas debe llamarse <strong>DIAS/FECHAS</strong>, <strong>FECHA</strong> o similar<br>
+        2. Las fechas deben ser celdas de tipo <strong>Fecha</strong> en Excel (no texto)<br>
+        3. Los encabezados deben estar en la <strong>primera fila con datos</strong> (el sistema los detecta automáticamente aunque haya filas de título arriba)<br>
+        4. Si las fechas son texto, usar formato <strong>DD/MM/YYYY</strong>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="renderEmpty()">← Volver e intentar otro archivo</button>
+    </div>`;
+    return;
+  }
+
+  $('stMain').textContent = fmt(APP.df.length) + ' sesiones cargadas';
+  $('stMain').className = 'file-status ok';
+  showSidebarExtras();
+  refreshView();
+}
+
+function processRes(rawRows) {
+  if (!rawRows.length) return;
+  APP.dfRes = rawRows.map(raw=>{
+    const r = normalizeRow(raw); // ya tiene keys normalizadas (uppercase sin tildes)
+    const fechaCol = findCol(r,['FECHA','DATE','DIA','DIAS/FECHAS']);
+    const dt = parseDate(r[normalizeKey(fechaCol||'')]);
+    // Buscar columnas de hora con normalizeKey para tolerar variantes
+    const hIniCol = findCol(r,['HORA_INICIO','INICIO','START','DESDE','HORA INICIO']);
+    const hFinCol = findCol(r,['HORA_FIN','FIN','END','HASTA','HORA FIN']);
+    const salaCol = findCol(r,['SALA','ROOM','AULA']);
+    const evCol   = findCol(r,['EVENTO','ACTIVITY','MOTIVO','NOMBRE','EVENTO RESERVA']);
+    const solCol  = findCol(r,['SOLICITANTE','PROFESOR','RESPONSABLE','SOLICITANTE RESERVA']);
+    return {
+      'FECHA':       dt,
+      'HORA_INICIO': String(hIniCol ? r[hIniCol] : '').trim(),
+      'HORA_FIN':    String(hFinCol ? r[hFinCol] : '').trim(),
+      'SALA':        String(salaCol ? r[salaCol] : '').trim(),
+      'EVENTO':      String(evCol   ? r[evCol]   : 'Reserva').trim() || 'Reserva',
+      'SOLICITANTE': String(solCol  ? r[solCol]  : '').trim(),
+    };
+  }).filter(r=>r['FECHA']!==null);
+  $('stRes').textContent = APP.dfRes.length + ' reservas cargadas';
+  $('stRes').className = 'file-status ok';
+  if (APP.cat==='calendarios'&&APP.tab==='reservas') refreshView();
+}
+
+/* ══════════════════════════════════════════════════════
+   PALABRAS CLAVE para detectar la fila de headers reales
+══════════════════════════════════════════════════════ */
+const HEADER_KEYWORDS = [
+  // Programa
+  'PROGRAMA','PROGRAM','CURSO','NOMBRE ABREVIADO',
+  // Fecha — columna real del archivo es "FECHAS"
+  'FECHAS','FECHA','DATE','DIAS/FECHAS','DIA SEMANA','DIA DE SEMANA','DIASEMANA',
+  // Coordinadora
+  'COORDINADORA RESPONSABLE','COORDINADORA','RESPONSABLE','COORD',
+  // Sede / Sala
+  'SEDE','CAMPUS','SALA','ROOM','AULA',
+  // Horario
+  'HORARIO','HORA',
+  // Profesor
+  'PROFESOR','DOCENTE','PROFESSOR',
+  // Asignatura / Tema
+  'ASIGNATURA','SUBJECT','TEMA',
+  // Alumnos
+  'N° ALUMNOS','Nº ALUMNOS','ALUMNOS','STUDENTS',
+  // Modalidad (columna real del archivo)
+  'MODALIDAD','MODALITY',
+  // Columnas adicionales del archivo real
+  'MES','ANO IMPARTE','AÑO IMPARTE','SIGLA','SIGLA-','SESIONES','HORAS','CC','SPA','NOMBRE ABREVIADO','ABREVIADO',
+];
+
+/**
+ * Dado un sheet de SheetJS, encuentra la fila que contiene los headers reales.
+ * Retorna los rows procesados con los headers correctos, o null si no encuentra.
+ */
+function smartParseSheet(sheet) {
+  // Leer todas las filas como arrays (sin asumir header)
+  const allRows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:true});
+  if (!allRows.length) return null;
+
+  // Buscar la fila que tenga más coincidencias con palabras clave de headers
+  let bestRowIdx = 0;
+  let bestScore = 0;
+
+  for (let i = 0; i < Math.min(allRows.length, 50); i++) {
+    const row = allRows[i];
+    let score = 0;
+    for (const cell of row) {
+      const norm = String(cell||'').trim().toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^A-Z0-9\s\/]/g,'')  // elimina Nº ° : - etc
+        .replace(/\s+/g,' ').trim();
+      for (const kw of HEADER_KEYWORDS) {
+        if (norm === kw || norm.includes(kw)) { score++; break; }
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestRowIdx = i;
+    }
+  }
+
+  if (bestScore === 0) {
+    // No encontramos headers reconocibles — usar fila 0 igual
+    bestRowIdx = 0;
+  }
+
+  // Reconstruir rows usando esa fila como headers
+  const headerRow = allRows[bestRowIdx];
+  const dataRows  = allRows.slice(bestRowIdx + 1);
+
+  // Filtrar filas completamente vacías
+  const result = dataRows
+    .filter(row => row.some(cell => String(cell||'').trim() !== ''))
+    .map(row => {
+      const obj = {};
+      headerRow.forEach((h, i) => {
+        const key = String(h||'').trim() || `__COL_${i}`;
+        obj[key] = row[i] !== undefined ? row[i] : '';
+      });
+      return obj;
+    });
+
+  console.log(`[Dashboard] Header detectado en fila ${bestRowIdx} (score=${bestScore}):`, headerRow);
+  return result.length ? result : null;
+}
+
+function readFile(file, type) {
+  const r = new FileReader();
+  r.onload = e=>{
+    try {
+      if (typeof XLSX === 'undefined') {
+        showToast('Error: librería XLSX no cargada. Verifica tu conexión y recarga la página.','err');
+        return;
+      }
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true, cellNF:false, cellText:false});
+
+      if (wb.SheetNames.length === 1) {
+        // Solo una hoja → cargar directo
+        processSheetFromWB(wb, wb.SheetNames[0], type, file.name);
+      } else {
+        // Múltiples hojas → mostrar selector
+        showSheetSelector(wb, type, file.name);
+      }
+    } catch(err) {
+      console.error('[Dashboard] Error leyendo archivo:', err);
+      showToast('Error leyendo archivo: '+err.message,'err');
+    }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function processSheetFromWB(wb, sheetName, type, fileName) {
+  const sheet = wb.Sheets[sheetName];
+  if (!sheet) { showToast('Hoja no encontrada: ' + sheetName, 'err'); return; }
+  const rows = smartParseSheet(sheet);
+  if (!rows || !rows.length) {
+    showToast('Hoja "' + sheetName + '" parece estar vacía o sin datos reconocibles.','err');
+    return;
+  }
+  if (type==='main') processMain(rows, fileName);
+  else processRes(rows);
+}
+
+function showSheetSelector(wb, type, fileName) {
+  // Score each sheet to pre-select the best one
+  const SCORE_KW = ['PROGRAMA','FECHAS','FECHA','COORDINADORA','ASIGNATURA','SEDE','HORARIO','PROFESOR','MODALIDAD'];
+  const sheetScores = wb.SheetNames.map(name => {
+    const sheet = wb.Sheets[name];
+    const allRows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:true});
+    let best = 0;
+    for (let i = 0; i < Math.min(allRows.length, 50); i++) {
+      let s = 0;
+      for (const cell of allRows[i]) {
+        const n = String(cell||'').toUpperCase().trim();
+        if (SCORE_KW.some(kw => n === kw || n.includes(kw))) s++;
+      }
+      if (s > best) best = s;
+    }
+    // Count data rows
+    const dataCount = allRows.filter(r => r.some(c => String(c||'').trim() !== '')).length;
+    return { name, score: best, rows: dataCount };
+  });
+
+  // Best sheet = highest score, then most rows
+  const recommended = sheetScores.sort((a,b) => b.score - a.score || b.rows - a.rows)[0];
+
+  // Build modal HTML
+  const modalHtml = `
+  <div id="sheetModal" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:520px;width:100%;box-shadow:var(--shadow)">
+      <div style="font-size:16px;font-weight:800;color:var(--t1);margin-bottom:6px">📋 Selecciona la hoja a cargar</div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:16px">El archivo tiene ${wb.SheetNames.length} hojas. Elige cuál contiene los datos del calendario.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;margin-bottom:16px">
+        ${sheetScores.map(s => `
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);border:1px solid ${s.name===recommended.name?'var(--blue)':'var(--border)'};background:${s.name===recommended.name?'rgba(56,189,248,.08)':'var(--bg3)'};cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='${s.name===recommended.name?'var(--blue)':'var(--border)'}'">
+          <input type="radio" name="sheetSel" value="${esc(s.name)}" ${s.name===recommended.name?'checked':''} style="accent-color:var(--blue)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</div>
+            <div style="font-size:11px;color:var(--t4);margin-top:2px">${s.rows} filas · score ${s.score}${s.name===recommended.name?' · <span style=\"color:var(--green)\">✓ Recomendada</span>':''}</div>
+          </div>
+        </label>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('sheetModal').remove()" class="btn btn-ghost btn-sm">Cancelar</button>
+        <button onclick="confirmSheetSelection()" class="btn btn-primary">✅ Cargar hoja seleccionada</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Store wb, type, fileName for confirm handler
+  window._pendingWB = {wb, type, fileName};
+}
+
+function confirmSheetSelection() {
+  const sel = document.querySelector('input[name="sheetSel"]:checked');
+  if (!sel) { showToast('Selecciona una hoja primero','warn'); return; }
+  const sheetName = sel.value;
+  const modal = document.getElementById('sheetModal');
+  if (modal) modal.remove();
+  const pending = window._pendingWB || {};
+  window._pendingWB = null; // cleanup
+  if (!pending.wb) return;
+  processSheetFromWB(pending.wb, sheetName, pending.type, pending.fileName);
+}
+
+// Wire file inputs
+function wireUpload(inputId, type) {
+  const input = $(inputId);
+  input.addEventListener('change', e=>{ if(e.target.files[0]) readFile(e.target.files[0], type); });
+}
+function wireDrop(zoneId, type) {
+  const z = $(zoneId);
+  z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('over')});
+  z.addEventListener('dragleave',()=>z.classList.remove('over'));
+  z.addEventListener('drop',e=>{
+    e.preventDefault(); z.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) { const dt=new DataTransfer(); dt.items.add(f); $(type==='main'?'fiMain':'fiRes').files=dt.files; readFile(f,type); }
+  });
+}
+
+function showSidebarExtras() {
+  ['sbDivAct','sbDivDl','sbDivGF'].forEach(id=>$(id).style.display='block');
+  $('sbAct').style.display='flex';
+  $('sbDl').style.display='block';
+  $('sbGF').style.display='block';
+  updateDlSel();
+  populateGF();
+}
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL FILTER
+══════════════════════════════════════════════════════ */
+function populateGF() {
+  const wrap=$('gfDropWrap'); if(!wrap) return;
+  const progs=uniq(APP.df.map(r=>r['Programa_Abrev']));
+  if(!_DF['gfSel']) {
+    wrap.innerHTML=mkDF('gfSel','Programa',progs,'applyGF()');
+    APP.globalFilter.forEach(p=>{if(_DF['gfSel'])_DF['gfSel'].selected.add(p);});
+    if(APP.globalFilter.length) _dfRefreshBtn('gfSel');
+  } else {
+    _DF['gfSel'].values=progs;
+    _DF['gfSel'].selected=new Set([..._DF['gfSel'].selected].filter(p=>progs.includes(p)));
+    const listEl=$('dflist_gfSel');
+    if(listEl) listEl.innerHTML=_dfItems('gfSel',progs,'');
+    _dfRefreshBtn('gfSel');
+  }
+  updateGFStatus();
+}
+function applyGF() {
+  APP.globalFilter = getDF_sel('gfSel');
+  updateGFStatus();
+  refreshView();
+}
+function updateGFStatus() {
+  const df = getDF();
+  $('gfStatus').textContent = APP.globalFilter.length
+    ? APP.globalFilter.length+' prog · '+fmt(df.length)+' sesiones'
+    : 'Todo: '+fmt(APP.df.length)+' sesiones';
+}
+function getDF() {
+  // Siempre retorna copia para proteger APP.df de mutaciones accidentales
+  if (!APP.globalFilter.length) return [...APP.df];
+  return APP.df.filter(r=>APP.globalFilter.includes(r['Programa_Abrev']));
+}
+
+/* ══════════════════════════════════════════════════════
+   DOWNLOADS
+══════════════════════════════════════════════════════ */
+const DL = {
+  excel(data, fname) {
+    if (!data?.length) { showToast('Sin datos','warn'); return; }
+    // Campos internos que no se exportan al Excel
+    // Excluir solo campos puramente internos/calculados que duplican datos del archivo
+    const INTERNAL = new Set(['Modalidad_Calc','Dia_Semana','Mes','Programa_Abrev','_raw_date']);
+    // N_ALUMNOS se exporta como "Nº ALUMNOS" para que sea legible
+    const exp = data.map(r=>{
+      const row = {};
+      for (const [k,v] of Object.entries(r)) {
+        if (INTERNAL.has(k)) continue;
+        const exportKey = k === 'N_ALUMNOS' ? 'Nº ALUMNOS' : k;
+        row[exportKey] = v instanceof Date ? fmtDate(v) : (v ?? '');
+      }
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(exp);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'DATOS');
+    XLSX.writeFile(wb,fname);
+  },
+  csv(data, fname) {
+    if (!data?.length) return;
+    const ks = Object.keys(data[0]);
+    const rows = [ks.join(','), ...data.map(r=>ks.map(k=>`"${String(r[k]??'').replace(/"/g,'""')}"`).join(','))];
+    const blob = new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; a.click();
+  },
+  ics(data, fname) {
+    const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Calendario UAI//ES','CALSCALE:GREGORIAN'];
+    data.forEach(r=>{
+      if (!r['DIAS/FECHAS']) return;
+      const d=r['DIAS/FECHAS'];
+      const ds=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      const uid=`${ds}-${hashStr(r['PROGRAMA']+r['COORDINADORA RESPONSABLE'])}@uai.cl`;
+      lines.push('BEGIN:VEVENT',`UID:${uid}`,`DTSTAMP:${new Date().toISOString().replace(/[-:.]/g,'').slice(0,15)}Z`,
+        `DTSTART;VALUE=DATE:${ds}`,`DTEND;VALUE=DATE:${ds}`,
+        `SUMMARY:${String(r['PROGRAMA']).replace(/\n/g,' ')}`,
+        `DESCRIPTION:Coordinadora: ${r['COORDINADORA RESPONSABLE']}\\nHorario: ${r['HORARIO']}`,
+        `LOCATION:${r['SEDE']}`,'END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob=new Blob([lines.join('\r\n')],{type:'text/calendar'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();
+  }
+};
+
+function updateDlSel() {
+  const t = $('dlType')?.value;
+  const sel = $('dlVal');
+  if (!sel) return;
+  const vals = t==='coord'
+    ? uniq(APP.df.map(r=>r['COORDINADORA RESPONSABLE']))
+    : uniq(APP.df.map(r=>r['PROGRAMA']));
+  sel.innerHTML = vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+}
+function downloadFiltered() {
+  const t=$('dlType')?.value, v=$('dlVal')?.value;
+  if (!v) return;
+  const filtered = t==='coord'
+    ? APP.df.filter(r=>r['COORDINADORA RESPONSABLE']===v)
+    : APP.df.filter(r=>r['PROGRAMA']===v);
+  DL.excel(filtered,`Reporte_${v.replace(/\s/g,'_').slice(0,20)}.xlsx`);
+}
+
+/* ══════════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════════ */
+function setCat(cat, btn) {
+  APP.cat=cat; APP.tab=CATS[cat][0];
+  document.querySelectorAll('.nav-pill').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  renderSubtabs();
+  refreshView();
+}
+function setTab(tab) {
+  APP.tab=tab;
+  renderSubtabs();
+  refreshView();
+}
+function renderSubtabs() {
+  var el = $('subtabs');
+  if (!el) return;
+  var tabs = CATS[APP.cat]||[];
+  var html = '';
+  for (var i=0;i<tabs.length;i++) {
+    var t = tabs[i];
+    var cls = t===APP.tab ? 'stab active' : 'stab';
+    html += '<button class="' + cls + '" data-tab="' + t + '" onclick="setTab(this.dataset.tab)">' + (TAB_LABELS[t]||t) + '</button>';
+  }
+  el.innerHTML = html;
+}
+function goTo(cat, tab) {
+  APP.cat=cat; APP.tab=tab;
+  document.querySelectorAll('.nav-pill').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  renderSubtabs();
+  refreshView();
+}
+function toggleSB() {
+  $('sidebar').classList.toggle('open');
+  $('sbOverlay').classList.toggle('active');
+}
+// moved to init()
+
+function refreshView() {
+  if (!$('page')) return; // DOM not ready yet
+  destroyCharts();
+  if (!APP.df.length && !['manual','faqs'].includes(APP.tab)) {
+    renderEmpty(); return;
+  }
+  const FN = {
+    home:         renderHome,
+    global:       renderGlobal,
+    coord:        renderCoord,
+    comp:         renderComparativa,
+    analytics:    renderAnalytics,
+    resumen:      renderResumen,
+    calidad:      renderCalidad,
+    calendario:   renderCalendario,
+    reservas:     renderReservas,
+    gestion:      renderGestion,
+    turnos:       renderTurnos,
+    validaciones: renderValidaciones,
+    manual:       renderManual,
+    faqs:         renderFAQs,
+  };
+  (FN[APP.tab]||renderEmpty)();
+  // Enhance multi-selects with Todos/Limpiar buttons
+  setTimeout(()=>enhanceMultiSelects($('page')),50);
+}
+function resetAll() { APP.globalFilter=[]; if(_DF['gfSel']){_DF['gfSel'].selected.clear();_dfRefreshBtn('gfSel');} updateGFStatus(); refreshView(); }
+
+/* ══════════════════════════════════════════════════════
+   CHART HELPERS
+══════════════════════════════════════════════════════ */
+const darkOpts = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{
+    legend:{labels:{color:'#94a3b8',font:{family:'Outfit',size:11},boxWidth:12}},
+    tooltip:{bodyColor:'#e2e8f0',titleColor:'#f1f5f9',backgroundColor:'#1e293b',borderColor:'#2a3f5a',borderWidth:1}
+  },
+  scales:{
+    x:{ticks:{color:'#94a3b8',font:{family:'Outfit',size:10}},grid:{color:'rgba(42,63,90,.4)'}},
+    y:{ticks:{color:'#94a3b8',font:{family:'Outfit',size:10}},grid:{color:'rgba(42,63,90,.4)'}}
+  }
+};
+function destroyCharts() {
+  Object.values(APP.charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  APP.charts={};
+}
+function makeChart(id, cfg) {
+  if (typeof Chart === 'undefined') { console.warn('Chart.js not loaded'); return null; }
+  const canvas=$(id); if(!canvas) return null;
+  try { Chart.getChart(canvas)?.destroy(); } catch(e){}
+  const merged = JSON.parse(JSON.stringify(darkOpts));
+  // Deep merge options
+  if (cfg.options) deepMerge(merged, cfg.options);
+  // Handle charts without scales (pie, doughnut, radar, polar)
+  const noScale = ['doughnut','pie','radar','polarArea'];
+  if (noScale.includes(cfg.type)) delete merged.scales;
+  const chart = new Chart(canvas, {...cfg, options: merged});
+  APP.charts[id]=chart;
+  return chart;
+}
+function deepMerge(target, src) {
+  for (const k of Object.keys(src)) {
+    if (src[k]&&typeof src[k]==='object'&&!Array.isArray(src[k])) {
+      if (!target[k]) target[k]={};
+      deepMerge(target[k],src[k]);
+    } else { target[k]=src[k]; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   SCORE CALCULATION
+══════════════════════════════════════════════════════ */
+function factorAlumnos(n) {
+  if (n>=50) return 2.0; if (n>=40) return 1.7; if (n>=30) return 1.4; if (n>=20) return 1.2; return 1.0;
+}
+function calcScore(sesiones, alumnos) { return (sesiones/4)*factorAlumnos(alumnos); }
+
+function computeLoadByCoord(df) {
+  const map={};
+  df.forEach(r=>{
+    const k=r['COORDINADORA RESPONSABLE']+'|||'+r['PROGRAMA'];
+    if (!map[k]) map[k]={coord:r['COORDINADORA RESPONSABLE'],prog:r['PROGRAMA'],ses:0,alum:0};
+    map[k].ses++; map[k].alum=Math.max(map[k].alum,r['N_ALUMNOS']||0);
+  });
+  const byCoord={};
+  Object.values(map).forEach(({coord,prog,ses,alum})=>{
+    if (!byCoord[coord]) byCoord[coord]=0;
+    byCoord[coord]+=calcScore(ses,alum);
+  });
+  return Object.entries(byCoord).sort((a,b)=>b[1]-a[1]).map(([coord,p])=>({coord,puntaje:p}));
+}
+
+/* ══════════════════════════════════════════════════════
+   HTML BUILDERS
+══════════════════════════════════════════════════════ */
+function buildTable(rows, cols, maxH=true) {
+  if (!rows.length) return '<div class="banner b-info">No hay datos.</div>';
+  const useCols = cols || Object.keys(rows[0]);
+  return `<div class="tbl-wrap${maxH?' mh':''}"><table class="dt">
+    <thead><tr>${useCols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${useCols.map(c=>{
+      const v=r[c]??'';
+      const s = v instanceof Date ? fmtDate(v) : String(v);
+      return `<td title="${esc(s)}">${esc(s)}</td>`;
+    }).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function buildHeatmap(coordDayMap, coords, days) {
+  let maxV=0;
+  coords.forEach(c=>days.forEach(d=>{maxV=Math.max(maxV,coordDayMap[c]?.[d]||0)}));
+  return `<div class="tbl-wrap"><table class="ht">
+    <thead><tr><th>Coordinadora</th>${days.map(d=>`<th>${d}</th>`).join('')}</tr></thead>
+    <tbody>${coords.map(c=>`<tr>
+      <td class="ht-label" title="${esc(c)}">${esc(abbr(c,22))}</td>
+      ${days.map(d=>{
+        const v=coordDayMap[c]?.[d]||0;
+        const pct=maxV>0?v/maxV:0;
+        const h=Math.round(200-pct*120), s2=Math.round(70+pct*10), l=Math.round(45+pct*15);
+        const bg=v?`hsla(${h},${s2}%,${l}%,${0.15+pct*0.55})`:'transparent';
+        return `<td style="background:${bg};font-weight:${v?700:400};color:${v?'#f1f5f9':'#475569'}">${v||''}</td>`;
+      }).join('')}
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function buildScoreBars(data, maxVal) {
+  return data.map(({coord,puntaje})=>{
+    const pct=maxVal>0?puntaje/maxVal*100:0;
+    const clr=puntaje===maxVal?'var(--red)':puntaje<maxVal*0.7?'var(--green)':'var(--orange)';
+    return `<div class="score-row">
+      <div class="score-lbl" title="${esc(coord)}">${esc(abbr(coord,22))}</div>
+      <div class="score-track"><div class="score-bar" style="width:${pct}%;background:${clr}"></div></div>
+      <div class="score-val" style="color:${clr}">${puntaje.toFixed(1)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════
+   EMPTY STATE
+══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   EMPTY STATE — solo mensaje central, sin duplicar uploaders
+══════════════════════════════════════════════════════ */
+function renderEmpty() {
+  var pg = $('page'); if(!pg) return;
+  pg.innerHTML=`
+  <div class="empty">
+    <div style="font-size:64px;margin-bottom:8px">&#9776;</div>
+    <div class="empty-title">Calendario Postgrado UAI</div>
+    <div class="empty-sub">
+      Carga tu archivo en el panel lateral izquierdo.<br>
+      <span style="color:var(--t4);font-size:13px">Arrastra el Excel o haz clic en la zona punteada</span>
+    </div>
+    <div style="margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:10px">
+      <div class="banner b-info" style="max-width:420px;text-align:left">
+        <strong>Columnas detectadas automáticamente:</strong><br>
+        📅 Fecha → DIAS/FECHAS, FECHA, DATE<br>
+        👩 Coord → COORDINADORA RESPONSABLE, COORDINADORA<br>
+        🎓 Programa → PROGRAMA, PROGRAM, CURSO<br>
+        🏫 Sede → SEDE, CAMPUS<br>
+        ⏰ Horario → HORARIO, HORA<br>
+        👨‍🏫 Profesor → PROFESOR, DOCENTE<br>
+        📚 Asignatura → ASIGNATURA, SUBJECT
+      </div>
+    </div>
+  </div>`;
+}
+function readFileEv(e,t){if(e.target.files[0])readFile(e.target.files[0],t==='main'?'main':'res');}
+
+/* ══════════════════════════════════════════════════════
+   HOME TAB
+══════════════════════════════════════════════════════ */
+function renderHome() {
+  const df=getDF();
+  const t=today();
+  const in7=new Date(t); in7.setDate(in7.getDate()+7);
+  const in30=new Date(t); in30.setDate(in30.getDate()+30);
+  const dfHoy=df.filter(r=>r['DIAS/FECHAS']&&fmtDate(r['DIAS/FECHAS'])===fmtDate(t));
+  const dfSem=df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']>=t&&r['DIAS/FECHAS']<=in7);
+  const numProgs=new Set(df.map(r=>r['PROGRAMA'])).size;
+  const upcoming=df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']>=t).sort((a,b)=>a['DIAS/FECHAS']-b['DIAS/FECHAS']).slice(0,10);
+
+  // ── Inicio de programas: fecha mínima por programa ─────────────────────
+  const progInicio={};   // programa → fecha más temprana
+  const progFin={};      // programa → fecha más tardía
+  const progCoord={};    // programa → coordinadora
+  const progAbrev={};    // programa → nombre abreviado
+  const progSesiones={}; // programa → nº sesiones
+  df.forEach(r=>{
+    const p=r['PROGRAMA'], d=r['DIAS/FECHAS'];
+    if(!p) return;
+    progCoord[p] = r['COORDINADORA RESPONSABLE'] || progCoord[p] || '';
+    progAbrev[p] = r['NOMBRE ABREVIADO'] || progAbrev[p] || abbr(p,32);
+    progSesiones[p] = (progSesiones[p]||0) + 1;
+    if(d){
+      if(!progInicio[p]||d<progInicio[p]) progInicio[p]=d;
+      if(!progFin[p]  ||d>progFin[p])    progFin[p]=d;
+    }
+  });
+
+  // Ordenar por fecha de inicio (más próxima primero)
+  const progList = Object.keys(progInicio)
+    .sort((a,b)=> progInicio[a] - progInicio[b])
+    .map(p=>({
+      prog:       p,
+      abrev:      progAbrev[p],
+      inicio:     progInicio[p],
+      fin:        progFin[p],
+      coord:      progCoord[p],
+      sesiones:   progSesiones[p],
+      estado:     progInicio[p] > t  ? 'futuro'
+                : progFin[p]   < t  ? 'finalizado'
+                :                     'activo',
+    }));
+
+  const activos     = progList.filter(p=>p.estado==='activo');
+  const futuros     = progList.filter(p=>p.estado==='futuro');
+  const finalizados = progList.filter(p=>p.estado==='finalizado');
+
+  // ── Alertas ──────────────────────────────────────────────────────────────
+  const alerts=[];
+  const termina=progList.filter(p=>p.fin>=t&&p.fin<=in7).length;
+  if(termina)alerts.push({tipo:'Cursos finalizan esta semana',det:`${termina} programas`,prio:'alta'});
+  const iniciaSem=futuros.filter(p=>p.inicio<=in7).length;
+  if(iniciaSem)alerts.push({tipo:'Programas inician esta semana',det:`${iniciaSem} programas`,prio:'alta'});
+  const inicia30=futuros.filter(p=>p.inicio>in7&&p.inicio<=in30).length;
+  if(inicia30)alerts.push({tipo:'Programas inician en 30 días',det:`${inicia30} programas`,prio:'med'});
+  const sinP=df.filter(r=>!r['PROFESOR']||IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).length;
+  if(sinP)alerts.push({tipo:'Sin Profesor asignado',det:`${sinP} sesiones`,prio:'med'});
+  const sinS=df.filter(r=>!r['SALA']||IGNORE_VALS.has(r['SALA'].toLowerCase())).length;
+  if(sinS)alerts.push({tipo:'Sin Sala asignada',det:`${sinS} sesiones`,prio:'med'});
+  const diaProgs={};
+  df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=r['COORDINADORA RESPONSABLE']+'|'+fmtDate(r['DIAS/FECHAS']);if(!diaProgs[k])diaProgs[k]=new Set();diaProgs[k].add(r['PROGRAMA'])});
+  const crit=Object.values(diaProgs).filter(s=>s.size>2).length;
+  if(crit)alerts.push({tipo:'Días Críticos',det:`${crit} días con más de 2 programas`,prio:'alta'});
+
+  // ── Tendencia ────────────────────────────────────────────────────────────
+  const trendMap={};
+  df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=r['DIAS/FECHAS'].getFullYear()+'-'+String(r['DIAS/FECHAS'].getMonth()+1).padStart(2,'0');trendMap[k]=(trendMap[k]||0)+1});
+  const trendLabels=Object.keys(trendMap).sort();
+  const trendVals=trendLabels.map(k=>trendMap[k]);
+
+  // ── Helper: badge de estado ───────────────────────────────────────────────
+  function estadoBadge(e){
+    if(e==='activo')     return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(16,185,129,.15);color:#34d399">EN CURSO</span>';
+    if(e==='futuro')     return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(56,189,248,.15);color:#38bdf8">PRÓXIMO</span>';
+    if(e==='finalizado') return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(100,116,139,.15);color:#94a3b8">FINALIZADO</span>';
+    return '';
+  }
+
+  // ── Filas de la tabla de programas ───────────────────────────────────────
+  function progRows(list){
+    if(!list.length) return '<tr><td colspan="6" style="text-align:center;color:var(--t4);padding:12px">Sin programas</td></tr>';
+    return list.map(p=>`<tr>
+      <td style="font-weight:600;color:var(--t1)" title="${esc(p.prog)}">${esc(p.abrev||abbr(p.prog,40))}</td>
+      <td style="color:var(--blue);font-weight:700;white-space:nowrap">${fmtDate(p.inicio)}</td>
+      <td style="color:var(--t3);white-space:nowrap">${fmtDate(p.fin)}</td>
+      <td style="text-align:right;color:var(--t2)">${p.sesiones}</td>
+      <td title="${esc(p.coord)}">${esc(abbr(p.coord,22))}</td>
+      <td>${estadoBadge(p.estado)}</td>
+    </tr>`).join('');
+  }
+
+  $('page').innerHTML=`
+  <div class="page-title">Dashboard Ejecutivo</div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-ico">📚</div><div class="kpi-val">${fmt(df.length)}</div><div class="kpi-lbl">Total Sesiones</div></div>
+    <div class="kpi"><div class="kpi-ico">🎓</div><div class="kpi-val">${numProgs}</div><div class="kpi-lbl">Programas</div></div>
+    <div class="kpi"><div class="kpi-ico">🗓️</div><div class="kpi-val">${dfHoy.length}</div><div class="kpi-lbl">Clases Hoy</div></div>
+    <div class="kpi"><div class="kpi-ico">📅</div><div class="kpi-val">${dfSem.length}</div><div class="kpi-lbl">Próximos 7 Días</div></div>
+  </div>
+
+  <div class="page-subtitle">Alertas</div>
+  ${alerts.length
+    ? alerts.map(a=>`<div class="alert alert-${a.prio}">
+        <div><div class="alert-title">${esc(a.tipo)}</div><div class="alert-detail">${esc(a.det)}</div></div>
+        <span class="pill pill-${a.prio==='alta'?'alta':'media'}">${a.prio==='alta'?'Alta':'Media'}</span>
+      </div>`).join('')
+    : '<div class="banner b-ok">Sin alertas pendientes</div>'}
+
+  <!-- ══ TABLA INICIO DE PROGRAMAS ══════════════════════════════════ -->
+  <div class="page-subtitle" style="margin-top:20px">
+    Inicio de Programas
+    <span style="font-size:10px;font-weight:400;color:var(--t4);margin-left:8px">ordenado por fecha de primera clase</span>
+  </div>
+
+  <!-- Tabs activos / próximos / finalizados -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--border2);margin-bottom:10px">
+    <button id="ptab_activos"
+      style="padding:7px 16px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--blue);color:var(--blue)"
+      onclick="switchProgTab('activos')">
+      En curso <span style="background:rgba(16,185,129,.15);color:#34d399;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">${activos.length}</span>
+    </button>
+    <button id="ptab_futuros"
+      style="padding:7px 16px;font-size:11px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--t3)"
+      onclick="switchProgTab('futuros')">
+      Próximos <span style="background:rgba(56,189,248,.15);color:#38bdf8;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">${futuros.length}</span>
+    </button>
+    <button id="ptab_finalizados"
+      style="padding:7px 16px;font-size:11px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--t3)"
+      onclick="switchProgTab('finalizados')">
+      Finalizados <span style="background:rgba(100,116,139,.15);color:#94a3b8;border-radius:10px;padding:1px 7px;font-size:9px;margin-left:4px">${finalizados.length}</span>
+    </button>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap mh">
+      <table class="dt" id="progTable">
+        <thead><tr>
+          <th>Programa</th>
+          <th>Inicio</th>
+          <th>Fin</th>
+          <th style="text-align:right">Sesiones</th>
+          <th>Coordinadora</th>
+          <th>Estado</th>
+        </tr></thead>
+        <tbody id="progTableBody">${progRows(activos)}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ PRÓXIMAS CLASES ══════════════════════════════════════════════ -->
+  <div class="page-subtitle" style="margin-top:20px">Próximas Clases</div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="dt"><thead><tr><th>Fecha</th><th>Horario</th><th>Programa</th><th>Coordinadora</th><th>Modalidad</th></tr></thead>
+      <tbody>${upcoming.map(r=>`<tr>
+        <td style="white-space:nowrap">${fmtDateShort(r['DIAS/FECHAS'])}</td>
+        <td style="color:var(--blue)">${esc(r['HORARIO'])}</td>
+        <td title="${esc(r['PROGRAMA'])}">${esc(r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],46))}</td>
+        <td title="${esc(r['COORDINADORA RESPONSABLE'])}">${esc(abbr(r['COORDINADORA RESPONSABLE'],22))}</td>
+        <td><span class="pill pill-${r['Modalidad_Calc']==='Online'?'online':r['Modalidad_Calc']==='Híbrido'?'hibr':'pres'}">${r['Modalidad_Calc']}</span></td>
+      </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--t4)">Sin próximas clases</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="exp open" id="expHoy">
+      <div class="exp-hd" onclick="this.closest('.exp').classList.toggle('open')">Sesiones de Hoy <span class="exp-arrow">▼</span></div>
+      <div class="exp-body">${dfHoy.length?buildTable(dfHoy.map(r=>({Horario:r['HORARIO'],Programa:abbr(r['PROGRAMA'],38),Sala:r['SALA']})),['Horario','Programa','Sala'],false):'<p style="color:var(--t3);font-size:12px">Sin sesiones hoy.</p>'}</div>
+    </div>
+    <div class="exp" id="expMes">
+      <div class="exp-hd" onclick="this.closest('.exp').classList.toggle('open')">Sesiones del Mes <span class="exp-arrow">▼</span></div>
+      <div class="exp-body">${(()=>{const m=t.getMonth(),y=t.getFullYear();const dfM=df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS'].getMonth()===m&&r['DIAS/FECHAS'].getFullYear()===y);return dfM.length?'<p style="font-size:12px;margin-bottom:8px">Total: <strong>'+dfM.length+'</strong></p>'+buildTable(dfM.slice(0,50).map(r=>({Fecha:fmtDate(r['DIAS/FECHAS']),Programa:abbr(r['PROGRAMA'],34),Coordinadora:abbr(r['COORDINADORA RESPONSABLE'],20)})),['Fecha','Programa','Coordinadora']):'Sin sesiones este mes.';})()} </div>
+    </div>
+  </div>
+
+  <div class="page-subtitle">Tendencia Mensual</div>
+  <div class="card"><div class="chart-box" style="height:200px"><canvas id="chartTrend"></canvas></div></div>
+
+  <div class="page-subtitle">Acceso Rápido</div>
+  <div class="g3" style="margin-bottom:8px">
+    <button class="btn btn-ghost" onclick="goTo('calendarios','calendario')">Calendario</button>
+    <button class="btn btn-ghost" onclick="goTo('dashboard','coord')">Coordinadoras</button>
+    <button class="btn btn-ghost" onclick="goTo('calendarios','reservas')">Reservas</button>
+  </div>
+  <div class="g3">
+    <button class="btn btn-ghost" onclick="goTo('dashboard','analytics')">Analytics</button>
+    <button class="btn btn-ghost" onclick="goTo('programas','resumen')">Resumen</button>
+    <button class="btn btn-ghost" onclick="goTo('dashboard','global')">Vista Global</button>
+  </div>`;
+
+  // ── switchProgTab: alterna entre activos / próximos / finalizados ─────────
+  window._homeProgData = { activos, futuros, finalizados };
+  makeChart('chartTrend',{type:'line',data:{labels:trendLabels,datasets:[{label:'Sesiones',data:trendVals,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.08)',fill:true,tension:.4,pointRadius:3}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:12,color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'}}}}});
+}
+
+function switchProgTab(tab) {
+  // Update tab button styles
+  ['activos','futuros','finalizados'].forEach(t => {
+    const btn = $('ptab_'+t);
+    if (!btn) return;
+    const isActive = t === tab;
+    btn.style.borderBottomColor  = isActive ? 'var(--blue)' : 'transparent';
+    btn.style.color               = isActive ? 'var(--blue)'  : 'var(--t3)';
+    btn.style.fontWeight          = isActive ? '700' : '600';
+  });
+
+  const data = window._homeProgData;
+  if (!data) return;
+  const list = data[tab] || [];
+
+  const tbody = $('progTableBody');
+  if (!tbody) return;
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t4);padding:12px">Sin programas en esta categoría</td></tr>';
+    return;
+  }
+
+  function estadoBadge(e){
+    if(e==='activo')     return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(16,185,129,.15);color:#34d399">EN CURSO</span>';
+    if(e==='futuro')     return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(56,189,248,.15);color:#38bdf8">PRÓXIMO</span>';
+    if(e==='finalizado') return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;background:rgba(100,116,139,.15);color:#94a3b8">FINALIZADO</span>';
+    return '';
+  }
+
+  tbody.innerHTML = list.map(p=>`<tr>
+    <td style="font-weight:600;color:var(--t1)" title="${esc(p.prog)}">${esc(p.abrev||abbr(p.prog,40))}</td>
+    <td style="color:var(--blue);font-weight:700;white-space:nowrap">${fmtDate(p.inicio)}</td>
+    <td style="color:var(--t3);white-space:nowrap">${fmtDate(p.fin)}</td>
+    <td style="text-align:right;color:var(--t2)">${p.sesiones}</td>
+    <td title="${esc(p.coord)}">${esc(abbr(p.coord,22))}</td>
+    <td>${estadoBadge(p.estado)}</td>
+  </tr>`).join('');
+}
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL TAB
+══════════════════════════════════════════════════════ */
+function renderGlobal() {
+  const df=getDF();
+  const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
+  const now=new Date();
+  $('page').innerHTML=`
+  <div class="page-title">Vision Global</div>
+  <div class="frow" style="flex-wrap:wrap;gap:6px">
+    ${mkDF('gYear','Año',  years,'updGlobal()')}
+    ${mkDF('gMes', 'Mes',  Object.values(MESES),'updGlobal()')}
+    ${mkDF('gProg','Programa',uniq(df.map(r=>r['Programa_Abrev'])),'updGlobal()')}
+  </div>
+  <div class="page-subtitle">Distribucion Mensual por Programa</div>
+  <div class="card"><div class="chart-box" style="height:380px"><canvas id="chartGBar"></canvas></div></div>
+  <div class="page-subtitle">Mapa de Calor: Carga por Coordinadora</div>
+  <div class="card" id="gHeatmapCard"><div id="gHeatmap"></div><div id="gHeatCaption" style="font-size:11px;color:var(--t4);margin-top:6px;text-align:center"></div></div>
+  `;
+  updGlobal();
+}
+
+
+/* ══════════════════════════════════════════════════════
+   DROPDOWN FILTER COMPONENT v2
+   Usage : mkDF(id, label, values, onChangeStr)
+   Read  : getDF_sel(id) → string[]
+   Reset : resetDF(id)
+══════════════════════════════════════════════════════ */
+const _DF = {};
+
+function mkDF(id, label, values, onChangeStr) {
+  // Store state — onChange as callable via eval (safe: only internal strings)
+  _DF[id] = {
+    values:   [...values],
+    selected: new Set(),
+    fire:     function(){ try{ eval(onChangeStr); }catch(e){ console.error('mkDF fire',e); } }
+  };
+  return _dfHTML(id, label, values);
+}
+
+function _dfHTML(id, label, values) {
+  const n = (_DF[id] && _DF[id].selected.size) || 0;
+  const badge = n > 0 ? `<span class="df-badge">${n}</span>` : '';
+  const btnTxt = n === 0 ? label+' — Todos' : label;
+  // Use data-dfid on button to avoid quote issues in onclick
+  return `<div class="df-wrap" id="dfwrap_${id}">
+    <span class="flabel">${label}</span>
+    <button class="df-btn${n>0?' active':''}" id="dfbtn_${id}" data-dfid="${id}" onclick="toggleDF(this.dataset.dfid)">${esc(btnTxt)}${badge}</button>
+    <div class="df-panel" id="dfpanel_${id}">
+      <div class="df-search"><input type="text" placeholder="Buscar..." id="dfsrch_${id}" data-dfid="${id}" oninput="filterDFList(this.dataset.dfid,this.value)"></div>
+      <div class="df-actions">
+        <button class="df-act" data-dfid="${id}" onclick="selectAllDF(this.dataset.dfid)">Todos</button>
+        <button class="df-act" data-dfid="${id}" onclick="clearDF(this.dataset.dfid)">Limpiar</button>
+        <button class="df-act" data-dfid="${id}" onclick="closeDF(this.dataset.dfid)">Cerrar</button>
+      </div>
+      <div class="df-list" id="dflist_${id}">${_dfItems(id, values, '')}</div>
+    </div>
+  </div>`;
+}
+
+function _dfItems(id, values, search) {
+  const state = _DF[id]; if (!state) return '';
+  const lsrch = search.toLowerCase();
+  const filtered = search ? values.filter(function(v){ return v.toLowerCase().indexOf(lsrch) >= 0; }) : values;
+  if (!filtered.length) return '<div class="df-empty">Sin resultados</div>';
+  // Use data-id and data-val attributes — NO inline onchange with string values
+  // This avoids ALL quote-escaping bugs
+  return filtered.map(function(v){
+    const chk = state.selected.has(v) ? ' checked' : '';
+    return '<label class="df-item">'
+      + '<input type="checkbox" data-dfid="'+id+'" data-dfval="'+esc(v)+'"'+chk+'>'
+      + '<span title="'+esc(v)+'">'+esc(v)+'</span>'
+      + '</label>';
+  }).join('');
+}
+
+// Single delegated event listener for ALL checkboxes — no inline handlers
+document.addEventListener('change', function(e) {
+  var cb = e.target;
+  if (cb.type !== 'checkbox' || !cb.dataset.dfid) return;
+  var id  = cb.dataset.dfid;
+  var val = cb.dataset.dfval;  // esc()-encoded, decode back
+  // Decode HTML entities to get original value
+  var tmp = document.createElement('textarea');
+  tmp.innerHTML = val;
+  var realVal = tmp.value;
+  var state = _DF[id]; if (!state) return;
+  if (cb.checked) state.selected.add(realVal);
+  else            state.selected.delete(realVal);
+  _dfRefreshBtn(id);
+  state.fire();
+});
+
+function toggleDF(id) {
+  var panel = $('dfpanel_'+id);
+  var btn   = $('dfbtn_'+id);
+  if (!panel || !btn) return;
+  var isOpen = panel.classList.contains('open');
+  closeAllDF();
+  if (!isOpen) {
+    panel.classList.add('open');
+    btn.classList.add('open');
+    var inp = $('dfsrch_'+id);
+    if (inp) setTimeout(function(){ inp.focus(); }, 40);
+  }
+}
+function closeDF(id) {
+  var p = $('dfpanel_'+id); if (p) p.classList.remove('open');
+  var b = $('dfbtn_'+id);   if (b) b.classList.remove('open');
+}
+function closeAllDF() {
+  document.querySelectorAll('.df-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  document.querySelectorAll('.df-btn.open').forEach(function(b){ b.classList.remove('open'); });
+}
+function filterDFList(id, search) {
+  var el = $('dflist_'+id); if (!el) return;
+  var state = _DF[id]; if (!state) return;
+  el.innerHTML = _dfItems(id, state.values, search);
+}
+function selectAllDF(id) {
+  var state = _DF[id]; if (!state) return;
+  state.values.forEach(function(v){ state.selected.add(v); });
+  var el = $('dflist_'+id);
+  if (el) el.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = true; });
+  _dfRefreshBtn(id); closeDF(id);
+  state.fire();
+}
+function clearDF(id) {
+  var state = _DF[id]; if (!state) return;
+  state.selected.clear();
+  var el = $('dflist_'+id);
+  if (el) el.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  _dfRefreshBtn(id); closeDF(id);
+  state.fire();
+}
+function resetDF(id) { clearDF(id); }
+
+function _dfRefreshBtn(id) {
+  var state = _DF[id]; if (!state) return;
+  var btn = $('dfbtn_'+id); if (!btn) return;
+  var n = state.selected.size;
+  var wrap = $('dfwrap_'+id);
+  var label = wrap ? (wrap.querySelector('.flabel') ? wrap.querySelector('.flabel').textContent : '') : '';
+  btn.innerHTML = esc(n === 0 ? label+' — Todos' : label)
+    + (n > 0 ? '<span class="df-badge">'+n+'</span>' : '');
+  btn.classList.toggle('active', n > 0);
+}
+
+function getDF_sel(id) {
+  var state = _DF[id];
+  if (!state || state.selected.size === 0) return [];
+  return Array.from(state.selected);
+}
+
+// Close when clicking outside any dropdown
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.df-wrap')) closeAllDF();
+}, true);
+
+function getSelArr(id) { const el=$(id); if(!el)return[]; return [...el.selectedOptions].map(o=>o.value); }
+
+function updGlobal() {
+  let df=getDF();
+  const sy=getDF_sel('gYear'), sm=getDF_sel('gMes'), sp=getDF_sel('gProg');
+  if(sy.length) df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+  if(sm.length) df=df.filter(r=>sm.includes(r['Mes']));
+  if(sp.length) df=df.filter(r=>sp.includes(r['Programa_Abrev']));
+
+  // Stacked bar by month+prog
+  const mpMap={};
+  df.forEach(r=>{
+    if(!r['DIAS/FECHAS'])return;
+    const key=`${r['DIAS/FECHAS'].getFullYear()}-${String(r['DIAS/FECHAS'].getMonth()+1).padStart(2,'0')}`;
+    const prog=r['Programa_Abrev']||'N/A';
+    if(!mpMap[key])mpMap[key]={};
+    mpMap[key][prog]=(mpMap[key][prog]||0)+1;
+  });
+  const mLabels=Object.keys(mpMap).sort();
+  const allProgs=[...new Set(df.map(r=>r['Programa_Abrev']||'N/A'))].sort();
+  const datasets=allProgs.map((p,i)=>({label:p,data:mLabels.map(m=>mpMap[m]?.[p]||0),backgroundColor:COLORS[i%COLORS.length]+'99',borderColor:COLORS[i%COLORS.length],borderWidth:1}));
+  makeChart('chartGBar',{type:'bar',data:{labels:mLabels,datasets},options:{plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}},scales:{x:{stacked:true,ticks:{maxRotation:45,color:'#94a3b8'}},y:{stacked:true,ticks:{color:'#94a3b8'}}}}});
+
+  // Heatmap
+  const cdMap={};
+  df.filter(r=>r['Dia_Semana']&&r['Dia_Semana']!=='Domingo').forEach(r=>{
+    const c=r['COORDINADORA RESPONSABLE'];
+    const dAb=r['Dia_Semana']==='Lunes'?'Lun':r['Dia_Semana']==='Martes'?'Mar':r['Dia_Semana']==='Miércoles'?'Mié':r['Dia_Semana']==='Jueves'?'Jue':r['Dia_Semana']==='Viernes'?'Vie':'Sáb';
+    if(!cdMap[c])cdMap[c]={};
+    cdMap[c][dAb]=(cdMap[c][dAb]||0)+1;
+  });
+  const coords=Object.keys(cdMap).sort();
+  $('gHeatmap').innerHTML=coords.length?buildHeatmap(cdMap,coords,DAYS_ABR):'<p style="color:var(--t4);font-size:12px">Sin datos.</p>';
+  if(coords.length){
+    const top=Object.entries(cdMap).sort((a,b)=>Object.values(b[1]).reduce((s,n)=>s+n,0)-Object.values(a[1]).reduce((s,n)=>s+n,0))[0]?.[0];
+    const dayT={};DAYS_ABR.forEach(d=>{dayT[d]=coords.reduce((s,c)=>s+(cdMap[c]?.[d]||0),0)});
+    const topDay=Object.entries(dayT).sort((a,b)=>b[1]-a[1])[0]?.[0];
+    $('gHeatCaption').textContent=`Mayor carga: ${top} · Día más ocupado: ${topDay}`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   COORDINADORAS TAB
+══════════════════════════════════════════════════════ */
+function renderCoord() {
+  const df=getDF();
+  $('page').innerHTML=`
+  <div class="page-title">Coordinadoras</div>
+  <div class="frow" style="flex-wrap:wrap;gap:6px" id="cFilters">
+    ${mkDF('cYear','Año',   uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updCoord()')}
+    ${mkDF('cMes', 'Mes',  Object.values(MESES),'updCoord()')}
+    ${mkDF('cSede','Sede', uniq(df.map(r=>r['SEDE'])),'updCoord()')}
+    ${mkDF('cMod', 'Modalidad',['Presencial','Online','Híbrido'],'updCoord()')}
+    ${mkDF('cCoord','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCoord()')}
+    ${mkDF('cProg', 'Programa',   uniq(df.map(r=>r['PROGRAMA'])),'updCoord()')}
+    ${mkDF('cProf', 'Profesor',   uniq(df.map(r=>r['PROFESOR'])),'updCoord()')}
+    ${mkDF('cDia',  'Dia semana', DAYS_MON,'updCoord()')}
+  </div>
+  <div class="metrics" id="cKPIs"></div>
+  <div class="card"><div class="chart-box" style="height:280px"><canvas id="chartCBar"></canvas></div></div>
+  <div class="page-subtitle">🚨 Días Críticos (&gt;2 programas)</div>
+  <div id="cCrit"></div>
+  <div class="page-subtitle">📅 Detalle</div>
+  <div id="cTable"></div>`;
+  updCoord();
+}
+
+function updCoord() {
+  let df=getDF();
+  const sy=getDF_sel('cYear'),sm=getDF_sel('cMes'),ss=getDF_sel('cSede'),smod=getDF_sel('cMod');
+  const sc=getDF_sel('cCoord'),sp=getDF_sel('cProg'),spf=getDF_sel('cProf'),sd=getDF_sel('cDia');
+  if(sy.length)df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+  if(sm.length)df=df.filter(r=>sm.includes(r['Mes']));
+  if(ss.length)df=df.filter(r=>ss.includes(r['SEDE']));
+  if(smod.length)df=df.filter(r=>smod.includes(r['Modalidad_Calc']));
+  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
+  if(sp.length)df=df.filter(r=>sp.includes(r['PROGRAMA']));
+  if(spf.length)df=df.filter(r=>spf.includes(r['PROFESOR']));
+  if(sd.length)df=df.filter(r=>sd.includes(r['Dia_Semana']));
+
+  const diaMap={};
+  df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=r['COORDINADORA RESPONSABLE']+'|'+fmtDate(r['DIAS/FECHAS']);if(!diaMap[k])diaMap[k]={coord:r['COORDINADORA RESPONSABLE'],fecha:fmtDate(r['DIAS/FECHAS']),progs:new Set()};diaMap[k].progs.add(r['PROGRAMA'])});
+  const crit=Object.values(diaMap).filter(d=>d.progs.size>2);
+
+  $('cKPIs').innerHTML=`
+    <div class="metric"><div class="metric-lbl">Sesiones</div><div class="metric-val">${fmt(df.length)}</div></div>
+    <div class="metric"><div class="metric-lbl">Programas</div><div class="metric-val">${new Set(df.map(r=>r['PROGRAMA'])).size}</div></div>
+    <div class="metric"><div class="metric-lbl">Días Activos</div><div class="metric-val">${new Set(df.filter(r=>r['DIAS/FECHAS']).map(r=>fmtDate(r['DIAS/FECHAS']))).size}</div></div>
+    <div class="metric"><div class="metric-lbl">Días Críticos</div><div class="metric-val" style="color:${crit.length?'var(--red)':'var(--green)'}">${crit.length}</div></div>`;
+
+  // Bar top 20 days
+  const top20=Object.values(diaMap).sort((a,b)=>b.progs.size-a.progs.size).slice(0,20);
+  // Línea de límite como dataset separado (sin plugin annotation)
+  const limitLine = top20.map(()=>2);
+  makeChart('chartCBar',{type:'bar',data:{
+    labels:top20.map(d=>d.fecha),
+    datasets:[
+      {label:'Programas',data:top20.map(d=>d.progs.size),backgroundColor:top20.map(d=>d.progs.size>2?'rgba(239,68,68,.7)':'rgba(56,189,248,.7)'),borderColor:top20.map(d=>d.progs.size>2?'#ef4444':'#38bdf8'),borderWidth:1,type:'bar'},
+      {label:'Límite (2)',data:limitLine,type:'line',borderColor:'#ef4444',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,backgroundColor:'transparent'},
+    ]
+  },options:{plugins:{legend:{labels:{filter:item=>item.datasetIndex===1}}},scales:{x:{ticks:{maxRotation:45,color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'},min:0}}}});
+
+  $('cCrit').innerHTML=crit.length
+    ?buildTable(crit.map(d=>({Fecha:d.fecha,Coordinadora:abbr(d.coord,24),'N° Progs':d.progs.size,Programas:[...d.progs].join(' / ')})),['Fecha','Coordinadora','N° Progs','Programas'])
+    :'<div class="banner b-ok">¡Sin sobrecarga! Ningún día supera 2 programas.</div>';
+
+  $('cTable').innerHTML=buildTable(
+    df.slice(0,300).sort((a,b)=>(a['DIAS/FECHAS']||0)-(b['DIAS/FECHAS']||0)).map(r=>({
+      Fecha:      fmtDate(r['DIAS/FECHAS']),
+      Día:        r['Dia_Semana'],
+      Horario:    r['HORARIO'],
+      Programa:   abbr(r['PROGRAMA'],40),
+      Abrev:      r['NOMBRE ABREVIADO']||'',
+      Asignatura: abbr(r['ASIGNATURA'],30),
+      Tema:       abbr(r['TEMA']||'',30),
+      Profesor:   abbr(r['PROFESOR'],22),
+      Coordinadora: abbr(r['COORDINADORA RESPONSABLE'],24),
+      Sede:       r['SEDE'],
+      Sala:       r['SALA'],
+      Modalidad:  r['Modalidad_Calc'],
+      Horas:      r['HORAS']||'',
+    })),
+    ['Fecha','Día','Horario','Programa','Abrev','Asignatura','Tema','Profesor','Coordinadora','Sede','Sala','Modalidad','Horas']
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   COMPARATIVA TAB
+══════════════════════════════════════════════════════ */
+function renderComparativa() {
+  const df=getDF();
+  $('page').innerHTML=`
+  <div class="page-title">Comparativa de Carga</div>
+  <div class="frow" style="flex-wrap:wrap;gap:6px">
+    ${mkDF('t2Y','Año',        uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updComp()')}
+    ${mkDF('t2C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updComp()')}
+    ${mkDF('t2M','Modalidad',   ['Presencial','Online','Híbrido'],'updComp()')}
+  </div>
+  <div class="g2">
+    <div class="card"><div class="card-title">🏆 Ranking por Sesiones</div><div class="chart-box" style="height:320px"><canvas id="chartRank"></canvas></div></div>
+    <div class="card"><div class="card-title">🔥 Calor Semanal</div><div id="compHeat"></div></div>
+  </div>
+  <div class="page-subtitle">📋 Resumen</div><div id="compRes"></div>`;
+  updComp();
+}
+function updComp() {
+  let df=getDF();
+  const sy=getDF_sel('t2Y'),sc=getDF_sel('t2C'),sm=getDF_sel('t2M');
+  if(sy.length)df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
+  if(sm.length)df=df.filter(r=>sm.includes(r['Modalidad_Calc']));
+
+  const cnt={};df.forEach(r=>{cnt[r['COORDINADORA RESPONSABLE']]=(cnt[r['COORDINADORA RESPONSABLE']]||0)+1});
+  const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  makeChart('chartRank',{type:'bar',data:{labels:sorted.map(([c])=>abbr(c,18)),datasets:[{label:'Sesiones',data:sorted.map(([,v])=>v),backgroundColor:sorted.map((_,i)=>COLORS[i%COLORS.length]+'99'),borderColor:sorted.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#94a3b8'}},y:{ticks:{color:'#94a3b8',font:{size:10}}}}}});
+
+  const cdMap={};
+  df.filter(r=>r['Dia_Semana']!=='Domingo').forEach(r=>{
+    const c=r['COORDINADORA RESPONSABLE'];const d=r['Dia_Semana'];
+    if(!c||!d)return;
+    const dAb=d==='Lunes'?'Lun':d==='Martes'?'Mar':d==='Miércoles'?'Mié':d==='Jueves'?'Jue':d==='Viernes'?'Vie':'Sáb';
+    if(!cdMap[c])cdMap[c]={};cdMap[c][dAb]=(cdMap[c][dAb]||0)+1;
+  });
+  $('compHeat').innerHTML=Object.keys(cdMap).length?buildHeatmap(cdMap,Object.keys(cdMap).sort(),DAYS_ABR):'<p class="banner b-info">Sin datos.</p>';
+
+  const res=uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])).map(c=>{
+    const rows=df.filter(r=>r['COORDINADORA RESPONSABLE']===c);
+    return {Coordinadora:c,'Días Activos':new Set(rows.filter(r=>r['DIAS/FECHAS']).map(r=>fmtDate(r['DIAS/FECHAS']))).size,Sesiones:rows.length,Modalidades:uniq(rows.map(r=>r['Modalidad_Calc'])).join(', ')};
+  });
+  $('compRes').innerHTML=buildTable(res.sort((a,b)=>b.Sesiones-a.Sesiones),['Coordinadora','Sesiones','Días Activos','Modalidades']);
+}
+
+/* ══════════════════════════════════════════════════════
+   ANALYTICS TAB
+══════════════════════════════════════════════════════ */
+function renderAnalytics() {
+  const df=getDF();
+  const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
+  const cy=String(new Date().getFullYear());
+
+  $('page').innerHTML=`
+  <div class="page-title">Analytics Avanzado</div>
+  <div class="frow">
+    <div class="fg"><span class="flabel">Coordinadora</span>
+      <select class="fsel" id="anC" onchange="updAna()"><option value="">Todas</option>${uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])).map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+    </div>
+    <div class="fg"><span class="flabel">Programa</span>
+      <select class="fsel" id="anP" onchange="updAna()"><option value="">Todos</option></select>
+    </div>
+    <div class="fg" style="max-width:160px"><span class="flabel">&nbsp;</span><div class="banner b-info" id="anaCnt" style="margin:0">—</div></div>
+  </div>
+
+  <div class="page-subtitle">Busqueda Global</div>
+  <input class="finput" id="anSrch" placeholder="Buscar en todos los campos..." oninput="runSearch()" style="margin-bottom:8px;max-width:500px">
+  <div id="anSrchRes"></div>
+
+  <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+  <div class="page-subtitle">Tasa de Cumplimiento</div>
+  <div class="frow"><div class="fg" style="max-width:180px"><span class="flabel">Año</span>
+    <select class="fsel" id="anCY" onchange="updAna()">
+      ${years.map(y=>`<option${y===cy?' selected':''}>${y}</option>`).join('')}
+    </select>
+  </div></div>
+  <div class="metrics" id="anCKPIs"></div>
+  <div class="card"><div class="chart-box" style="height:260px"><canvas id="chartCumpl"></canvas></div></div>
+
+  <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+  <div class="page-subtitle">Comparativa Año vs Año</div>
+  <div class="frow">
+    <div class="fg" style="max-width:160px"><span class="flabel">Año A</span>
+      <select class="fsel" id="hA" onchange="updHistorico()">
+        ${[...years].reverse().map(y=>`<option>${y}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg" style="max-width:160px"><span class="flabel">Año B</span>
+      <select class="fsel" id="hB" onchange="updHistorico()">
+        ${years.length>=2?[...years].reverse().map((y,i)=>`<option${i===1?' selected':''}>${y}</option>`).join(''):'<option>—</option>'}
+      </select>
+    </div>
+  </div>
+  <div class="metrics" id="anHKPIs"></div>
+  <div class="card"><div class="chart-box" style="height:240px"><canvas id="chartHist"></canvas></div></div>
+
+  <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+  <div class="page-subtitle">Carga Mensual (Puntaje)</div>
+  <div class="frow"><div class="fg" style="max-width:180px"><span class="flabel">Año</span>
+    <select class="fsel" id="anCargaY" onchange="updCarga()">
+      ${[...years].reverse().map(y=>`<option>${y}</option>`).join('')}
+    </select>
+  </div></div>
+  <div class="card"><div class="chart-box" style="height:280px"><canvas id="chartCarga"></canvas></div></div>
+  <div class="page-subtitle">Heatmap de Carga</div>
+  <div id="cargaHeat"></div>`;
+
+  updAna();
+}
+
+function getAnaDf() {
+  let df=getDF();
+  const c=$('anC')?.value,p=$('anP')?.value;
+  if(c)df=df.filter(r=>r['COORDINADORA RESPONSABLE']===c);
+  if(p)df=df.filter(r=>r['PROGRAMA']===p);
+  return df;
+}
+
+function updAna() {
+  const df0=getDF();
+  const cv=$('anC')?.value;
+  const dfC=cv?df0.filter(r=>r['COORDINADORA RESPONSABLE']===cv):df0;
+  const ps=uniq(dfC.map(r=>r['PROGRAMA']));
+  const pp=$('anP');if(pp){const cur=pp.value;pp.innerHTML='<option value="">Todos</option>'+ps.map(p=>`<option${p===cur?' selected':''}>${esc(p)}</option>`).join('');}
+  const df=getAnaDf();
+  const cnt=$('anaCnt');if(cnt)cnt.textContent=`📊 ${fmt(df.length)} registros`;
+
+  const hoy=today();
+  const ysel=$('anCY')?.value;
+  const dfY=ysel?df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===ysel):df;
+  const pasadas=dfY.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).length;
+  const futuras=dfY.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']>hoy).length;
+  const tasa=dfY.length?+(pasadas/dfY.length*100).toFixed(1):0;
+  const k=$('anCKPIs');
+  if(k)k.innerHTML=`
+    <div class="metric"><div class="metric-lbl">Planificadas</div><div class="metric-val">${fmt(dfY.length)}</div></div>
+    <div class="metric"><div class="metric-lbl">Realizadas</div><div class="metric-val" style="color:var(--green)">${fmt(pasadas)}</div></div>
+    <div class="metric"><div class="metric-lbl">Pendientes</div><div class="metric-val" style="color:var(--orange)">${fmt(futuras)}</div></div>
+    <div class="metric"><div class="metric-lbl">Tasa Cumpl.</div><div class="metric-val">${tasa}%</div></div>`;
+
+  const cumplMap={};
+  dfY.forEach(r=>{const c=r['COORDINADORA RESPONSABLE'];if(!cumplMap[c])cumplMap[c]={t:0,r:0};cumplMap[c].t++;if(r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy)cumplMap[c].r++;});
+  const cL=Object.keys(cumplMap).sort((a,b)=>cumplMap[b].r/cumplMap[b].t-cumplMap[a].r/cumplMap[a].t);
+  const cV=cL.map(c=>+(cumplMap[c].r/cumplMap[c].t*100).toFixed(1));
+  makeChart('chartCumpl',{type:'bar',data:{labels:cL.map(c=>abbr(c,16)),datasets:[{label:'% Cumplido',data:cV,backgroundColor:cV.map(v=>`hsl(${v*1.2},65%,42%)`),borderColor:cV.map(v=>`hsl(${v*1.2},65%,55%)`),borderWidth:1}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:40,color:'#94a3b8'}},y:{min:0,max:100,ticks:{color:'#94a3b8'}}}}});
+
+  updHistorico();
+  updCarga();
+}
+
+function runSearch() {
+  const term=($('anSrch')?.value||'').toLowerCase().trim();
+  const el=$('anSrchRes');if(!el)return;
+  if(term.length<2){el.innerHTML='';return;}
+  const df=getAnaDf();
+  const hits=df.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(term)));
+  el.innerHTML=hits.length
+    ?`<div class="banner b-ok">✅ ${hits.length} resultados</div>`+buildTable(hits.slice(0,20).map(r=>({
+      Programa:     r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],36),
+      Asignatura:   abbr(r['ASIGNATURA'],28),
+      Tema:         abbr(r['TEMA']||'',28),
+      Profesor:     r['PROFESOR'],
+      Coordinadora: abbr(r['COORDINADORA RESPONSABLE'],22),
+      Fecha:        fmtDate(r['DIAS/FECHAS']),
+      Día:          r['Dia_Semana'],
+      Sede:         r['SEDE'],
+      Modalidad:    r['Modalidad_Calc'],
+    })),['Programa','Asignatura','Tema','Profesor','Coordinadora','Fecha','Día','Sede','Modalidad'])
+    :`<div class="banner b-info">Sin resultados para "${esc(term)}"</div>`;
+}
+
+function updHistorico() {
+  const df=getAnaDf();
+  const yA=$('hA')?.value,yB=$('hB')?.value;
+  if(!yA||!yB)return;
+  const dfA=df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===yA);
+  const dfB=df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===yB);
+  const sd=(a,b)=>b>0?+((a-b)/b*100).toFixed(1):0;
+  const h=$('anHKPIs');
+  if(h)h.innerHTML=[
+    ['📚 Sesiones',dfA.length,dfB.length],
+    ['🎓 Programas',new Set(dfA.map(r=>r['PROGRAMA'])).size,new Set(dfB.map(r=>r['PROGRAMA'])).size],
+    ['👨‍🏫 Profesores',new Set(dfA.map(r=>r['PROFESOR'])).size,new Set(dfB.map(r=>r['PROFESOR'])).size],
+    ['📅 Días Activos',new Set(dfA.filter(r=>r['DIAS/FECHAS']).map(r=>fmtDate(r['DIAS/FECHAS']))).size,new Set(dfB.filter(r=>r['DIAS/FECHAS']).map(r=>fmtDate(r['DIAS/FECHAS']))).size],
+  ].map(([lbl,a,b])=>{const d=sd(a,b);return`<div class="metric"><div class="metric-lbl">${lbl}</div><div class="metric-val">${fmt(a)}</div><div class="metric-delta ${d>=0?'delta-up':'delta-dn'}">${d>=0?'+':''}${d}%</div></div>`}).join('');
+
+  const aByM=Array(12).fill(0),bByM=Array(12).fill(0);
+  dfA.forEach(r=>{if(r['DIAS/FECHAS'])aByM[r['DIAS/FECHAS'].getMonth()]++});
+  dfB.forEach(r=>{if(r['DIAS/FECHAS'])bByM[r['DIAS/FECHAS'].getMonth()]++});
+  makeChart('chartHist',{type:'line',data:{labels:MESES_ABR,datasets:[
+    {label:yA,data:aByM,borderColor:COLORS[0],backgroundColor:'rgba(56,189,248,.08)',fill:false,tension:.3,pointRadius:3},
+    {label:yB,data:bByM,borderColor:COLORS[2],backgroundColor:'rgba(245,158,11,.08)',fill:false,tension:.3,pointRadius:3,borderDash:[5,5]},
+  ]},options:{scales:{x:{ticks:{color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'}}}}});
+}
+
+function updCarga() {
+  const df=getAnaDf();
+  const ysel=$('anCargaY')?.value;
+  const dfY=ysel?df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===ysel):df;
+
+  const pmMap={};
+  dfY.forEach(r=>{
+    const k=r['COORDINADORA RESPONSABLE']+'|||'+r['PROGRAMA'];
+    const m=r['DIAS/FECHAS']?r['DIAS/FECHAS'].getMonth():-1;
+    if(m<0)return;
+    if(!pmMap[k])pmMap[k]={coord:r['COORDINADORA RESPONSABLE'],prog:r['PROGRAMA'],byM:Array(12).fill(0),alum:0};
+    pmMap[k].byM[m]++;pmMap[k].alum=Math.max(pmMap[k].alum,r['N_ALUMNOS']||0);
+  });
+  const coordMon={};
+  Object.values(pmMap).forEach(({coord,byM,alum})=>{
+    if(!coordMon[coord])coordMon[coord]=Array(12).fill(0);
+    byM.forEach((s,m)=>{coordMon[coord][m]+=calcScore(s,alum)});
+  });
+  const cs=Object.keys(coordMon).sort();
+  makeChart('chartCarga',{type:'bar',data:{labels:MESES_ABR,datasets:cs.map((c,i)=>({label:abbr(c,18),data:coordMon[c].map(v=>+v.toFixed(1)),backgroundColor:COLORS[i%COLORS.length]+'88',borderColor:COLORS[i%COLORS.length],borderWidth:1}))},options:{plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}},scales:{x:{ticks:{color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'}}}}});
+
+  const el=$('cargaHeat');if(!el)return;
+  if(!cs.length){el.innerHTML='';return;}
+  let mxV=0; cs.forEach(c=>coordMon[c].forEach(v=>{mxV=Math.max(mxV,v)}));
+  el.innerHTML=`<div class="tbl-wrap"><table class="ht"><thead><tr><th>Coordinadora</th>${MESES_ABR.map(m=>`<th>${m}</th>`).join('')}</tr></thead><tbody>${cs.map(c=>`<tr><td class="ht-label">${esc(abbr(c,20))}</td>${coordMon[c].map(v=>{const pct=mxV>0?v/mxV:0;const bg=v?`hsla(${Math.round(20-pct*10)},${Math.round(70+pct*10)}%,${Math.round(50+pct*10)}%,${(0.15+pct*0.55).toFixed(2)})`:'transparent';return`<td style="background:${bg};font-size:10px">${v>0?v.toFixed(1):''}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   PROGRAMAS RESUMEN
+══════════════════════════════════════════════════════ */
+let _lastStats=[];
+function renderResumen() {
+  const df=getDF();
+  $('page').innerHTML=`
+  <div class="page-title">Resumen de Programas</div>
+  <div class="frow" style="flex-wrap:wrap;gap:6px">
+    ${mkDF('p4Y','Año',        uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updRes()')}
+    ${mkDF('p4C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updRes()')}
+    ${mkDF('p4P','Programa',    uniq(df.map(r=>r['PROGRAMA'])),'updRes()')}
+  </div>
+  <div id="resTable"></div>
+  <div class="btn-row">
+    <button class="btn btn-ghost btn-sm" onclick="DL.excel(_lastStats,'Resumen_Programas.xlsx')">📊 Excel</button>
+    <button class="btn btn-ghost btn-sm" onclick="DL.csv(_lastStats,'Resumen_Programas.csv')">📄 CSV</button>
+    <button class="btn btn-ghost btn-sm" onclick="DL.ics(getDF(),'Calendario.ics')">📅 iCal</button>
+  </div>`;
+  updRes();
+}
+function updRes() {
+  let df=getDF();
+  const sy=getDF_sel('p4Y'),sc=getDF_sel('p4C'),sp=getDF_sel('p4P');
+  if(sy.length)df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
+  if(sp.length)df=df.filter(r=>sp.includes(r['PROGRAMA']));
+  const hoy=today();
+  const pm={};
+  df.forEach(r=>{const p=r['PROGRAMA'];if(!pm[p])pm[p]={ini:r['DIAS/FECHAS'],fin:r['DIAS/FECHAS'],ses:0,coords:new Set()};if(r['DIAS/FECHAS']){if(r['DIAS/FECHAS']<pm[p].ini)pm[p].ini=r['DIAS/FECHAS'];if(r['DIAS/FECHAS']>pm[p].fin)pm[p].fin=r['DIAS/FECHAS'];}pm[p].ses++;pm[p].coords.add(r['COORDINADORA RESPONSABLE']);});
+  _lastStats=Object.entries(pm).map(([prog,d])=>{
+    const total=(d.fin-d.ini)/86400000;const elapsed=(hoy-d.ini)/86400000;
+    const avance=total<=0?100:Math.max(0,Math.min(100,Math.round(elapsed/total*100)));
+    return {PROGRAMA:prog,'Inicio':fmtDate(d.ini),'Fin':fmtDate(d.fin),'Sesiones':d.ses,'Coordinadoras':[...d.coords].join(', '),'Avance':avance};
+  }).sort((a,b)=>b.Avance-a.Avance);
+
+  $('resTable').innerHTML=`<div class="tbl-wrap mh"><table class="dt"><thead><tr>
+    <th>Programa</th><th>Inicio</th><th>Fin</th><th>Sesiones</th><th>Coordinadoras</th><th style="min-width:120px">Progreso</th>
+  </tr></thead><tbody>${_lastStats.map(r=>`<tr>
+    <td title="${esc(r.PROGRAMA)}">${esc(abbr(r.PROGRAMA,44))}</td>
+    <td>${r.Inicio}</td><td>${r.Fin}</td><td class="num">${r.Sesiones}</td>
+    <td title="${esc(r.Coordinadoras)}" class="wrap">${esc(abbr(r.Coordinadoras,44))}</td>
+    <td><div style="display:flex;align-items:center;gap:6px">
+      <div class="pb-wrap" style="flex:1"><div class="pb-fill" style="width:${r.Avance}%;background:${r.Avance===100?'var(--green)':r.Avance>60?'var(--blue)':'var(--orange)'}"></div></div>
+      <span style="font-size:10px;font-weight:700;width:28px;text-align:right">${r.Avance}%</span>
+    </div></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   CALIDAD & SEDE
+══════════════════════════════════════════════════════ */
+function renderCalidad() {
+  const df=getDF();
+  $('page').innerHTML=`
+  <div class="page-title">Calidad y Sede</div>
+  <div class="frow" style="flex-wrap:wrap;gap:6px">
+    ${mkDF('t5Y','Año',        uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updCalidad()')}
+    ${mkDF('t5C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCalidad()')}
+  </div>
+  <div class="g2">
+    <div class="card"><div class="card-title">Modalidad</div><div class="chart-box" style="height:200px"><canvas id="chartMod"></canvas></div></div>
+    <div class="card"><div class="card-title">Sede (Top 10)</div><div class="chart-box" style="height:200px"><canvas id="chartSede"></canvas></div></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="card-title">🕸️ Radar Sedes</div><div class="chart-box" style="height:220px"><canvas id="chartRS"></canvas></div></div>
+    <div class="card"><div class="card-title">🕸️ Radar Modalidades</div><div class="chart-box" style="height:220px"><canvas id="chartRM"></canvas></div></div>
+  </div>
+  <div class="page-subtitle">🧹 Auditoría de Datos</div><div id="auditTable"></div>`;
+  updCalidad();
+}
+function updCalidad() {
+  let df=getDF();
+  const sy=getDF_sel('t5Y'),sc=getDF_sel('t5C');
+  if(sy.length)df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
+
+  const modC={};df.forEach(r=>{modC[r['Modalidad_Calc']]=(modC[r['Modalidad_Calc']]||0)+1});
+  const mL=Object.keys(modC),mV=Object.values(modC);
+  makeChart('chartMod',{type:'doughnut',data:{labels:mL,datasets:[{data:mV,backgroundColor:COLORS.slice(0,mL.length),borderWidth:2,borderColor:'#172337'}]},options:{plugins:{legend:{position:'bottom'}}}});
+
+  const sedeC={};df.forEach(r=>{sedeC[r['SEDE']]=(sedeC[r['SEDE']]||0)+1});
+  const sArr=Object.entries(sedeC).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  makeChart('chartSede',{type:'bar',data:{labels:sArr.map(([s])=>abbr(s,18)),datasets:[{label:'Sesiones',data:sArr.map(([,v])=>v),backgroundColor:'rgba(56,189,248,.6)',borderColor:'#38bdf8',borderWidth:1}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:40,color:'#94a3b8',font:{size:10}}},y:{ticks:{color:'#94a3b8'}}}}});
+
+  const top8S=sArr.slice(0,8);
+  makeChart('chartRS',{type:'radar',data:{labels:top8S.map(([s])=>abbr(s,14)),datasets:[{label:'Sesiones',data:top8S.map(([,v])=>v),backgroundColor:'rgba(45,212,191,.2)',borderColor:'#2dd4bf',pointBackgroundColor:'#2dd4bf'}]},options:{plugins:{legend:{display:false}},scales:{r:{ticks:{color:'#94a3b8',backdropColor:'transparent'},grid:{color:'#2a3f5a'},angleLines:{color:'#2a3f5a'}}}}});
+  makeChart('chartRM',{type:'radar',data:{labels:mL,datasets:[{label:'Sesiones',data:mV,backgroundColor:'rgba(56,189,248,.2)',borderColor:'#38bdf8',pointBackgroundColor:'#38bdf8'}]},options:{plugins:{legend:{display:false}},scales:{r:{ticks:{color:'#94a3b8',backdropColor:'transparent'},grid:{color:'#2a3f5a'},angleLines:{color:'#2a3f5a'}}}}});
+
+  const FULL_DF=APP.df;
+  const tot=FULL_DF.length;
+  const auditFields=['DIAS/FECHAS','PROGRAMA','COORDINADORA RESPONSABLE','Modalidad_Calc','SEDE','HORARIO'];
+  const aud=auditFields.map(f=>({Campo:f,Faltantes:FULL_DF.filter(r=>!r[f]||IGNORE_VALS.has(String(r[f]).toLowerCase())).length,'%':+(FULL_DF.filter(r=>!r[f]||IGNORE_VALS.has(String(r[f]).toLowerCase())).length/tot*100).toFixed(1)+'%'}));
+  $('auditTable').innerHTML=buildTable(aud,['Campo','Faltantes','%'],false);
+}
+
+/* ══════════════════════════════════════════════════════
+   CALENDARIO TAB
+══════════════════════════════════════════════════════ */
+let _calDf=[];
+function renderCalendario() {
+  const df=getDF();
+  const now=new Date();
+  const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
+  const cy=String(now.getFullYear());
+  const MLIST=['Todos',...Object.values(MESES)];
+
+  $('page').innerHTML=`
+  <div class="page-title">Calendario Académico</div>
+  <div class="frow">
+    <div class="fg"><span class="flabel">Año</span>
+      <select class="fsel" id="calY" onchange="updCal()">
+        <option value="">Todos</option>${years.map(y=>`<option value="${y}"${y===cy?' selected':''}>${y}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg"><span class="flabel">Mes</span>
+      <select class="fsel" id="calM" onchange="updCal()">
+        ${MLIST.map((m,i)=>`<option value="${i}"${i===now.getMonth()+1?' selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    ${mkDF('calC','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCalCascade()')}
+    ${mkDF('calP','Programa',   uniq(df.map(r=>r['PROGRAMA'])),'updCal()')}
+  </div>
+  <div id="calGrid"></div>
+  <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+  <div class="page-subtitle" id="calTitle">Agenda</div>
+  <div id="calDetail"></div>
+  <div class="btn-row">
+    <button class="btn btn-ghost btn-sm" onclick="DL.ics(_calDf,'calendario.ics')">📅 iCal</button>
+    <button class="btn btn-ghost btn-sm" onclick="DL.excel(_calDf,'agenda.xlsx')">📊 Excel</button>
+  </div>`;
+  updCal();
+}
+
+function updCalCascade() {
+  const df=getDF();
+  const sc=getDF_sel('calC');
+  const dfF=sc.length?df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE'])):df;
+  const progs=uniq(dfF.map(r=>r['PROGRAMA']));
+  // Update calP dropdown options, keeping valid selections
+  const state=_DF['calP'];
+  if(state){
+    state.values=progs;
+    state.selected=new Set([...state.selected].filter(p=>progs.includes(p)));
+    const listEl=$('dflist_calP');
+    if(listEl) listEl.innerHTML=_dfItems('calP',progs,'');
+    _dfRefreshBtn('calP');
+  }
+  updCal();
+}
+function updCal() {
+  let df=getDF();
+  const ysel=$('calY')?.value;
+  const msel=parseInt($('calM')?.value||'0');
+  const sc=getDF_sel('calC'),sp=getDF_sel('calP');
+  if(ysel)df=df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===ysel);
+  if(msel>0)df=df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS'].getMonth()+1===msel);
+  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
+  if(sp.length)df=df.filter(r=>sp.includes(r['PROGRAMA']));
+  _calDf=df;
+
+  const now=new Date();
+  const ry=ysel?parseInt(ysel):now.getFullYear();
+  const rm=msel>0?msel:now.getMonth()+1;
+
+  // Events map
+  const eMap={};
+  df.forEach(r=>{
+    if(!r['DIAS/FECHAS'])return;
+    const d=r['DIAS/FECHAS'];
+    if(d.getFullYear()!==ry||d.getMonth()+1!==rm)return;
+    const day=d.getDate();
+    if(!eMap[day])eMap[day]=[];
+    eMap[day].push(r);
+  });
+
+  // Grid HTML
+  const first=new Date(ry,rm-1,1);
+  let dow=first.getDay(); // 0=Sun
+  // Convert to Mon-first: Mon=0,...,Sun=6
+  dow=dow===0?6:dow-1;
+  const dim=new Date(ry,rm,0).getDate();
+
+  let html=`<div class="cal-wrap"><div class="cal-head">${DAYS_MON.map(d=>`<div class="cal-dow">${d}</div>`).join('')}</div><div class="cal-body">`;
+  for(let i=0;i<dow;i++) html+=`<div class="cal-cell empty"></div>`;
+  for(let day=1;day<=dim;day++){
+    const isTd=day===now.getDate()&&rm===now.getMonth()+1&&ry===now.getFullYear();
+    html+=`<div class="cal-cell${isTd?' today':''}">`;
+    html+=`<div class="cal-num">${isTd?`<span>${day}</span>`:day}</div><div class="cal-events">`;
+    const evts=eMap[day]||[];
+    const show=evts.slice(0,4);
+    show.forEach((r,i)=>{
+      if(i===3&&evts.length>3){html+=`<div class="ev-more">+${evts.length-3} más</div>`;return;}
+      const progName = r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],35);
+      const asig=abbr(r['ASIGNATURA'],30);
+      const tema=r['TEMA']?abbr(r['TEMA'],28):'';
+      const hora=r['HORARIO'];
+      const prof=r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())?r['PROFESOR'].split(' ').slice(0,2).join(' '):'';
+      const sala=r['SALA']&&!IGNORE_VALS.has(r['SALA'].toLowerCase())?r['SALA']:'';
+      const meta=[prof?'👤 '+prof:'',sala?'📍 '+sala:''].filter(Boolean).join('  ');
+      html+=`<div class="ev-card">
+        <div class="ev-time">${esc(hora)}</div>
+        <div class="ev-prog">${esc(progName)}</div>
+        <div class="ev-sub">${esc(asig)}${tema?' · '+esc(tema):''}</div>
+        <div class="ev-meta">${esc(meta)}</div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  }
+  const total=dow+dim;
+  for(let i=0;i<(total%7===0?0:7-total%7);i++) html+=`<div class="cal-cell empty"></div>`;
+  html+=`</div></div>`;
+  $('calGrid').innerHTML=html;
+
+  const MLIST2=Object.values(MESES);
+  const ct=$('calTitle');if(ct)ct.textContent=`Agenda: ${MLIST2[rm-1]||''} ${ry}`;
+  const cd=$('calDetail');if(cd){
+    if(!df.length){cd.innerHTML='<div class="banner b-info">Sin clases en este período.</div>';return;}
+    const sorted=[...df].sort((a,b)=>(a['DIAS/FECHAS']||0)-(b['DIAS/FECHAS']||0));
+    cd.innerHTML=buildTable(sorted.map(r=>({
+      Fecha:        fmtDate(r['DIAS/FECHAS']),
+      Día:          r['Dia_Semana'],
+      Horario:      r['HORARIO'],
+      Programa:     r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],36),
+      Asignatura:   abbr(r['ASIGNATURA'],30),
+      Tema:         abbr(r['TEMA']||'',28),
+      Profesor:     r['PROFESOR'],
+      Coordinadora: abbr(r['COORDINADORA RESPONSABLE'],22),
+      Sede:         r['SEDE'],
+      Sala:         r['SALA'],
+      Modalidad:    r['Modalidad_Calc'],
+      Horas:        r['HORAS']||'',
+    })),['Fecha','Día','Horario','Programa','Asignatura','Tema','Profesor','Coordinadora','Sede','Sala','Modalidad','Horas']);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   RESERVAS TAB
+══════════════════════════════════════════════════════ */
+let _resDf=[];
+function renderReservas() {
+  if(!APP.dfRes.length){$('page').innerHTML='<div class="banner b-info" style="margin-top:20px">ℹ️ Carga un archivo de reservas en el panel lateral.</div>';return;}
+  const now=new Date();
+  const years=uniq(APP.dfRes.filter(r=>r['FECHA']).map(r=>String(r['FECHA'].getFullYear())));
+  const salas=uniq(APP.dfRes.map(r=>r['SALA']));
+  const MLIST=Object.values(MESES);
+
+  $('page').innerHTML=`
+  <div class="page-title">Reservas de Salas</div>
+  <div class="frow">
+    <div class="fg"><span class="flabel">Año</span>
+      <select class="fsel" id="resY" onchange="updRes2()">${years.map(y=>`<option${y===String(now.getFullYear())?' selected':''}>${y}</option>`).join('')}</select>
+    </div>
+    <div class="fg"><span class="flabel">Mes</span>
+      <select class="fsel" id="resM" onchange="updRes2()">${MLIST.map((m,i)=>`<option value="${i+1}"${i===now.getMonth()?' selected':''}>${m}</option>`).join('')}</select>
+    </div>
+    ${mkDF('resSa','Sala',salas,'updRes2()')}
+  </div>
+  <div id="resGrid"></div>
+  <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+  <div class="page-subtitle">📝 Lista</div>
+  <div id="resDetail"></div>
+  <div class="btn-row"><button class="btn btn-ghost btn-sm" onclick="DL.csv(_resDf.map(r=>({...r,FECHA:fmtDate(r['FECHA'])})),'reservas.csv')">📥 CSV</button></div>`;
+  updRes2();
+}
+function updRes2() {
+  const ysel=$('resY')?.value,msel=parseInt($('resM')?.value||'0');
+  const ssa=getDF_sel('resSa');
+  let df=APP.dfRes;
+  if(ysel)df=df.filter(r=>r['FECHA']&&String(r['FECHA'].getFullYear())===ysel);
+  if(msel)df=df.filter(r=>r['FECHA']&&r['FECHA'].getMonth()+1===msel);
+  if(ssa.length)df=df.filter(r=>ssa.includes(r['SALA']));
+  _resDf=df;
+
+  const ry=ysel?parseInt(ysel):new Date().getFullYear();
+  const rm=msel||new Date().getMonth()+1;
+  const now=new Date();
+  const eMap={};
+  df.forEach(r=>{if(!r['FECHA'])return;const d=r['FECHA'].getDate();if(!eMap[d])eMap[d]=[];eMap[d].push(r);});
+
+  const first=new Date(ry,rm-1,1);let dow=first.getDay();dow=dow===0?6:dow-1;
+  const dim=new Date(ry,rm,0).getDate();
+  let html=`<div class="cal-wrap"><div class="cal-head">${['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}</div><div class="cal-body">`;
+  for(let i=0;i<dow;i++)html+=`<div class="cal-cell empty"></div>`;
+  for(let day=1;day<=dim;day++){
+    const isTd=day===now.getDate()&&rm===now.getMonth()+1&&ry===now.getFullYear();
+    html+=`<div class="cal-cell${isTd?' today':''}"><div class="cal-num">${isTd?`<span>${day}</span>`:day}</div><div class="cal-events">`;
+    (eMap[day]||[]).slice(0,4).forEach((r,i,arr)=>{
+      if(i===3&&arr.length>3){html+=`<div class="ev-more">+${arr.length-3} más</div>`;return;}
+      const hora=[r['HORA_INICIO'],r['HORA_FIN']].filter(Boolean).join(' - ');
+      const sol=(r['SOLICITANTE']||'').split(' ').slice(0,2).join(' ');
+      html+=`<div class="ev-card" style="border-left-color:#8b5cf6"><div class="ev-time">${esc(hora)}</div><div class="ev-prog" style="color:#a78bfa">${esc((r['EVENTO']||'Reserva').slice(0,38))}</div><div class="ev-sub">📍 ${esc(r['SALA']||'—')}</div><div class="ev-meta">👤 ${esc(sol)}</div></div>`;
+    });
+    html+=`</div></div>`;
+  }
+  const tot2=dow+dim;for(let i=0;i<(tot2%7===0?0:7-tot2%7);i++)html+=`<div class="cal-cell empty"></div>`;
+  html+=`</div></div>`;
+  $('resGrid').innerHTML=html;
+  const rd=$('resDetail');
+  if(rd)rd.innerHTML=df.length?buildTable(df.map(r=>({Fecha:fmtDate(r['FECHA']),Inicio:r['HORA_INICIO'],Fin:r['HORA_FIN'],Sala:r['SALA'],Evento:r['EVENTO'],Solicitante:r['SOLICITANTE']})),['Fecha','Inicio','Fin','Sala','Evento','Solicitante']):'<div class="banner b-info">Sin reservas.</div>';
+}
+
+/* ══════════════════════════════════════════════════════
+   GESTIÓN TAB
+══════════════════════════════════════════════════════ */
+function renderGestion() {
+  $('page').innerHTML=`
+  <div class="page-title">Gestión Administrativa</div>
+  <div class="pwd-wrap"><input type="password" id="adPwd" placeholder="Contraseña Administrador" oninput="chkAdmin()"></div>
+  <div id="adContent">${APP.adminOk?'':'<div class="banner b-info">🔒 Ingrese contraseña para continuar.</div>'}</div>`;
+  if(APP.adminOk)showAdmin();
+}
+function chkAdmin(){
+  const v=$('adPwd')?.value;
+  if(v==='admin'){APP.adminOk=true;showAdmin();}
+  else if(v)$('adContent').innerHTML='<div class="banner b-err">Contraseña incorrecta</div>';
+}
+function showAdmin(){
+  const df=getDF();
+  const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
+  $('adContent').innerHTML=`
+  <div class="banner b-ok">✅ Acceso Concedido</div>
+  <div class="frow">
+    ${mkDF('gY','Año',years,'updAdmin()')}
+    <div class="fg"><span class="flabel">Mes para Carga</span><select class="fsel" id="gM" onchange="updAdmin()"><option value="">Todos</option>${Object.values(MESES).map(m=>`<option>${m}</option>`).join('')}</select></div>
+  </div>
+  <div class="page-subtitle">Matriz de Sesiones</div>
+  <div id="gestMatriz"></div>
+  <div class="page-subtitle">Carga Laboral</div>
+  <div class="g2"><div id="gestBars"></div><div id="gestMeta"></div></div>
+  <div class="page-subtitle">Balanceo y Reasignacion</div>
+  <div id="gestBal"></div>`;
+  updAdmin();
+}
+function updAdmin(){
+  let df=getDF();
+  const sy=getDF_sel('gY'),mes=$('gM')?.value;
+  if(sy.length)df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+
+  // Matriz
+  const matMap={};
+  df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=abbr(r['COORDINADORA RESPONSABLE'],22)+' | '+abbr(r['PROGRAMA'],30);const m=MESES[r['DIAS/FECHAS'].getMonth()+1];if(!matMap[k])matMap[k]={};matMap[k][m]=(matMap[k][m]||0)+1;});
+  const keys=Object.keys(matMap).sort();let mxM=0;keys.forEach(k=>Object.values(matMap[k]).forEach(v=>{mxM=Math.max(mxM,v)}));
+  $('gestMatriz').innerHTML=`<div class="tbl-wrap mh"><table class="ht"><thead><tr><th>Coord | Programa</th>${MESES_ABR.map(m=>`<th>${m}</th>`).join('')}</tr></thead><tbody>${keys.map(k=>`<tr><td class="ht-label">${esc(k)}</td>${MESES_ABR.map((_,i)=>{const m=Object.values(MESES)[i];const v=matMap[k][m]||0;const pct=mxM>0?v/mxM:0;const bg=v?`hsla(${Math.round(120-pct*120)},${Math.round(60+pct*20)}%,${Math.round(40+pct*15)}%,${(0.2+pct*0.6).toFixed(2)})`:'transparent';return`<td style="background:${bg};font-size:10px;font-weight:${v?700:400}">${v||''}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`;
+
+  // Carga
+  let dfC=mes?df.filter(r=>r['Mes']===mes):df;
+  const load=computeLoadByCoord(dfC);
+  const pMax=load[0]?.puntaje||0, pMin=load[load.length-1]?.puntaje||0;
+  const avg=load.length?load.reduce((s,r)=>s+r.puntaje,0)/load.length:0;
+  $('gestBars').innerHTML=load.length?buildScoreBars(load,pMax):'<div class="banner b-info">Sin datos de carga.</div>';
+  $('gestMeta').innerHTML=`
+    <div class="metric" style="margin-bottom:8px"><div class="metric-lbl">Promedio</div><div class="metric-val" style="font-size:20px">${avg.toFixed(2)}</div></div>
+    <div class="metric" style="margin-bottom:8px"><div class="metric-lbl">Desbalance (Max-Min)</div><div class="metric-val" style="font-size:20px;color:var(--red)">${(pMax-pMin).toFixed(1)}</div></div>
+    <div class="metric"><div class="metric-lbl">Coordinadoras</div><div class="metric-val" style="font-size:20px">${load.length}</div></div>`;
+
+  // Balanceo section
+  const coordsPool=uniq(APP.df.map(r=>r['COORDINADORA RESPONSABLE']));
+  const progLoad=computeLoadByProgInDf(dfC);
+  $('gestBal').innerHTML=`
+  <div class="btn-row" style="margin-bottom:10px">
+    <button class="btn btn-primary" onclick="genBalanceo()">🤖 Generar Balanceo Automático</button>
+    <button class="btn btn-ghost btn-sm" onclick="APP.simCambios={};APP.propuesta=null;updAdmin()">🗑️ Resetear Simulador</button>
+  </div>
+  <div id="propWrap"></div>
+  <div class="page-subtitle">Reasignacion Manual</div>
+  <div class="frow">
+    <div class="fg"><span class="flabel">Programa</span>
+      <select class="fsel" id="simProg">${progLoad.map(p=>`<option value="${esc(p.prog)}">${esc(abbr(p.prog,46))}</option>`).join('')}</select>
+    </div>
+    <div class="fg"><span class="flabel">Nueva Coordinadora</span>
+      <select class="fsel" id="simNew">${coordsPool.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+    </div>
+    <div class="fg" style="max-width:160px;justify-content:flex-end;padding-top:16px">
+      <button class="btn btn-success" onclick="applyManual()">🔄 Aplicar</button>
+    </div>
+  </div>
+  ${Object.keys(APP.simCambios).length?`<div class="page-subtitle">Cambios en Simulacion</div><div class="tbl-wrap"><table class="dt"><thead><tr><th>Programa</th><th>Original</th><th>Simulado</th></tr></thead><tbody>${Object.entries(APP.simCambios).map(([p,c])=>`<tr><td>${esc(abbr(p,44))}</td><td style="color:var(--t3)">${esc(progLoad.find(pl=>pl.prog===p)?.coord||'—')}</td><td style="color:var(--green)">${esc(c)}</td></tr>`).join('')}</tbody></table></div>`:''}`;
+
+  // Show propuesta if exists
+  if(APP.propuesta) renderPropuesta(APP.propuesta, load, progLoad);
+}
+
+function computeLoadByProgInDf(df) {
+  const map={};
+  df.forEach(r=>{const k=r['PROGRAMA'];if(!map[k])map[k]={prog:k,coord:r['COORDINADORA RESPONSABLE'],ses:0,alum:0};map[k].ses++;map[k].alum=Math.max(map[k].alum,r['N_ALUMNOS']||0);});
+  return Object.values(map).map(d=>({...d,puntaje:calcScore(d.ses,d.alum)}));
+}
+
+function genBalanceo(){
+  const df=getDF();const mes=$('gM')?.value;
+  let dfC=mes?df.filter(r=>r['Mes']===mes):df;
+  const progLoad=computeLoadByProgInDf(dfC);
+  const SPECIAL=new Set(['','nan','none','n/a','por definir','sin asignar','sin coord']);
+  const coords=uniq(APP.df.map(r=>r['COORDINADORA RESPONSABLE'])).filter(c=>!SPECIAL.has(c.toLowerCase()));
+  if(!coords.length){showToast('Sin coordinadoras válidas','warn');return;}
+
+  const loads={};coords.forEach(c=>loads[c]=0);
+  const changes={};
+  progLoad.sort((a,b)=>b.puntaje-a.puntaje).forEach(({prog,coord,puntaje})=>{
+    const best=coords.reduce((a,b)=>(loads[a]||0)<=(loads[b]||0)?a:b);
+    loads[best]=(loads[best]||0)+puntaje;
+    if(best!==coord) changes[prog]=best;
+  });
+  APP.propuesta=Object.keys(changes).length?changes:null;
+  updAdmin();
+}
+
+function renderPropuesta(changes, load, progLoad){
+  const el=$('propWrap');if(!el)return;
+  const rows=Object.entries(changes).map(([p,nc])=>({Programa:abbr(p,44),'Actual':progLoad.find(pl=>pl.prog===p)?.coord||'—','Propuesta 🔄':nc}));
+  el.innerHTML=`<div class="banner b-info">💡 ${rows.length} programa(s) para reasignar.</div>
+  <div class="tbl-wrap" style="max-height:200px;overflow-y:auto;margin-bottom:10px">${buildTable(rows,['Programa','Actual','Propuesta 🔄'],false)}</div>
+  <div class="btn-row">
+    <button class="btn btn-success" onclick="aceptarProp()">✅ Aceptar</button>
+    <button class="btn btn-danger btn-sm" onclick="APP.propuesta=null;$('propWrap').innerHTML=''">❌ Descartar</button>
+  </div>`;
+}
+function aceptarProp(){if(APP.propuesta){Object.assign(APP.simCambios,APP.propuesta);APP.propuesta=null;}updAdmin();}
+function applyManual(){const p=$('simProg')?.value,c=$('simNew')?.value;if(p&&c){APP.simCambios[p]=c;updAdmin();}}
+
+/* ══════════════════════════════════════════════════════
+   TURNOS TAB
+══════════════════════════════════════════════════════ */
+function renderTurnos() {
+  const df=getDF();
+  const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
+  const now=new Date();
+  $('page').innerHTML=`
+  <div class="page-title">Auditoria de Turnos</div>
+  <div class="frow">
+    <div class="fg"><span class="flabel">Año</span><select class="fsel" id="tY" onchange="updTurnos()">${years.map(y=>`<option${y===String(now.getFullYear())?' selected':''}>${y}</option>`).join('')}</select></div>
+    <div class="fg"><span class="flabel">Mes</span><select class="fsel" id="tM" onchange="updTurnos()">${Object.values(MESES).map((m,i)=>`<option value="${i+1}"${i===now.getMonth()?' selected':''}>${m}</option>`).join('')}</select></div>
+  </div>
+  <div id="turnosContent"></div>`;
+  updTurnos();
+}
+function updTurnos(){
+  let df=getDF();
+  const y=$('tY')?.value,m=parseInt($('tM')?.value||'0');
+  if(y)df=df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===y);
+  if(m)df=df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS'].getMonth()+1===m);
+  const el=$('turnosContent');if(!el)return;
+  if(!df.length){el.innerHTML='<div class="banner b-info">Sin clases en este período.</div>';return;}
+
+  // Sedes
+  const sdMap={};df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=fmtDate(r['DIAS/FECHAS'])+'|'+r['SEDE'];if(!sdMap[k])sdMap[k]={fecha:fmtDate(r['DIAS/FECHAS']),sede:r['SEDE'],coords:new Set()};sdMap[k].coords.add(r['COORDINADORA RESPONSABLE'])});
+  const cSede=Object.values(sdMap).filter(d=>d.coords.size>2);
+  // Carga
+  const cdMap={};df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=r['COORDINADORA RESPONSABLE']+'|'+fmtDate(r['DIAS/FECHAS']);if(!cdMap[k])cdMap[k]={coord:r['COORDINADORA RESPONSABLE'],fecha:fmtDate(r['DIAS/FECHAS']),progs:new Set()};cdMap[k].progs.add(r['PROGRAMA'])});
+  const cCarga=Object.values(cdMap).filter(d=>d.progs.size>2);
+  // Logística
+  const lgMap={};df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=r['COORDINADORA RESPONSABLE']+'|'+fmtDate(r['DIAS/FECHAS']);if(!lgMap[k])lgMap[k]={coord:r['COORDINADORA RESPONSABLE'],fecha:fmtDate(r['DIAS/FECHAS']),sedes:new Set()};lgMap[k].sedes.add(r['SEDE'])});
+  const cLog=Object.values(lgMap).filter(d=>d.sedes.size>1);
+  // Equidad
+  const eqMap={};df.forEach(r=>{const c=r['COORDINADORA RESPONSABLE'];if(!eqMap[c])eqMap[c]={dias:new Set(),sab:new Set(),sedes:new Set()};if(r['DIAS/FECHAS']){eqMap[c].dias.add(fmtDate(r['DIAS/FECHAS']));if(r['DIAS/FECHAS'].getDay()===6)eqMap[c].sab.add(fmtDate(r['DIAS/FECHAS']));}eqMap[c].sedes.add(r['SEDE'])});
+  const maxDias=Math.max(...Object.values(eqMap).map(e=>e.dias.size),1);
+
+  el.innerHTML=`
+  <div class="page-subtitle">1. 📍 Ocupación de Sedes (max 2 coords/sede/día)</div>
+  ${cSede.length?`<div class="banner b-warn">⚠️ ${cSede.length} días con más de 2 coordinadoras en una sede.</div>`+buildTable(cSede.map(d=>({Fecha:d.fecha,Sede:d.sede,'Coords':d.coords.size})),['Fecha','Sede','Coords'],false):'<div class="banner b-ok">✅ Sedes balanceadas.</div>'}
+
+  <div class="page-subtitle">2. ⚡ Carga Diaria (max 2 programas/coord/día)</div>
+  ${cCarga.length?`<div class="banner b-err">🚫 ${cCarga.length} casos de sobrecarga.</div>`+buildTable(cCarga.map(d=>({Fecha:d.fecha,Coordinadora:abbr(d.coord,24),'Nº Progs':d.progs.size})),['Fecha','Coordinadora','Nº Progs'],false):'<div class="banner b-ok">✅ Carga saludable.</div>'}
+
+  <div class="page-subtitle">3. 🏃 Desplazamientos (sin cruces de sede)</div>
+  ${cLog.length?`<div class="banner b-err">🚨 ${cLog.length} cruces de sede.</div>`+buildTable(cLog.map(d=>({Fecha:d.fecha,Coordinadora:abbr(d.coord,24),'Sedes':d.sedes.size})),['Fecha','Coordinadora','Sedes'],false):'<div class="banner b-ok">✅ Logística OK.</div>'}
+
+  <div class="page-subtitle">Balance y Equidad</div>
+  <div class="tbl-wrap"><table class="dt"><thead><tr><th>Coordinadora</th><th>Días Activos</th><th>Sábados</th><th>Sedes</th><th>Barra</th></tr></thead>
+  <tbody>${Object.entries(eqMap).sort((a,b)=>b[1].dias.size-a[1].dias.size).map(([c,e])=>`<tr>
+    <td>${esc(c)}</td><td>${e.dias.size}</td>
+    <td style="color:${e.sab.size>2?'var(--red)':'var(--t2)'}">${e.sab.size}${e.sab.size>2?' ⚠️':''}</td>
+    <td>${e.sedes.size}</td>
+    <td style="min-width:80px"><div class="pb-wrap"><div class="pb-fill" style="width:${Math.min(100,e.dias.size/maxDias*100).toFixed(0)}%"></div></div></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   VALIDACIONES TAB
+══════════════════════════════════════════════════════ */
+function renderValidaciones(){
+  const df=getDF();
+  $('page').innerHTML=`
+  <div class="page-title">Validaciones</div>
+  <div class="banner b-info">💡 Análisis de consistencia de la programación.</div>
+  <div id="valContent"></div>`;
+
+  const IGNORE_P=new Set(['','nan','por definir','sin profesor']);
+  const IGNORE_S=new Set(['','nan','sin sala','online','zoom','por asignar']);
+
+  const sinProf=df.filter(r=>IGNORE_P.has((r['PROFESOR']||'').toLowerCase())).length;
+  const sinSala=df.filter(r=>IGNORE_S.has((r['SALA']||'').toLowerCase())).length;
+  const sinSede=df.filter(r=>!r['SEDE']||IGNORE_VALS.has((r['SEDE']||'').toLowerCase())).length;
+  const sinHor=df.filter(r=>!r['HORARIO']||IGNORE_VALS.has((r['HORARIO']||'').toLowerCase())).length;
+
+  // Date anomalies
+  const now=new Date(); const y5=new Date(); y5.setFullYear(y5.getFullYear()+5);
+  const fechasRaras=df.filter(r=>r['DIAS/FECHAS']&&(r['DIAS/FECHAS']<new Date(2000,0,1)||r['DIAS/FECHAS']>y5)).length;
+
+  $('valContent').innerHTML=`
+  <div class="g4" style="margin-top:12px">
+    <div class="metric"><div class="metric-lbl">Sin Profesor</div><div class="metric-val" style="color:${sinProf?'var(--orange)':'var(--green)'}">${sinProf}</div></div>
+    <div class="metric"><div class="metric-lbl">Sin Sala</div><div class="metric-val" style="color:${sinSala?'var(--orange)':'var(--green)'}">${sinSala}</div></div>
+    <div class="metric"><div class="metric-lbl">Sin Sede</div><div class="metric-val" style="color:${sinSede?'var(--orange)':'var(--green)'}">${sinSede}</div></div>
+    <div class="metric"><div class="metric-lbl">Sin Horario</div><div class="metric-val" style="color:${sinHor?'var(--orange)':'var(--green)'}">${sinHor}</div></div>
+  </div>
+  ${fechasRaras?`<div class="banner b-warn">⚠️ ${fechasRaras} fechas fuera de rango esperado (2000-hoy+5 años).</div>`:''}
+
+  <div class="page-subtitle" style="margin-top:14px">👥 Verificación de Cobertura</div>
+  ${buildTable(uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])).map(c=>{
+    const rows=df.filter(r=>r['COORDINADORA RESPONSABLE']===c);
+    const sinP=rows.filter(r=>IGNORE_P.has((r['PROFESOR']||'').toLowerCase())).length;
+    const sinSa=rows.filter(r=>IGNORE_S.has((r['SALA']||'').toLowerCase())).length;
+    return {Coordinadora:c,'Sesiones':rows.length,'Sin Profesor':sinP,'Sin Sala':sinSa,'% Ok':+((1-(sinP+sinSa)/(rows.length*2))*100).toFixed(0)+'%'};
+  }).sort((a,b)=>b['Sesiones']-a['Sesiones']),['Coordinadora','Sesiones','Sin Profesor','Sin Sala','% Ok'])}
+
+  <div class="page-subtitle">🔁 Programas Duplicados (misma fecha + coord)</div>
+  ${(()=>{
+    const mp={};df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=r['PROGRAMA']+'|'+fmtDate(r['DIAS/FECHAS'])+'|'+r['COORDINADORA RESPONSABLE'];mp[k]=(mp[k]||0)+1;});
+    const dups=Object.entries(mp).filter(([,v])=>v>1).map(([k,v])=>{const [p,f,c]=k.split('|');return{Programa:abbr(p,40),Fecha:f,Coordinadora:abbr(c,24),'Veces':v}});
+    return dups.length?buildTable(dups,['Programa','Fecha','Coordinadora','Veces'],false):'<div class="banner b-ok">✅ Sin duplicados detectados.</div>';
+  })()}`;
+}
+
+/* ══════════════════════════════════════════════════════
+   MANUAL & FAQs
+══════════════════════════════════════════════════════ */
+function renderManual(){
+  const STEPS=[
+    ['📂 Carga de Datos','Usa el panel lateral izquierdo para cargar tu archivo académico. Acepta Excel (.xlsx, .xls) y CSV. También puedes arrastrar y soltar el archivo directamente en la zona de carga. Una vez cargado verás el número de registros procesados.','Las columnas se detectan automáticamente por nombre: DIAS/FECHAS, COORDINADORA RESPONSABLE, PROGRAMA, SEDE, HORARIO, PROFESOR, ASIGNATURA, SALA, Nº ALUMNOS. Si tu columna tiene un nombre parecido, también será detectada.'],
+    ['📊 Dashboard','El Dashboard Home muestra KPIs clave: total de sesiones, programas activos, clases de hoy y próximos 7 días. Las alertas activas se calculan automáticamente al cargar los datos.','El gráfico de tendencia mensual muestra la evolución del número de clases a lo largo del tiempo. Los accesos rápidos te llevan directamente a las secciones más usadas.'],
+    ['coord','El tab Coordinadoras permite filtrar por hasta 8 criterios simultáneos: año, mes, sede, modalidad, coordinadora, programa, profesor y día de la semana.','El gráfico muestra los 20 días con más carga. Las barras rojas indican días críticos (más de 2 programas). La tabla de días críticos muestra el detalle completo.'],
+    ['📅 Calendarios','El Calendario Académico muestra una vista mensual tipo agenda con todos los eventos. Los eventos muestran horario, programa, asignatura, profesor y sala.','Puedes exportar el calendario en formato iCal (.ics) para importarlo en Google Calendar, Outlook o Apple Calendar. También puedes exportar a Excel filtrado por el mes y período seleccionado.'],
+    ['⚙️ Administración','Accede con la contraseña <strong>admin</strong> al panel de gestión. Aquí puedes ver la matriz de sesiones mensuales y calcular la carga laboral por puntaje.','El sistema de balanceo automático distribuye los programas equitativamente entre coordinadoras. También puedes hacer reasignaciones manuales programa por programa.'],
+  ];
+  $('page').innerHTML=`<div class="page-title">Manual de Usuario</div>
+  <div class="subtabs" style="margin:-20px -20px 20px;background:var(--bg1);border-radius:0">
+    ${STEPS.map(([t],i)=>`<button class="stab${i===0?' active':''}" onclick="showManStep(${i},this)">${t}</button>`).join('')}
+  </div>
+  <div id="manBody">${buildManStep(STEPS[0])}</div>`;
+  window._manSteps=STEPS;
+}
+function buildManStep([t,p1,p2]){return`<div class="card"><div class="card-title">${t}</div><p style="color:var(--t2);font-size:13px;line-height:1.8;margin-bottom:10px">${p1}</p><p style="color:var(--t3);font-size:12px;line-height:1.7">${p2}</p></div>`;}
+function showManStep(i,btn){document.querySelectorAll('#page .stab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');$('manBody').innerHTML=buildManStep(window._manSteps[i]);}
+
+function renderFAQs(){
+  const FAQS=[
+    ['¿Por qué no se ven mis datos?','Verifica que el archivo tenga datos a partir de la fila 2 (fila 1 = headers). El sistema detecta automáticamente columnas como DIAS/FECHAS, PROGRAMA, COORDINADORA RESPONSABLE. Si tu columna tiene un nombre diferente como "Fecha Clase" también será detectada.'],
+    ['¿Cómo exporto a Google Calendar?','Ve a la pestaña Calendario Académico, selecciona el período deseado y haz clic en "📅 iCal". Luego en Google Calendar: Configuración → Importar → sube el archivo .ics.'],
+    ['¿Cómo funciona el Puntaje de Carga?','El puntaje es: (Sesiones ÷ 4) × Factor_Alumnos. El factor va desde 1.0 (menos de 20 alumnos) hasta 2.0 (50 o más alumnos). Esto pondera tanto la cantidad de clases como el tamaño del grupo.'],
+    ['¿Qué contraseña usa el panel Admin?','La contraseña por defecto es "admin". Para producción, edita la función chkAdmin() en el código y cambia el valor.'],
+    ['¿Puedo usar múltiples filtros a la vez?','Sí. Mantén Ctrl (Windows) o Cmd (Mac) para seleccionar varios valores en los filtros de lista. Los filtros en cascada se aplican en orden y se combinan entre sí.'],
+    ['¿Qué formatos de fecha acepta?','DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, y fechas seriales de Excel. Las fechas en texto como "01/03/2025" también se detectan automáticamente.'],
+    ['¿Funciona sin conexión a internet?','Sí, una vez cargada la página en tu navegador. Solo las fuentes de Google Fonts y las librerías Chart.js / SheetJS se cargan desde CDN al inicio.'],
+  ];
+  $('page').innerHTML=`<div class="page-title">Preguntas Frecuentes</div>${FAQS.map(([q,a])=>`<div class="faq"><div class="faq-q">❓ ${q}</div><div class="faq-a">${a}</div></div>`).join('')}`;
+}
+
+/* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+// Add select-all and clear buttons to any multi-select filter
+function enhanceMultiSelects(container){
+  const cont = container || document.getElementById('page');
+  if(!cont) return;
+  cont.querySelectorAll('select[multiple]').forEach(sel=>{
+    // Skip if already enhanced or in sidebar
+    if(sel.dataset.enhanced || sel.closest('.sb-scroll')) return;
+    sel.dataset.enhanced='1';
+    const wrap = document.createElement('div');
+    wrap.style.cssText='margin-top:3px;display:flex;gap:4px;flex-wrap:wrap';
+    
+    const btnAll = document.createElement('button');
+    btnAll.className='fb'; btnAll.textContent='Todos';
+    btnAll.type='button';
+    btnAll.onclick=()=>{
+      [...sel.options].forEach(o=>o.selected=true);
+      sel.dispatchEvent(new Event('change'));
+    };
+    
+    const btnNone = document.createElement('button');
+    btnNone.className='fb'; btnNone.textContent='Limpiar';
+    btnNone.type='button';
+    btnNone.onclick=()=>{
+      [...sel.options].forEach(o=>o.selected=false);
+      sel.dispatchEvent(new Event('change'));
+    };
+    
+    const hint = document.createElement('span');
+    hint.style.cssText='font-size:9px;color:var(--t4);align-self:center';
+    hint.textContent='Ctrl+clic para varios';
+    
+    wrap.appendChild(btnAll);
+    wrap.appendChild(btnNone);
+    wrap.appendChild(hint);
+    sel.parentNode.insertBefore(wrap, sel.nextSibling);
+  });
+}
+
+// Override refreshView to enhance selects after render
+const _origRefreshView = null; // will be set below
+
+function init(){
+  wireUpload('fiMain','main');
+  wireUpload('fiRes','res');
+  wireDrop('uzMain','main');
+  wireDrop('uzRes','res');
+  // Wire overlay click (must happen after DOM ready)
+  const ovl = $('sbOverlay');
+  if(ovl) ovl.onclick=()=>{$('sidebar').classList.remove('open');ovl.classList.remove('active');};
+  renderSubtabs();
+  renderEmpty();
+}
+document.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
+
