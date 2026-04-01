@@ -265,6 +265,22 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 .df-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .df-empty{padding:10px;font-size:11px;color:var(--t4);text-align:center}
 
+
+/* BADGE ENCUESTA */
+.enc-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,.15);color:var(--orange);border:1px solid rgba(245,158,11,.35);border-radius:4px;padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.04em;animation:enc-pulse 2s ease-in-out infinite;white-space:nowrap;vertical-align:middle;margin-left:5px}
+.enc-badge-asig{display:inline-flex;align-items:center;gap:3px;background:rgba(245,158,11,.1);color:var(--orange);border-radius:3px;padding:1px 5px;font-size:8px;font-weight:700;white-space:nowrap;vertical-align:middle;margin-left:4px}
+@keyframes enc-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+/* DETALLE PROGRAMA */
+.prog-row td{vertical-align:middle}
+.prog-row.open td{background:rgba(56,189,248,.04)}
+.prog-detail-row{display:none}
+.prog-detail-row.open{display:table-row}
+.prog-detail-cell{padding:0!important;border-bottom:1px solid var(--border)!important}
+.prog-detail-inner{padding:10px 14px 14px 32px;background:var(--bg0);border-top:1px solid var(--border2)}
+.prog-toggle{background:none;border:none;cursor:pointer;color:var(--t4);font-size:11px;padding:2px 6px;border-radius:3px;transition:all .15s;line-height:1}
+.prog-toggle:hover{color:var(--blue);background:rgba(56,189,248,.08)}
+.prog-toggle.open{color:var(--blue)}
+.detail-title{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -2152,25 +2168,240 @@ function updRes() {
   if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
   if(sp.length)df=df.filter(r=>sp.includes(r['PROGRAMA']));
   const hoy=today();
+
+  // ── Construir resumen por programa ─────────────────────────────────────
   const pm={};
-  df.forEach(r=>{const p=r['PROGRAMA'];if(!pm[p])pm[p]={ini:r['DIAS/FECHAS'],fin:r['DIAS/FECHAS'],ses:0,coords:new Set()};if(r['DIAS/FECHAS']){if(r['DIAS/FECHAS']<pm[p].ini)pm[p].ini=r['DIAS/FECHAS'];if(r['DIAS/FECHAS']>pm[p].fin)pm[p].fin=r['DIAS/FECHAS'];}pm[p].ses++;pm[p].coords.add(r['COORDINADORA RESPONSABLE']);});
+  df.forEach(r=>{
+    const p=r['PROGRAMA']; if(!p) return;
+    if(!pm[p]) pm[p]={ini:r['DIAS/FECHAS'],fin:r['DIAS/FECHAS'],ses:0,coords:new Set(),rows:[]};
+    const d=r['DIAS/FECHAS'];
+    if(d){if(d<pm[p].ini)pm[p].ini=d; if(d>pm[p].fin)pm[p].fin=d;}
+    pm[p].ses++;
+    pm[p].coords.add(r['COORDINADORA RESPONSABLE']);
+    pm[p].rows.push(r);
+  });
+
+  const en7 = new Date(hoy); en7.setDate(en7.getDate()+7);
+
   _lastStats=Object.entries(pm).map(([prog,d])=>{
-    const total=(d.fin-d.ini)/86400000;const elapsed=(hoy-d.ini)/86400000;
+    const total=(d.fin-d.ini)/86400000, elapsed=(hoy-d.ini)/86400000;
     const avance=total<=0?100:Math.max(0,Math.min(100,Math.round(elapsed/total*100)));
-    return {PROGRAMA:prog,'Inicio':fmtDate(d.ini),'Fin':fmtDate(d.fin),'Sesiones':d.ses,'Coordinadoras':[...d.coords].join(', '),'Avance':avance};
+
+    // Encuesta nivel PROGRAMA: el programa mismo finaliza en 7 días
+    const encuestaProg = d.fin >= hoy && d.fin <= en7;
+
+    // Encuesta nivel ASIGNATURA: alguna asignatura del programa finaliza en 7 días
+    // (aunque el programa siga corriendo más tiempo)
+    const asigEncuestas = [];
+    const amTmp = {};
+    d.rows.forEach(r => {
+      const a = r['ASIGNATURA'] || 'Sin asignatura';
+      if (!amTmp[a]) amTmp[a] = {ini:null, fin:null};
+      const dt = r['DIAS/FECHAS'];
+      if (dt) {
+        if (!amTmp[a].ini || dt < amTmp[a].ini) amTmp[a].ini = dt;
+        if (!amTmp[a].fin || dt > amTmp[a].fin) amTmp[a].fin = dt;
+      }
+    });
+    Object.entries(amTmp).forEach(([nombre, ad]) => {
+      if (ad.fin && ad.fin >= hoy && ad.fin <= en7) {
+        asigEncuestas.push({nombre, fin: ad.fin});
+      }
+    });
+
+    // encuesta = true si hay encuesta a nivel programa O a nivel asignatura
+    const encuesta = encuestaProg || asigEncuestas.length > 0;
+
+    return {
+      PROGRAMA:     prog,
+      Inicio:       fmtDate(d.ini),
+      Fin:          fmtDate(d.fin),
+      Sesiones:     d.ses,
+      Coordinadoras:[...d.coords].join(', '),
+      Avance:       avance,
+      encuesta,
+      encuestaProg,
+      asigEncuestas,    // [{nombre, fin}] de asignaturas que finalizan en 7 días
+      _rows:        d.rows,
+      _fin:         d.fin,
+    };
   }).sort((a,b)=>b.Avance-a.Avance);
 
-  $('resTable').innerHTML=`<div class="tbl-wrap mh"><table class="dt"><thead><tr>
-    <th>Programa</th><th>Inicio</th><th>Fin</th><th>Sesiones</th><th>Coordinadoras</th><th style="min-width:120px">Progreso</th>
-  </tr></thead><tbody>${_lastStats.map(r=>`<tr>
-    <td title="${esc(r.PROGRAMA)}">${esc(abbr(r.PROGRAMA,44))}</td>
-    <td>${r.Inicio}</td><td>${r.Fin}</td><td class="num">${r.Sesiones}</td>
-    <td title="${esc(r.Coordinadoras)}" class="wrap">${esc(abbr(r.Coordinadoras,44))}</td>
-    <td><div style="display:flex;align-items:center;gap:6px">
-      <div class="pb-wrap" style="flex:1"><div class="pb-fill" style="width:${r.Avance}%;background:${r.Avance===100?'var(--green)':r.Avance>60?'var(--blue)':'var(--orange)'}"></div></div>
-      <span style="font-size:10px;font-weight:700;width:28px;text-align:right">${r.Avance}%</span>
-    </div></td>
-  </tr>`).join('')}</tbody></table></div>`;
+  // ── Construir detalle de cursos (asignaturas) por programa ─────────────
+  function buildProgDetail(rows){
+    // Agrupar por ASIGNATURA → fecha min/max, nº sesiones, profesores
+    const am={};
+    rows.forEach(r=>{
+      const a=r['ASIGNATURA']||'Sin asignatura'; if(!am[a])am[a]={ini:null,fin:null,ses:0,profs:new Set()};
+      const d=r['DIAS/FECHAS'];
+      if(d){if(!am[a].ini||d<am[a].ini)am[a].ini=d; if(!am[a].fin||d>am[a].fin)am[a].fin=d;}
+      am[a].ses++;
+      if(r['PROFESOR']&&r['PROFESOR'].trim()) am[a].profs.add(r['PROFESOR'].trim());
+    });
+
+    const asigs=Object.entries(am)
+      .sort((a,b)=> (a[1].ini||0)-(b[1].ini||0))
+      .map(([name,d])=>({name,ini:d.ini,fin:d.fin,ses:d.ses,profs:[...d.profs]}));
+
+    if(!asigs.length) return '<p style="color:var(--t4);font-size:11px">Sin detalle disponible.</p>';
+
+    return `
+      <div class="detail-title">Cursos / Asignaturas del programa</div>
+      <div class="tbl-wrap">
+        <table class="dt" style="font-size:10.5px">
+          <thead><tr>
+            <th>Asignatura / Curso</th>
+            <th>Inicio</th>
+            <th>Fin</th>
+            <th style="text-align:right">Sesiones</th>
+            <th>Profesor(es)</th>
+          </tr></thead>
+          <tbody>${(()=>{
+            const hoyA=today(),en7A=new Date(hoyA);en7A.setDate(en7A.getDate()+7);
+            return asigs.map(a=>{
+              const asigEnc=a.fin&&a.fin>=hoyA&&a.fin<=en7A;
+              const asigFin=a.fin&&a.fin<hoyA;
+              return `<tr style="${asigEnc?'background:rgba(245,158,11,.04)':''}">
+                <td style="font-weight:600;max-width:280px">
+                  ${esc(a.name)}
+                  ${asigEnc?'<span class=\"enc-badge-asig\" title=\"Finaliza en 7 dias — encuesta pendiente\">&#9888; Encuesta</span>':''}
+                </td>
+                <td style="white-space:nowrap;color:var(--blue);font-weight:700">${a.ini?fmtDate(a.ini):'—'}</td>
+                <td style="white-space:nowrap;color:${asigEnc?'var(--orange)':asigFin?'var(--t4)':'var(--t3)'};font-weight:${asigEnc?700:400}">${a.fin?fmtDate(a.fin):'—'}</td>
+                <td style="text-align:right">${a.ses}</td>
+                <td style="color:var(--t3);max-width:200px">${esc(a.profs.slice(0,2).map(p=>abbr(p,22)).join(' / '))}</td>
+              </tr>`;
+            }).join('');
+          })()}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── Renderizar tabla con filas expandibles ─────────────────────────────
+  let tbody='';
+  _lastStats.forEach((r,idx)=>{
+    const rid='prow_'+idx;
+    const color=r.Avance===100?'var(--green)':r.Avance>60?'var(--blue)':'var(--orange)';
+    // Badge encuesta: construir tooltip con los cursos específicos que aplican
+    let encBadge = '';
+    if (r.encuesta) {
+      let tooltip = '';
+      if (r.encuestaProg) {
+        tooltip = 'Programa finaliza en 7 días o menos';
+      }
+      if (r.asigEncuestas && r.asigEncuestas.length) {
+        const cursos = r.asigEncuestas.map(a => abbr(a.nombre,32)+' ('+fmtDate(a.fin)+')').join(' · ');
+        tooltip += (tooltip ? '\n' : '') + 'Curso(s): ' + cursos;
+      }
+      encBadge = '<span class="enc-badge" title="'+esc(tooltip)+'">&#9888; Encuesta</span>';
+    }
+
+    // Segunda línea: nombres de cursos que aplican encuesta (visible debajo del programa)
+    let encCursos = '';
+    if (r.asigEncuestas && r.asigEncuestas.length && !r.encuestaProg) {
+      encCursos = '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">'
+        + r.asigEncuestas.map(a =>
+            '<span style="display:inline-flex;align-items:center;gap:3px;'
+            +'background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);'
+            +'border-radius:3px;padding:1px 6px;font-size:9px;color:var(--orange);'
+            +'font-weight:600;white-space:nowrap">'
+            +'&#9888; '+esc(abbr(a.nombre,30))+' — '+fmtDate(a.fin)
+            +'</span>'
+          ).join('')
+        + '</div>';
+    }
+
+    // Fila principal
+    tbody+=`<tr class="prog-row" id="${rid}">
+      <td>
+        <button class="prog-toggle" id="ptgl_${idx}" onclick="toggleProgDetail(${idx})" title="Ver cursos">&#9658;</button>
+      </td>
+      <td style="font-weight:600" title="${esc(r.PROGRAMA)}">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span>${esc(abbr(r.PROGRAMA,42))}</span>
+          ${encBadge}
+        </div>
+        ${encCursos}
+      </td>
+      <td style="white-space:nowrap;color:var(--blue);font-weight:700">${r.Inicio}</td>
+      <td style="white-space:nowrap;color:${r.encuesta?'var(--orange)':'var(--t3)'};font-weight:${r.encuesta?'700':'400'}">${r.Fin}</td>
+      <td style="text-align:right">${r.Sesiones}</td>
+      <td title="${esc(r.Coordinadoras)}">${esc(abbr(r.Coordinadoras,36))}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="pb-wrap" style="flex:1"><div class="pb-fill" style="width:${r.Avance}%;background:${color}"></div></div>
+          <span style="font-size:10px;font-weight:700;width:28px;text-align:right;color:${color}">${r.Avance}%</span>
+        </div>
+      </td>
+    </tr>`;
+    // Fila de detalle (oculta por defecto)
+    tbody+=`<tr class="prog-detail-row" id="pdet_${idx}">
+      <td class="prog-detail-cell" colspan="7">
+        <div class="prog-detail-inner" id="pdetin_${idx}"></div>
+      </td>
+    </tr>`;
+  });
+
+  $('resTable').innerHTML=`
+    <div class="tbl-wrap mh">
+      <table class="dt">
+        <thead><tr>
+          <th style="width:28px"></th>
+          <th>Programa</th>
+          <th>Inicio</th>
+          <th>Fin</th>
+          <th style="text-align:right">Sesiones</th>
+          <th>Coordinadoras</th>
+          <th style="min-width:130px">Progreso</th>
+        </tr></thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>`;
+
+  // Guardar datos para el toggle
+  window._resStatsRows = _lastStats;
+  window._buildProgDetail = buildProgDetail;
+}
+
+function toggleProgDetail(idx){
+  const detRow  = $('pdet_'+idx);
+  const detIn   = $('pdetin_'+idx);
+  const tgl     = $('ptgl_'+idx);
+  const mainRow = $('prow_'+idx);
+  if(!detRow||!detIn||!tgl||!mainRow) return;
+
+  // Guardar estado ANTES de cerrar todo
+  const wasOpen = detRow.classList.contains('open');
+
+  // Cerrar TODOS (incluido este si estaba abierto)
+  document.querySelectorAll('.prog-detail-row.open').forEach(el=>{
+    el.classList.remove('open');
+    const i=el.id.replace('pdet_','');
+    const t2=$('ptgl_'+i); if(t2){t2.textContent='▶';t2.classList.remove('open');}
+    const m=$('prow_'+i);  if(m) m.classList.remove('open');
+  });
+
+  // Si estaba abierto → quedó cerrado, no hacer nada más (toggle off)
+  if(wasOpen) return;
+
+  // Estaba cerrado → abrir
+  detRow.classList.add('open');
+  mainRow.classList.add('open');
+  tgl.textContent='▼';
+  tgl.classList.add('open');
+
+  // Renderizar detalle lazy (solo la primera vez)
+  if(!detIn.dataset.loaded){
+    const stats   = (window._resStatsRows||[])[idx];
+    const builder = window._buildProgDetail;
+    if(stats && builder){
+      detIn.innerHTML = builder(stats._rows||[]);
+      detIn.dataset.loaded='1';
+    }
+  }
+
+  // Scroll suave para que el detalle quede visible
+  setTimeout(()=>mainRow.scrollIntoView({behavior:'smooth',block:'start'}),60);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -2743,4 +2974,3 @@ document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
-
