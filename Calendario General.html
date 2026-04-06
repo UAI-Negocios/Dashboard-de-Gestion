@@ -33,6 +33,7 @@ select,input{font-family:'Outfit',sans-serif}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:199}
 
+
 /* ══════════════════════ SIDEBAR ══════════════════════ */
 .sb-logo{padding:18px 16px 12px;font-size:18px;font-weight:800;color:var(--blue);border-bottom:1px solid var(--border);letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
 .sb-section{padding:12px 14px 4px;font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.1em}
@@ -55,12 +56,10 @@ select,input{font-family:'Outfit',sans-serif}
 /* sidebar extras: controlados solo por inline style desde JS */
 
 /* ══════════════════════ TOP NAV ══════════════════════ */
-.topnav{background:var(--bg1);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+.topnav{background:var(--bg1);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:100}
 .topnav-label{font-size:10px;font-weight:800;color:var(--blue);letter-spacing:.15em;margin-right:4px;white-space:nowrap}
 .ham{background:none;border:none;color:var(--t1);font-size:20px;padding:4px;display:none;margin-right:4px}
-.nav-pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--t3);transition:all .2s;white-space:nowrap}
-.nav-pill:hover{color:var(--t1);border-color:var(--blue)}
-.nav-pill.active{background:var(--blue);color:#0f172a;border-color:var(--blue);font-weight:700}
+.nav-pill{display:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--t3);transition:all .2s;white-space:nowrap}
 
 /* ══════════════════════ SUBTABS ══════════════════════ */
 .subtabs{background:var(--bg1);border-bottom:1px solid var(--border);padding:0 16px;display:flex;gap:2px;flex-wrap:wrap}
@@ -180,12 +179,25 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 .cal-num{font-size:12px;font-weight:600;color:var(--t3);margin-bottom:3px}
 .cal-cell.today .cal-num span{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;background:var(--blue);color:#0a1628;border-radius:50%;font-weight:800;font-size:11px}
 .cal-events{display:flex;flex-direction:column;gap:2px}
-.ev-card{background:rgba(14,165,233,.1);border-left:2px solid var(--blue);border-radius:3px;padding:3px 5px;cursor:pointer;transition:background .15s}
+.ev-card{background:rgba(14,165,233,.1);border-left:2px solid var(--blue);border-radius:3px;padding:3px 5px;cursor:pointer;transition:background .15s;position:relative}
 .ev-card:hover{background:rgba(14,165,233,.2)}
+.ev-card:hover .ev-tooltip{display:block}
 .ev-time{font-size:9px;color:var(--blue);font-weight:700}
 .ev-prog{font-size:9px;color:var(--t1);font-weight:600;white-space:normal;line-height:1.3}
-.ev-sub{font-size:9px;color:var(--t3);white-space:normal}
-.ev-meta{font-size:9px;color:var(--t4)}
+.ev-sub{font-size:9px;color:var(--t3);white-space:normal;line-height:1.3}
+.ev-sede{font-size:8px;color:var(--orange);font-weight:700;margin-top:2px}
+.ev-meta{font-size:8px;color:var(--t4);margin-top:1px}
+.ev-more{font-size:9px;text-align:center;color:var(--t4);padding:2px}
+.ev-tooltip{display:none;position:absolute;left:calc(100% + 8px);top:0;z-index:900;width:240px;background:var(--bg1);border:1px solid var(--blue);border-radius:var(--r);padding:10px 12px;box-shadow:0 8px 32px rgba(0,0,0,.8);pointer-events:none;min-width:220px}
+.ev-tooltip::before{content:'';position:absolute;left:-7px;top:14px;border:7px solid transparent;border-right-color:var(--blue);border-left:none}
+.cal-cell:nth-child(7n) .ev-tooltip,.cal-cell:nth-child(7n-1) .ev-tooltip{left:auto;right:calc(100% + 8px)}
+.cal-cell:nth-child(7n) .ev-tooltip::before,.cal-cell:nth-child(7n-1) .ev-tooltip::before{left:auto;right:-7px;border-right:none;border-left:7px solid var(--blue)}
+.tip-row{display:flex;gap:6px;margin-bottom:4px;align-items:flex-start;line-height:1.4}
+.tip-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.04em;min-width:62px;flex-shrink:0;padding-top:1px}
+.tip-val{font-size:11px;color:var(--t1);flex:1}
+.tip-val.blue{color:var(--blue);font-weight:700;font-size:12px}
+.tip-val.orange{color:var(--orange);font-weight:700}
+.tip-div{height:1px;background:var(--border2);margin:5px 0}
 .ev-more{font-size:9px;text-align:center;color:var(--t4);padding:2px}
 
 /* ══════════════════════ EXPANDER ══════════════════════ */
@@ -230,6 +242,8 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
   .sidebar-overlay{display:block}
   .sidebar-overlay.active{display:block}
   .ham{display:flex}
+  .nav-pill{display:inline-flex}
+  .sb-nav{display:none}
   .kpi-grid,.metrics{grid-template-columns:repeat(2,1fr)}
   .g2,.g3,.g4{grid-template-columns:1fr}
   .frow{flex-direction:column}
@@ -281,6 +295,171 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 .prog-toggle:hover{color:var(--blue);background:rgba(56,189,248,.08)}
 .prog-toggle.open{color:var(--blue)}
 .detail-title{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.sb-nav{display:flex;flex-direction:column;gap:2px;padding:8px 10px}
+.sb-navbtn{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r2);border:none;background:transparent;color:var(--t3);cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;transition:all .18s;width:100%;text-align:left;position:relative}
+.sb-navbtn:hover{background:rgba(56,189,248,.07);color:var(--t1)}
+.sb-navbtn.active{background:rgba(56,189,248,.12);color:var(--blue);font-weight:700}
+.sb-navbtn.active::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:3px;background:var(--blue);border-radius:0 2px 2px 0}
+.sb-navico{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.sb-navdiv{height:1px;background:var(--border2);margin:4px 10px}
+
+/* PLANIFICADOR GENERAL */
+.plan-form{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:18px}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.plan-grid.full{grid-template-columns:1fr}
+.plan-field{display:flex;flex-direction:column;gap:4px}
+.plan-lbl{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em}
+.plan-inp{background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:8px 10px;border-radius:var(--r2);font-family:'Outfit',sans-serif;font-size:12px;outline:none;transition:border-color .2s;width:100%}
+.plan-inp:focus{border-color:var(--blue)}
+.plan-inp::placeholder{color:var(--t4)}
+.plan-inp[type=date]{color-scheme:dark}
+.plan-btn{display:flex;align-items:center;gap:6px;padding:9px 18px;background:var(--blue2);color:#fff;border:none;border-radius:var(--r2);font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background .2s}
+.plan-btn:hover{background:var(--blue)}
+/* CARDS */
+.plan-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.plan-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;position:relative;transition:border-color .2s}
+.plan-card:hover{border-color:var(--bdr2,var(--border))}
+.plan-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px}
+.plan-card-name{font-size:13px;font-weight:700;color:var(--t1);line-height:1.3;flex:1}
+.plan-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.badge-proximo{background:rgba(56,189,248,.15);color:#38bdf8;border:1px solid rgba(56,189,248,.25)}
+.badge-activo{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.25)}
+.badge-finalizado{background:rgba(100,116,139,.15);color:#94a3b8;border:1px solid rgba(100,116,139,.2)}
+.plan-dates{display:flex;gap:12px;margin-bottom:10px}
+.plan-date-item{display:flex;flex-direction:column;gap:2px}
+.plan-date-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.05em}
+.plan-date-val{font-size:11px;color:var(--t2);font-weight:600}
+.plan-progress{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:10px}
+.plan-progress-bar{height:100%;border-radius:2px;transition:width .4s}
+.plan-docentes-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.plan-docentes{display:flex;flex-wrap:wrap;gap:4px}
+.plan-docente-tag{font-size:10px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.15);color:var(--t3);padding:2px 8px;border-radius:10px}
+.plan-card-del{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--t4);cursor:pointer;font-size:14px;padding:2px 5px;border-radius:3px;line-height:1;transition:all .15s}
+.plan-card-del:hover{color:var(--red);background:rgba(239,68,68,.1)}
+.plan-empty{text-align:center;padding:40px 20px;color:var(--t4);font-size:13px;border:2px dashed var(--border);border-radius:var(--r)}
+.plan-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.plan-stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:12px;text-align:center}
+.plan-stat-v{font-size:22px;font-weight:800;line-height:1}
+.plan-stat-l{font-size:10px;color:var(--t4);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+
+/* GENERADOR DE CALENDARIO */
+.gen-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:center;justify-content:center;padding:16px}
+.gen-modal-bg.open{display:flex}
+.gen-modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);width:100%;max-width:620px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column}
+.gen-modal-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.gen-modal-title{font-size:14px;font-weight:700;color:var(--t1)}
+.gen-modal-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.gen-modal-close{background:none;border:none;color:var(--t4);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:3px;line-height:1}
+.gen-modal-close:hover{color:var(--t1);background:var(--bg3)}
+.gen-modal-body{padding:16px 18px;overflow-y:auto;flex:1}
+.gen-modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.gen-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.gen-row.tri{grid-template-columns:1fr 1fr 1fr}
+.gen-row.full{grid-template-columns:1fr}
+.gen-field{display:flex;flex-direction:column;gap:3px}
+.gen-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em}
+.gen-inp{background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:7px 9px;border-radius:var(--r2);font-family:'Outfit',sans-serif;font-size:11px;outline:none;width:100%;transition:border-color .2s}
+.gen-inp:focus{border-color:var(--blue)}
+.gen-inp[type=date]{color-scheme:dark}
+.gen-sel{background:var(--bg3);border:1px solid var(--border);color:var(--t1);padding:7px 9px;border-radius:var(--r2);font-family:'Outfit',sans-serif;font-size:11px;outline:none;width:100%}
+/* dias checkboxes */
+.gen-dias{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.gen-dia{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--r2);border:1px solid var(--border);cursor:pointer;font-size:11px;font-weight:600;color:var(--t3);transition:all .15s;user-select:none}
+.gen-dia:hover{border-color:var(--blue);color:var(--t1)}
+.gen-dia input{display:none}
+.gen-dia.checked{background:rgba(56,189,248,.12);border-color:var(--blue);color:var(--blue)}
+/* preview */
+.gen-preview{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
+.gen-preview-title{font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.gen-preview-cnt{font-size:11px;color:var(--blue);font-weight:700}
+.gen-session-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.gen-session{display:flex;align-items:center;gap:10px;padding:5px 8px;background:var(--bg3);border-radius:var(--r2);font-size:11px}
+.gen-session-n{width:22px;text-align:center;font-size:9px;font-weight:700;color:var(--t4)}
+.gen-session-d{color:var(--blue);font-weight:700;white-space:nowrap}
+.gen-session-dia{color:var(--t3);font-size:10px;width:28px}
+.gen-session-h{color:var(--t2);font-size:10px}
+.plan-card-gen{position:absolute;top:10px;right:34px;background:none;border:none;color:var(--t4);cursor:pointer;font-size:13px;padding:2px 5px;border-radius:3px;line-height:1;transition:all .15s}
+.plan-card-gen:hover{color:var(--blue);background:rgba(56,189,248,.1)}
+.oferta-wrap{margin-bottom:18px}
+.oferta-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+.oferta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;max-height:280px;overflow-y:auto;padding:2px}
+.espacio-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:10px 12px;cursor:pointer;transition:all .18s;position:relative}
+.espacio-card:hover{border-color:var(--blue);background:rgba(56,189,248,.05)}
+.espacio-card.seleccionado{border-color:var(--blue);background:rgba(56,189,248,.1)}
+.espacio-card.asignado{border-color:var(--green);background:rgba(16,185,129,.06);cursor:default}
+.espacio-fecha{font-size:11px;font-weight:700;color:var(--blue)}
+.espacio-hora{font-size:12px;font-weight:800;color:var(--t1);margin:2px 0}
+.espacio-sala{font-size:10px;color:var(--t3)}
+.espacio-sede{font-size:9px;color:var(--orange);font-weight:700;margin-top:2px}
+.espacio-check{position:absolute;top:8px;right:8px;width:16px;height:16px;border-radius:50%;border:2px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s}
+.espacio-card.seleccionado .espacio-check{background:var(--blue);border-color:var(--blue);color:#fff}
+.espacio-card.asignado .espacio-check{background:var(--green);border-color:var(--green);color:#fff}
+.tipo-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.tipo-pill{padding:5px 12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--t3);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;font-family:'Outfit',sans-serif}
+.tipo-pill:hover{border-color:var(--blue);color:var(--blue)}
+.tipo-pill.active.mag{background:rgba(83,74,183,.15);border-color:#534AB7;color:#AFA9EC}
+.tipo-pill.active.dip{background:rgba(29,158,117,.15);border-color:#1D9E75;color:#5DCAA5}
+.tipo-pill.active.cur{background:rgba(186,117,23,.15);border-color:#BA7517;color:#EF9F27}
+.tipo-pill.active.otr{background:rgba(100,116,139,.15);border-color:#64748b;color:#94a3b8}
+.plan-sesiones{margin-top:10px;border-top:1px solid var(--border2);padding-top:10px}
+.plan-ses-title{font-size:10px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.plan-ses-list{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto}
+.plan-ses-row{display:flex;align-items:center;gap:8px;padding:4px 6px;background:var(--bg3);border-radius:var(--r2);font-size:10px}
+.plan-ses-n{width:20px;text-align:right;color:var(--t4);font-weight:700;flex-shrink:0}
+.plan-ses-fecha{color:var(--blue);font-weight:700;white-space:nowrap}
+.plan-ses-hora{color:var(--t2)}
+.plan-ses-sala{color:var(--orange);font-size:9px}
+.espacios-drop{border:2px dashed var(--border);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);margin-bottom:12px}
+.espacios-drop:hover,.espacios-drop.over{border-color:var(--blue);background:rgba(56,189,248,.04)}
+
+/* MALLA CURRICULAR */
+.malla-wrap{margin-bottom:0}
+.malla-prog-header{background:linear-gradient(135deg,rgba(56,189,248,.12),rgba(83,74,183,.08));border:1px solid rgba(56,189,248,.25);border-radius:var(--r);padding:16px 20px;margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.malla-prog-tipo{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
+.malla-prog-nombre{font-size:17px;font-weight:800;color:var(--t1);line-height:1.2;margin-bottom:8px}
+.malla-prog-stats{display:flex;gap:16px;flex-wrap:wrap}
+.malla-prog-stat{display:flex;flex-direction:column;gap:1px}
+.malla-prog-stat-v{font-size:16px;font-weight:800;color:var(--blue);line-height:1}
+.malla-prog-stat-l{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em}
+.malla-periodo-title{font-size:10px;font-weight:800;color:var(--t4);text-transform:uppercase;letter-spacing:.1em;padding:10px 0 6px;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border2);margin-top:6px}
+.malla-periodo-title:first-of-type{border-top:none;margin-top:0}
+.malla-periodo-badge{background:rgba(56,189,248,.1);color:var(--blue);border-radius:6px;padding:2px 10px;font-size:10px;font-weight:700}
+.malla-table{width:100%;border-collapse:collapse;margin-bottom:6px}
+.malla-table th{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;padding:6px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;background:var(--bg1)}
+.malla-table th.num{text-align:right}
+.malla-table td{font-size:11px;padding:8px 10px;border-bottom:1px solid var(--border2);vertical-align:middle;color:var(--t2)}
+.malla-table tr:hover td{background:rgba(56,189,248,.04)}
+.malla-table td.curso-name{font-weight:600;color:var(--t1);max-width:320px}
+.malla-table td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--t3)}
+.malla-badge-si{display:inline-flex;align-items:center;gap:3px;background:rgba(16,185,129,.1);color:#34d399;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700}
+.malla-badge-no{display:inline-flex;align-items:center;gap:3px;background:rgba(100,116,139,.1);color:var(--t4);border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700}
+.malla-tipo-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase}
+.malla-tipo-regular{background:rgba(56,189,248,.1);color:var(--blue)}
+.malla-tipo-taller{background:rgba(245,158,11,.1);color:var(--orange)}
+.malla-upload-zone{border:2px dashed var(--border);border-radius:var(--r);padding:24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);margin-bottom:16px}
+.malla-upload-zone:hover,.malla-upload-zone.over{border-color:var(--blue);background:rgba(56,189,248,.04)}
+.malla-upload-zone input[type=file]{display:none}
+.malla-resumen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:16px}
+.malla-resumen-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:10px 14px}
+.malla-resumen-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.malla-resumen-val{font-size:20px;font-weight:800;color:var(--t1)}
+.malla-resumen-sub{font-size:10px;color:var(--t3);margin-top:1px}
+
+/* SELECTOR CURSO DE LA MALLA */
+.plan-curso-sel-wrap{position:relative;grid-column:1/-1}
+.plan-curso-sel{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--t1);
+  padding:8px 32px 8px 10px;border-radius:var(--r2);font-family:'Outfit',sans-serif;
+  font-size:12px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;
+  transition:border-color .2s}
+.plan-curso-sel:focus{border-color:var(--blue)}
+.plan-curso-sel option{background:var(--bg1);color:var(--t1);padding:4px}
+.plan-curso-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  pointer-events:none;color:var(--t4);font-size:10px}
+.plan-curso-info{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;
+  padding:6px 10px;background:var(--bg3);border-radius:var(--r2);
+  border:1px solid var(--border2);font-size:10px}
+.plan-curso-info-item{display:flex;align-items:center;gap:4px;color:var(--t3)}
+.plan-curso-info-item strong{color:var(--t1)}
 </style>
 </head>
 <body>
@@ -291,6 +470,29 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 <!-- ══════════ SIDEBAR ══════════ -->
 <aside class="sidebar" id="sidebar">
   <div class="sb-logo"><strong>Calendario UAI</strong></div>
+  <!-- NAV VERTICAL -->
+  <div class="sb-nav">
+    <button class="sb-navbtn active" data-cat="dashboard" onclick="setCat('dashboard',this)">
+      <span class="sb-navico">&#9783;</span>Dashboard
+    </button>
+    <button class="sb-navbtn" data-cat="programas" onclick="setCat('programas',this)">
+      <span class="sb-navico">&#9636;</span>Programas
+    </button>
+    <button class="sb-navbtn" data-cat="calendarios" onclick="setCat('calendarios',this)">
+      <span class="sb-navico">&#9781;</span>Calendarios
+    </button>
+    <button class="sb-navbtn" data-cat="planificador" onclick="setCat('planificador',this)">
+      <span class="sb-navico">&#9998;</span>Planificador
+    </button>
+    <div class="sb-navdiv"></div>
+    <button class="sb-navbtn" data-cat="admin" onclick="setCat('admin',this)">
+      <span class="sb-navico">&#9881;</span>Admin
+    </button>
+    <button class="sb-navbtn" data-cat="ayuda" onclick="setCat('ayuda',this)">
+      <span class="sb-navico">&#9432;</span>Ayuda
+    </button>
+  </div>
+  <div class="sb-divider"></div>
   <div class="sb-body">
     <div class="sb-section">📥 Archivo Académico</div>
     <div class="sb-caption">Drag &amp; drop o haz clic — Excel / CSV</div>
@@ -338,7 +540,7 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
       <div id="gfDropWrap" style="padding:2px 0 4px"></div>
       <div class="sb-caption" id="gfStatus" style="padding:3px 0 0"></div>
     </div>
-  </div>
+    </div>
 </aside>
 
 <!-- ══════════ MAIN ══════════ -->
@@ -349,15 +551,16 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
     <button class="nav-pill active" data-cat="dashboard" onclick="setCat('dashboard',this)">Dashboard</button>
     <button class="nav-pill" data-cat="programas" onclick="setCat('programas',this)">Programas</button>
     <button class="nav-pill" data-cat="calendarios" onclick="setCat('calendarios',this)">Calendarios</button>
+    <button class="nav-pill" data-cat="planificador" onclick="setCat('planificador',this)">Planificador</button>
     <button class="nav-pill" data-cat="admin" onclick="setCat('admin',this)">Admin</button>
     <button class="nav-pill" data-cat="ayuda" onclick="setCat('ayuda',this)">Ayuda</button>
   </nav>
   <div class="subtabs" id="subtabs"></div>
   <div class="page" id="page"></div>
 </div>
-</div>
 
-<!-- CDN libraries loaded before inline script -->
+
+</div>DN libraries loaded before inline script -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -391,11 +594,12 @@ const APP = {
 
 // Tab keys: simple ASCII only — no emoji, no special chars
 const CATS = {
-  dashboard:   ['home','global','coord','comp','analytics'],
-  programas:   ['resumen','calidad'],
-  calendarios: ['calendario','reservas'],
-  admin:       ['gestion','turnos','validaciones'],
-  ayuda:       ['manual','faqs'],
+  dashboard:    ['home','global','coord','comp','analytics'],
+  programas:    ['resumen','calidad'],
+  calendarios:  ['calendario','reservas'],
+  planificador: ['plancursos','malla'],
+  admin:        ['gestion','turnos','validaciones'],
+  ayuda:        ['manual','faqs'],
 };
 
 // Display labels for each tab key
@@ -840,6 +1044,20 @@ function processMain(rawRows, fileName) {
 
   $('stMain').textContent = fmt(APP.df.length) + ' sesiones cargadas';
   $('stMain').className = 'file-status ok';
+
+  // Log diagnóstico limpio
+  const _fechaMin = APP.df.reduce((a,r)=>r['DIAS/FECHAS']&&(!a||r['DIAS/FECHAS']<a)?r['DIAS/FECHAS']:a,null);
+  const _fechaMax = APP.df.reduce((a,r)=>r['DIAS/FECHAS']&&(!a||r['DIAS/FECHAS']>a)?r['DIAS/FECHAS']:a,null);
+  console.log(
+    '[Dashboard] Carga exitosa —',
+    APP.df.length + ' sesiones |',
+    new Set(APP.df.map(r=>r['PROGRAMA'])).size + ' programas |',
+    new Set(APP.df.map(r=>r['COORDINADORA RESPONSABLE'])).size + ' coordinadoras |',
+    'Rango: ' + (_fechaMin?_fechaMin.toLocaleDateString('es-CL'):'?') +
+    ' → ' + (_fechaMax?_fechaMax.toLocaleDateString('es-CL'):'?')
+  );
+  console.log('[Dashboard] Columnas detectadas — fecha:', dateCol, '| coord:', coordCol, '| prog:', progCol, '| modalidad:', modalCol);
+
   showSidebarExtras();
   refreshView();
 }
@@ -948,7 +1166,9 @@ function smartParseSheet(sheet) {
       return obj;
     });
 
-  console.log(`[Dashboard] Header detectado en fila ${bestRowIdx} (score=${bestScore}):`, headerRow);
+  const _filaExcel = 'fila ' + (bestRowIdx + 1) + ' del rango leido';
+  const _nota = bestRowIdx > 0 ? ' ('+bestRowIdx+' fila(s) vacía(s) antes de headers — normal en este archivo)' : '';
+  console.log('[Dashboard] Headers detectados en ' + _filaExcel + _nota + ' | score=' + bestScore + ' | columnas:', headerRow.filter(Boolean).slice(0,6).join(', ') + '...');
   return result.length ? result : null;
 }
 
@@ -1188,6 +1408,7 @@ function downloadFiltered() {
 ══════════════════════════════════════════════════════ */
 function setCat(cat, btn) {
   APP.cat=cat; APP.tab=CATS[cat][0];
+  document.querySelectorAll('.sb-navbtn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   document.querySelectorAll('.nav-pill').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   renderSubtabs();
   refreshView();
@@ -1240,6 +1461,8 @@ function refreshView() {
     gestion:      renderGestion,
     turnos:       renderTurnos,
     validaciones: renderValidaciones,
+    plancursos:   renderPlanificador,
+    malla:        renderMalla,
     manual:       renderManual,
     faqs:         renderFAQs,
   };
@@ -2549,17 +2772,69 @@ function updCal() {
     show.forEach((r,i)=>{
       if(i===3&&evts.length>3){html+=`<div class="ev-more">+${evts.length-3} más</div>`;return;}
       const progName = r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],35);
-      const asig=abbr(r['ASIGNATURA'],30);
-      const tema=r['TEMA']?abbr(r['TEMA'],28):'';
-      const hora=r['HORARIO'];
-      const prof=r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())?r['PROFESOR'].split(' ').slice(0,2).join(' '):'';
-      const sala=r['SALA']&&!IGNORE_VALS.has(r['SALA'].toLowerCase())?r['SALA']:'';
-      const meta=[prof?'👤 '+prof:'',sala?'📍 '+sala:''].filter(Boolean).join('  ');
+      const asig     = r['ASIGNATURA']||'';
+      const tema     = r['TEMA']||'';
+      const hora     = r['HORARIO']||'';
+      const sede     = r['SEDE']||'';
+      const sala     = (!r['SALA']||IGNORE_VALS.has(r['SALA'].toLowerCase()))?'':r['SALA'];
+      const prof     = (!r['PROFESOR']||IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))?'':r['PROFESOR'];
+      const coord    = r['COORDINADORA RESPONSABLE']||'';
+      const modal    = r['Modalidad_Calc']||'';
+      const horas    = r['HORAS']||'';
+
+      // Tarjeta compacta con sede visible
       html+=`<div class="ev-card">
         <div class="ev-time">${esc(hora)}</div>
-        <div class="ev-prog">${esc(progName)}</div>
-        <div class="ev-sub">${esc(asig)}${tema?' · '+esc(tema):''}</div>
-        <div class="ev-meta">${esc(meta)}</div>
+        <div class="ev-prog">${esc(abbr(progName,34))}</div>
+        <div class="ev-sub">${esc(abbr(asig,30))}</div>
+        ${sede?`<div class="ev-sede">&#9657; ${esc(sede)}${sala?' &nbsp;·&nbsp; '+esc(sala):''}</div>`:''}
+        ${prof?`<div class="ev-meta">&#128100; ${esc(abbr(prof,24))}</div>`:''}
+
+        <!-- TOOLTIP al hover -->
+        <div class="ev-tooltip">
+          <div class="tip-row">
+            <span class="tip-lbl">Horario</span>
+            <span class="tip-val blue">${esc(hora)}</span>
+          </div>
+          <div class="tip-div"></div>
+          <div class="tip-row">
+            <span class="tip-lbl">Programa</span>
+            <span class="tip-val">${esc(progName)}</span>
+          </div>
+          ${asig?`<div class="tip-row">
+            <span class="tip-lbl">Asignatura</span>
+            <span class="tip-val">${esc(asig)}</span>
+          </div>`:''}
+          ${tema?`<div class="tip-row">
+            <span class="tip-lbl">Tema</span>
+            <span class="tip-val">${esc(abbr(tema,60))}</span>
+          </div>`:''}
+          <div class="tip-div"></div>
+          ${sede?`<div class="tip-row">
+            <span class="tip-lbl">Sede</span>
+            <span class="tip-val orange">&#9657; ${esc(sede)}</span>
+          </div>`:''}
+          ${sala?`<div class="tip-row">
+            <span class="tip-lbl">Sala</span>
+            <span class="tip-val">${esc(sala)}</span>
+          </div>`:''}
+          ${modal?`<div class="tip-row">
+            <span class="tip-lbl">Modalidad</span>
+            <span class="tip-val">${esc(modal)}</span>
+          </div>`:''}
+          ${prof?`<div class="tip-div"></div><div class="tip-row">
+            <span class="tip-lbl">Profesor</span>
+            <span class="tip-val">${esc(prof)}</span>
+          </div>`:''}
+          ${coord?`<div class="tip-row">
+            <span class="tip-lbl">Coord.</span>
+            <span class="tip-val">${esc(abbr(coord,32))}</span>
+          </div>`:''}
+          ${horas?`<div class="tip-row">
+            <span class="tip-lbl">Horas</span>
+            <span class="tip-val">${esc(horas)} hrs</span>
+          </div>`:''}
+        </div>
       </div>`;
     });
     html+=`</div></div>`;
@@ -2880,6 +3155,1039 @@ function renderValidaciones(){
   })()}`;
 }
 
+
+/* ══════════════════════════════════════════════════════
+   PLANIFICADOR GENERAL
+══════════════════════════════════════════════════════ */
+// Storage: cursos en localStorage
+function planLoad(){
+  try{ return JSON.parse(localStorage.getItem('plan_cursos')||'[]'); }catch(e){ return []; }
+}
+function planSave(cursos){ localStorage.setItem('plan_cursos', JSON.stringify(cursos)); }
+
+function planEstado(ini,fin){
+  const hoy=today();
+  if(!ini) return {lbl:'Sin fecha',cls:'badge-finalizado'};
+  if(ini>hoy) return {lbl:'Proximamente',cls:'badge-proximo'};
+  if(fin && fin<hoy) return {lbl:'Finalizado',cls:'badge-finalizado'};
+  return {lbl:'En curso',cls:'badge-activo'};
+}
+function planAvance(ini,fin){
+  if(!ini||!fin) return 0;
+  const hoy=today();
+  if(hoy<=ini) return 0;
+  if(hoy>=fin) return 100;
+  const total=fin-ini, elapsed=hoy-ini;
+  return Math.round(elapsed/total*100);
+}
+function planFmtDate(s){
+  if(!s) return '—';
+  const d=new Date(s+'T00:00:00');
+  return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+function renderPlanificador(){
+  $('page').innerHTML=`
+  <div class="pg-title">Planificador General</div>
+
+  <!-- FORMULARIO -->
+  <div class="plan-form">
+    <div class="pg-sub" style="margin-top:0;margin-bottom:12px">Agregar nuevo programa</div>
+    <div class="plan-grid">
+
+      <!-- FILA 1: Tipo de programa + Nombre desde malla -->
+      <div class="plan-field" style="grid-column:1/-1">
+        <label class="plan-lbl">Tipo de programa</label>
+        <div style="display:flex;gap:8px;align-items:stretch;flex-wrap:wrap">
+          <!-- Pills tipo -->
+          <div class="tipo-pills" style="margin:0;align-items:center">
+            <button class="tipo-pill mag active" data-tipo="Magister" onclick="planSelTipo(this)">Magister</button>
+            <button class="tipo-pill dip"        data-tipo="Diploma"  onclick="planSelTipo(this)">Diploma</button>
+            <button class="tipo-pill cur"        data-tipo="Curso"    onclick="planSelTipo(this)">Curso</button>
+          </div>
+          <input type="hidden" id="planTipo" value="Magister">
+        </div>
+      </div>
+
+      <!-- FILA 2: Nombre del Magister/Diploma/Curso (vinculado a malla) -->
+      <div class="plan-field" style="grid-column:1/-1">
+        <label class="plan-lbl">
+          Nombre del Magister / Diploma / Curso
+          ${(()=>{
+            const m=mallaLoad();
+            return m.length&&m[0].nombre
+              ? '<span style="color:var(--green);font-weight:600;font-size:9px;margin-left:6px;text-transform:none">&#10003; Malla cargada: '+esc(m[0].nombre)+'</span>'
+              : '<span style="color:var(--t4);font-weight:400;font-size:9px;margin-left:6px;text-transform:none">Carga una malla en Planificador &#8594; Malla Curricular para auto-completar</span>';
+          })()}
+        </label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input class="plan-inp" id="planNombre"
+            placeholder="Ej. Magister en Gestión de Negocios 2026"
+            value="${(()=>{ const m=mallaLoad(); return m.length&&m[0].nombre?esc(m[0].nombre):''; })()}"
+            autocomplete="off" style="flex:1">
+          ${(()=>{
+            const m=mallaLoad();
+            return m.length&&m[0].nombre
+              ? '<button class="btn btn-g" style="font-size:10px;white-space:nowrap;flex-shrink:0" onclick="planUsarMalla()" title="Usar nombre de la malla cargada">&#8635; Desde malla</button>'
+              : '';
+          })()}
+        </div>
+      </div>
+
+      <!-- FILA 2B: Selector de curso de la malla -->
+      <div class="plan-curso-sel-wrap">
+        <label class="plan-lbl">
+          Nombre del Curso
+          <span style="color:var(--t4);font-weight:400;font-size:9px;margin-left:4px;text-transform:none">
+            (selecciona desde la malla cargada)
+          </span>
+        </label>
+        ${(()=>{
+          const m = mallaLoad();
+          const cursos = m.length ? (m[0].cursos||[]) : [];
+          if(!cursos.length){
+            return '<input class="plan-inp" id="planCursoNombre" placeholder="Sin malla cargada — escribe el nombre del curso" autocomplete="off" style="width:100%">';
+          }
+          const opts = cursos.map((cu,i)=>
+            '<option value="'+i+'">'+esc(cu.nombre)+(cu.sigla?' ('+cu.sigla+')':'')+'</option>'
+          ).join('');
+          return '<div style="position:relative">'
+            + '<select class="plan-curso-sel" id="planCursoSel" onchange="planCursoSelChange(this)">'
+            + '<option value="">— Selecciona un curso de la malla —</option>'
+            + opts
+            + '</select>'
+            + '<span class="plan-curso-arrow">&#9660;</span>'
+            + '</div>'
+            + '<div class="plan-curso-info" id="planCursoInfo" style="display:none"></div>'
+            + '<input type="hidden" id="planCursoNombre">';
+        })()}
+      </div>
+
+      <!-- FILA 3: Fechas -->
+      <div class="plan-field">
+        <label class="plan-lbl">Fecha de Inicio</label>
+        <input class="plan-inp" id="planIni" type="date">
+      </div>
+      <div class="plan-field">
+        <label class="plan-lbl">Fecha de Término</label>
+        <input class="plan-inp" id="planFin" type="date">
+      </div>
+
+      <!-- FILA 4: Docentes -->
+      <div class="plan-field" style="grid-column:1/-1">
+        <label class="plan-lbl">Docentes <span style="color:var(--t4);font-weight:400;text-transform:none">(separados por coma)</span></label>
+        <input class="plan-inp" id="planDocentes" placeholder="Ej. Juan Pérez, María González" autocomplete="off">
+      </div>
+
+      <!-- FILA 5: Sede + Coordinadora -->
+      <div class="plan-field">
+        <label class="plan-lbl">Sede</label>
+        <input class="plan-inp" id="planSede" placeholder="Ej. Vitacura, Online" autocomplete="off">
+      </div>
+      <div class="plan-field">
+        <label class="plan-lbl">Coordinadora</label>
+        <input class="plan-inp" id="planCoord" placeholder="Ej. Marcela Orellana" autocomplete="off">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="plan-btn" onclick="planAgregar()">
+        <span style="font-size:15px">+</span> Agregar Programa
+      </button>
+      <span id="planMsg" style="font-size:11px;color:var(--red);display:none"></span>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="plan-stats" id="planStats"></div>
+
+  <!-- FILTROS RÁPIDOS -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="planFiltros">
+    <button class="btn btn-g" style="font-size:10px" onclick="planFiltrar('todos')" id="pf_todos">Todos</button>
+    <button class="btn btn-g" style="font-size:10px" onclick="planFiltrar('activo')" id="pf_activo">En curso</button>
+    <button class="btn btn-g" style="font-size:10px" onclick="planFiltrar('proximo')" id="pf_proximo">Proximamente</button>
+    <button class="btn btn-g" style="font-size:10px" onclick="planFiltrar('finalizado')" id="pf_finalizado">Finalizados</button>
+    <button class="btn btn-g" style="font-size:10px;margin-left:auto" onclick="DL.excel(planExport(),'Planificador.xlsx')">Exportar Excel</button>
+  </div>
+
+  <!-- CARDS -->
+  <div class="plan-cards" id="planCards"></div>`;
+
+  planRender('todos');
+}
+
+let _planFiltro='todos';
+function planFiltrar(f){
+  _planFiltro=f;
+  document.querySelectorAll('[id^="pf_"]').forEach(b=>{
+    b.classList.toggle('btn-p', b.id==='pf_'+f);
+    b.classList.toggle('btn-g', b.id!=='pf_'+f);
+  });
+  planRender(f);
+}
+
+function planRender(filtro){
+  filtro=filtro||_planFiltro||'todos';
+  const cursos=planLoad();
+  const hoy=today();
+
+  // Stats
+  const total=cursos.length;
+  const activos=cursos.filter(cu=>{
+    const ini=cu.ini?new Date(cu.ini+'T00:00:00'):null;
+    const fin=cu.fin?new Date(cu.fin+'T00:00:00'):null;
+    return ini&&ini<=hoy&&(!fin||fin>=hoy);
+  }).length;
+  const proximos=cursos.filter(cu=>{
+    const ini=cu.ini?new Date(cu.ini+'T00:00:00'):null;
+    return ini&&ini>hoy;
+  }).length;
+
+  const statsEl=$('planStats');
+  if(statsEl) statsEl.innerHTML=`
+    <div class="plan-stat"><div class="plan-stat-v">${total}</div><div class="plan-stat-l">Total cursos</div></div>
+    <div class="plan-stat"><div class="plan-stat-v" style="color:var(--green)">${activos}</div><div class="plan-stat-l">En curso</div></div>
+    <div class="plan-stat"><div class="plan-stat-v" style="color:var(--blue)">${proximos}</div><div class="plan-stat-l">Próximos</div></div>`;
+
+  // Filter
+  const visible=filtro==='todos'?cursos:cursos.filter(cu=>{
+    const ini=cu.ini?new Date(cu.ini+'T00:00:00'):null;
+    const fin=cu.fin?new Date(cu.fin+'T00:00:00'):null;
+    const st=planEstado(ini,fin);
+    if(filtro==='activo')     return st.lbl==='En curso';
+    if(filtro==='proximo')    return st.lbl==='Proximamente';
+    if(filtro==='finalizado') return st.lbl==='Finalizado';
+    return true;
+  });
+
+  const cardsEl=$('planCards');
+  if(!cardsEl) return;
+
+  if(!visible.length){
+    cardsEl.innerHTML=`<div class="plan-empty" style="grid-column:1/-1">
+      ${total===0
+        ? 'No hay cursos aún. Usa el formulario para agregar el primero.'
+        : 'No hay cursos en esta categoría.'}
+    </div>`;
+    return;
+  }
+
+  // Sort by date
+  const sorted=[...visible].sort((a,b)=>{
+    const da=a.ini?new Date(a.ini):new Date('9999');
+    const db=b.ini?new Date(b.ini):new Date('9999');
+    return da-db;
+  });
+
+  cardsEl.innerHTML=sorted.map((cu,i)=>{
+    const ini=cu.ini?new Date(cu.ini+'T00:00:00'):null;
+    const fin=cu.fin?new Date(cu.fin+'T00:00:00'):null;
+    const st=planEstado(ini,fin);
+    const av=planAvance(ini,fin);
+    const barColor=st.lbl==='En curso'?'var(--blue)':st.lbl==='Finalizado'?'var(--green)':'var(--orange)';
+    const docs=(cu.docentes||'').split(',').map(d=>d.trim()).filter(Boolean);
+    const realIdx=cursos.indexOf(cu);
+
+    return `<div class="plan-card">
+      <button class="plan-card-gen" onclick="genAbrir(${realIdx})" title="Generar calendario">&#9711;</button>
+      <button class="plan-card-del" onclick="planEliminar(${realIdx})" title="Eliminar">&#10005;</button>
+      <div class="plan-card-top">
+        <div class="plan-card-name">${esc(cu.nombre||'Sin nombre')}</div>
+        <span class="plan-badge ${st.cls}">${st.lbl}</span>
+      </div>
+      <div class="plan-dates">
+        <div class="plan-date-item">
+          <span class="plan-date-lbl">Inicio</span>
+          <span class="plan-date-val" style="color:var(--blue)">${planFmtDate(cu.ini)}</span>
+        </div>
+        <div class="plan-date-item">
+          <span class="plan-date-lbl">Término</span>
+          <span class="plan-date-val">${planFmtDate(cu.fin)}</span>
+        </div>
+        ${cu.sede?`<div class="plan-date-item">
+          <span class="plan-date-lbl">Sede</span>
+          <span class="plan-date-val">${esc(cu.sede)}</span>
+        </div>`:''}
+      </div>
+      ${ini&&fin?`<div class="plan-progress"><div class="plan-progress-bar" style="width:${av}%;background:${barColor}"></div></div>`:''}
+      ${cu.coord?`<div style="font-size:10px;color:var(--t3);margin-bottom:8px">&#128100; ${esc(cu.coord)}</div>`:''}
+      ${docs.length?`<div class="plan-docentes-lbl">Docentes</div>
+      <div class="plan-docentes">${docs.map(d=>`<span class="plan-docente-tag">${esc(d)}</span>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function planSelTipo(btn){
+  // Solo afectar los pills dentro del formulario del planificador
+  const container = btn.closest('.tipo-pills') || document;
+  container.querySelectorAll('.tipo-pill').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  const t=$('planTipo'); if(t) t.value=btn.dataset.tipo||'Magister';
+}
+
+function planUsarMalla(){
+  const mallas = mallaLoad();
+  if(!mallas.length || !mallas[0].nombre){
+    showToast('No hay malla cargada. Ve a Planificador → Malla Curricular primero.','warn');
+    return;
+  }
+  const inp = $('planNombre');
+  if(inp){ inp.value = mallas[0].nombre; inp.focus(); inp.select(); }
+  const tipo = mallas[0].tipo || 'Magister';
+  const t = $('planTipo'); if(t) t.value = tipo;
+  document.querySelectorAll('.plan-form .tipo-pill').forEach(function(b){
+    b.classList.toggle('active', b.dataset.tipo === tipo);
+  });
+  showToast('Nombre cargado desde la malla','ok');
+}
+
+function planCursoSelChange(sel){
+  const idx = parseInt(sel.value);
+  const info = $('planCursoInfo');
+  const hidden = $('planCursoNombre');
+  if(isNaN(idx) || idx < 0){
+    if(info) info.style.display='none';
+    if(hidden) hidden.value='';
+    return;
+  }
+  const mallas = mallaLoad();
+  const cursos = mallas.length ? (mallas[0].cursos||[]) : [];
+  const cu = cursos[idx];
+  if(!cu){ if(info) info.style.display='none'; return; }
+
+  // Guardar nombre en hidden input para usarlo al agregar
+  if(hidden) hidden.value = cu.nombre;
+
+  // Mostrar ficha del curso seleccionado
+  if(info){
+    const rtBadge = cu.rt==='Si'
+      ? '<span style="color:#34d399;font-weight:700">&#10003; Sí</span>'
+      : '<span style="color:var(--t4)">— No</span>';
+    const cpBadge = cu.cp==='Si'
+      ? '<span style="color:#34d399;font-weight:700">&#10003; Sí</span>'
+      : '<span style="color:var(--t4)">— No</span>';
+    info.style.display='flex';
+    info.innerHTML =
+      '<div class="plan-curso-info-item"><span>Período</span><strong>'+esc(String(cu.periodo||''))+'</strong></div>'
+    + '<div class="plan-curso-info-item"><span>Créditos</span><strong style="color:var(--blue)">'+esc(String(cu.cs||''))+'</strong></div>'
+    + '<div class="plan-curso-info-item"><span>H. Presenciales</span><strong>'+esc(String(cu.hp||''))+'</strong></div>'
+    + '<div class="plan-curso-info-item"><span>H. No Presenciales</span><strong>'+esc(String(cu.hnp||''))+'</strong></div>'
+    + '<div class="plan-curso-info-item"><span>Tipo</span><strong>'+esc(cu.ta||'Regular')+'</strong></div>'
+    + '<div class="plan-curso-info-item"><span>Req. Término</span>'+rtBadge+'</div>'
+    + '<div class="plan-curso-info-item"><span>Suma Promedio</span>'+cpBadge+'</div>';
+  }
+}
+
+function planAgregar(){
+  // Nombre del curso: preferir selección del dropdown, luego campo de texto
+  const selCurso = $('planCursoNombre');
+  const cursoNombreFromSel = selCurso ? selCurso.value.trim() : '';
+  const nombre  = cursoNombreFromSel || ($('planNombre')?.value||'').trim();
+  const ini     =($('planIni')?.value||'').trim();
+  const fin     =($('planFin')?.value||'').trim();
+  const docentes=($('planDocentes')?.value||'').trim();
+  const sede    =($('planSede')?.value||'').trim();
+  const coord   =($('planCoord')?.value||'').trim();
+  const tipo    =($('planTipo')?.value||'Otro').trim();
+  const msg     =$('planMsg');
+
+  if(!nombre){
+    if(msg){msg.textContent='El nombre es obligatorio';msg.style.display='inline';}
+    $('planNombre')?.focus(); return;
+  }
+  if(ini&&fin&&ini>fin){
+    if(msg){msg.textContent='La fecha de termino debe ser posterior al inicio';msg.style.display='inline';}
+    return;
+  }
+  if(msg) msg.style.display='none';
+
+  const cursos=planLoad();
+  cursos.push({nombre,tipo,ini,fin,docentes,sede,coord,sesiones:[],creadoEn:new Date().toISOString()});
+  planSave(cursos);
+
+  ['planNombre','planIni','planFin','planDocentes','planSede','planCoord'].forEach(id=>{
+    const el=$(id); if(el) el.value='';
+  });
+  document.querySelectorAll('.tipo-pill').forEach(b=>b.classList.remove('active'));
+  const fm=document.querySelector('.tipo-pill.mag'); if(fm) fm.classList.add('active');
+  const t=$('planTipo'); if(t) t.value='Magister';
+  $('planNombre')?.focus();
+  planRender(_planFiltro);
+  showToast('Programa agregado correctamente','ok');
+}
+
+function planEliminar(idx){
+  const cursos=planLoad();
+  if(idx<0||idx>=cursos.length) return;
+  const nombre=cursos[idx].nombre||'este curso';
+  if(!confirm('¿Eliminar "'+nombre+'"?')) return;
+  cursos.splice(idx,1);
+  planSave(cursos);
+  planRender(_planFiltro);
+  showToast('Curso eliminado','info');
+}
+
+function planExport(){
+  const rows = [];
+  planLoad().forEach(cu=>{
+    const ini=cu.ini?new Date(cu.ini+'T00:00:00'):null;
+    const fin=cu.fin?new Date(cu.fin+'T00:00:00'):null;
+    const estado=planEstado(ini,fin).lbl;
+    const sesiones=cu.sesiones||[];
+    if(!sesiones.length){
+      rows.push({'Tipo':cu.tipo||'','Nombre':cu.nombre||'','Fecha Inicio':cu.ini||'',
+        'Fecha Término':cu.fin||'','Docentes':cu.docentes||'','Sede':cu.sede||'',
+        'Coordinadora':cu.coord||'','Estado':estado,'N° Sesión':'','Fecha Sesión':'',
+        'Horario':'','Sala':''});
+    } else {
+      sesiones.forEach(s=>{
+        rows.push({'Tipo':cu.tipo||'','Nombre':cu.nombre||'','Fecha Inicio':cu.ini||'',
+          'Fecha Término':cu.fin||'','Docentes':cu.docentes||'','Sede':s.sede||cu.sede||'',
+          'Coordinadora':cu.coord||'','Estado':estado,
+          'N° Sesión':s.n||'','Fecha Sesión':s.fecha||'','Horario':s.horario||'','Sala':s.sala||''});
+      });
+    }
+  });
+  return rows;
+}
+
+
+
+/* ══════════════════════════════════════════════════════
+   GENERADOR AUTOMATICO DE CALENDARIO
+══════════════════════════════════════════════════════ */
+let _genCursoIdx = -1;
+
+const DIAS_NOMBRE = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+const DIAS_ABR2   = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+
+function genAbrir(idx){
+  _genCursoIdx = idx;
+  const cu = planLoad()[idx];
+  if(!cu){ showToast('Curso no encontrado','err'); return; }
+
+  $('genModalTitle').textContent = 'Generar Calendario';
+  $('genModalSub').textContent   = cu.nombre || 'Sin nombre';
+
+  // Pre-fill sede/sala del curso
+  if(cu.sede) $('genSede').value = cu.sede;
+  if(cu.coord) {} // no campo coord en modal
+
+  $('genModal').classList.add('open');
+  genPreview();
+}
+
+function genCerrar(){
+  $('genModal').classList.remove('open');
+  _genCursoIdx = -1;
+}
+
+function genToggleDia(cb, labelId){
+  const lbl = $(labelId);
+  if(lbl) lbl.classList.toggle('checked', cb.checked);
+}
+
+function genGetDias(){
+  return [...document.querySelectorAll('#genDias input[type=checkbox]:checked')]
+    .map(cb => parseInt(cb.value));
+}
+
+function genGenerar(){
+  const cu = planLoad()[_genCursoIdx];
+  if(!cu||!cu.ini||!cu.fin){ return []; }
+
+  const ini   = new Date(cu.ini + 'T00:00:00');
+  const fin   = new Date(cu.fin + 'T00:00:00');
+  const freq  = $('genFreq')?.value || 'semanal';
+  const dias  = genGetDias();
+  const maxS  = parseInt($('genMaxSes')?.value || '0') || 999;
+  const hIni  = $('genHIni')?.value || '17:00';
+  const hFin  = $('genHFin')?.value || '21:00';
+
+  if(!dias.length) return [];
+
+  const sesiones = [];
+  let cur = new Date(ini);
+  let semCount = 0;
+  let lastWeekAdded = -1;
+
+  while(cur <= fin && sesiones.length < maxS){
+    const dow = cur.getDay(); // 0=Dom
+    const inDias = dias.includes(dow);
+
+    if(inDias){
+      if(freq === 'semanal'){
+        sesiones.push(new Date(cur));
+      } else if(freq === 'quincenal'){
+        // Solo semanas pares (0,2,4...)
+        const weekNum = Math.floor((cur - ini) / (7*24*3600*1000));
+        if(weekNum % 2 === 0){
+          sesiones.push(new Date(cur));
+        }
+      } else if(freq === 'mensual'){
+        // Primer dia del mes que coincide
+        const monthKey = cur.getFullYear()*12 + cur.getMonth();
+        if(!sesiones.some(s=>s.getFullYear()*12+s.getMonth()===monthKey&&dias.includes(s.getDay()))){
+          sesiones.push(new Date(cur));
+        }
+      }
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+
+  return sesiones.map((d,i)=>({
+    n:    i+1,
+    fecha:d,
+    dia:  DIAS_NOMBRE[d.getDay()],
+    diaAbr: DIAS_ABR2[d.getDay()],
+    horario: hIni + ' a ' + hFin,
+  }));
+}
+
+function genPreview(){
+  const sesiones = genGenerar();
+  const cnt = $('genCnt');
+  const list = $('genList');
+  if(!cnt||!list) return;
+
+  cnt.textContent = sesiones.length + ' sesion' + (sesiones.length!==1?'es':'');
+
+  if(!sesiones.length){
+    list.innerHTML = '<div style="color:var(--t4);font-size:11px">Selecciona al menos un dia de la semana para ver el preview.</div>';
+    return;
+  }
+
+  list.innerHTML = sesiones.map(s=>`
+    <div class="gen-session">
+      <span class="gen-session-n">${s.n}</span>
+      <span class="gen-session-dia">${s.diaAbr}</span>
+      <span class="gen-session-d">${s.fecha.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'})}</span>
+      <span class="gen-session-h">${s.horario}</span>
+    </div>`).join('');
+}
+
+function genDescargar(){
+  const sesiones = genGenerar();
+  if(!sesiones.length){
+    const m=$('genFootMsg');
+    if(m){m.textContent='Selecciona al menos un dia de la semana';m.style.display='inline';}
+    return;
+  }
+  const m=$('genFootMsg'); if(m) m.style.display='none';
+
+  const cu = planLoad()[_genCursoIdx] || {};
+  const modalidad = $('genModal2')?.value || 'Presencial';
+  const sede      = $('genSede')?.value  || cu.sede || '';
+  const sala      = $('genSala')?.value  || '';
+  const docs      = (cu.docentes||'').split(',').map(d=>d.trim()).filter(Boolean);
+  const profesor  = docs[0] || '';
+
+  const rows = sesiones.map(s=>({
+    'PROGRAMA':                cu.nombre||'',
+    'NOMBRE ABREVIADO':        cu.nombre||'',
+    'Nº ALUMNOS':              '',
+    'AÑO IMPARTE':             s.fecha.getFullYear(),
+    'ASIGNATURA':              cu.nombre||'',
+    'FECHAS':                  s.fecha.toLocaleDateString('es-CL'),
+    'DIA SEMANA':              s.dia,
+    'MES':                     s.fecha.toLocaleDateString('es-CL',{month:'long'}),
+    'HORARIO':                 s.horario,
+    'PROFESOR':                profesor,
+    'MODALIDAD':               modalidad,
+    'SEDE':                    sede,
+    'SALA':                    sala,
+    'COORDINADORA RESPONSABLE':cu.coord||'',
+    'Nº SESION':               s.n,
+  }));
+
+  if(typeof XLSX === 'undefined'){ showToast('XLSX no disponible','err'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SESIONES');
+  const fname = 'Calendario_' + (cu.nombre||'Curso').replace(/[^a-zA-Z0-9]/g,'_').slice(0,24) + '.xlsx';
+  XLSX.writeFile(wb, fname);
+
+  showToast(sesiones.length + ' sesiones exportadas a Excel', 'ok');
+  genCerrar();
+}
+
+// Cerrar modal al hacer clic fuera
+document.addEventListener('click', e=>{
+  const modal = $('genModal');
+  if(modal && modal.classList.contains('open') && e.target === modal){
+    genCerrar();
+  }
+});
+
+
+
+/* ══════════════════════════════════════════════════════
+   MALLA CURRICULAR
+══════════════════════════════════════════════════════ */
+let _mallaData = []; // Mallas cargadas [{nombre, tipo, cursos:[]}]
+
+// Corrector de encoding (Ó→ÓN, É→ÉG, etc. — chars corruptos del xlsx UAI)
+function mallaFixName(s){
+  var MAP = {
+    '\u04CE': 'ÓN', '\u04CD': 'ÓM', '\u0247': 'ÉG',
+    '\u0354': 'ÍT', '\u0254': 'ÉT', '\u04C0': 'ÍN',
+    '\u0345': 'ÚN', '\u0416': 'ÓN',
+  };
+  var r = '';
+  for(var i=0;i<s.length;i++){
+    var c2 = s[i];
+    r += MAP[c2] !== undefined ? MAP[c2] : c2;
+  }
+  return r;
+}
+
+function mallaLoad(){
+  try { return JSON.parse(localStorage.getItem('malla_data')||'[]'); } catch(e){ return []; }
+}
+function mallaSave(d){ localStorage.setItem('malla_data', JSON.stringify(d)); }
+
+function renderMalla(){
+  const mallas = mallaLoad();
+  $('page').innerHTML = `
+  <div class="pg-title">Malla Curricular</div>
+
+  <!-- ZONA CARGA -->
+  <div class="malla-upload-zone" id="mallaDropZone" onclick="document.getElementById('fiMalla').click()">
+    <input type="file" id="fiMalla" accept=".xlsx,.xls,.csv" onchange="mallaCargaArchivo(this)">
+    <div style="font-size:24px;margin-bottom:6px">📋</div>
+    <div style="font-size:12px;font-weight:700;color:var(--t2)">Arrastra o haz clic para cargar una Malla</div>
+    <div style="font-size:10px;color:var(--t4);margin-top:4px">Excel con columnas: Período · Sigla · Nombre · CS · HA · CP · RT</div>
+  </div>
+
+  <!-- NOMBRE DEL PROGRAMA sobre la malla -->
+  <div id="mallaNombreWrap" style="margin-bottom:14px;display:${mallas.length?'block':'none'}">
+    <div class="plan-field" style="max-width:520px">
+      <label class="plan-lbl">Nombre del Programa <span style="color:var(--t4);font-weight:400;text-transform:none">(aparece en el encabezado de la malla)</span></label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="plan-inp" id="mallaProgNombre" placeholder="Ej. Magister en Gestión de Negocios" value="${esc(mallas[0]?.nombre||'')}" oninput="mallaActualizarNombre(this.value)">
+        <div class="tipo-pills" style="margin:0">
+          ${['Magister','Diploma','Curso'].map(t=>`<button class="tipo-pill ${t==='Magister'?'mag':t==='Diploma'?'dip':'cur'}${(mallas[0]?.tipo||'Magister')===t?' active':''}" data-tipo="${t}" onclick="mallaSelTipo(this)">${t}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENIDO DE MALLA(S) -->
+  <div id="mallaContent">${mallas.length ? mallaRenderContent(mallas) : '<div class="plan-empty">Carga un archivo de plan de estudios para ver la malla curricular.</div>'}</div>
+
+  ${mallas.length ? '<div class="btn-row" style="margin-top:12px"><button class="btn btn-g btn-sm" onclick="mallaLimpiar()">Limpiar malla</button><button class="btn btn-g btn-sm" onclick="DL.excel(mallaExport(),\'Malla_Curricular.xlsx\')">Exportar Excel</button></div>' : ''}
+  `;
+
+  // Wire drag & drop
+  const dz = $('mallaDropZone');
+  if(dz){
+    dz.addEventListener('dragover', e=>{e.preventDefault();dz.classList.add('over');});
+    dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+    dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('over');
+      const f=e.dataTransfer.files[0]; if(f) mallaCargarFile(f);
+    });
+  }
+}
+
+function mallaRenderContent(mallas){
+  return mallas.map(function(m){
+    var cursos = m.cursos||[];
+    var periodos = [...new Set(cursos.map(function(c){return c.periodo;}))].sort(function(a,b){return a-b;});
+    var totalCS = cursos.reduce(function(s,c){return s+(+c.cs||0);},0);
+    var totalHA = cursos.reduce(function(s,c){return s+(+c.ha||0);},0);
+    var totalRT = cursos.filter(function(c){return c.rt==='Si';}).length;
+    var totalCP = cursos.filter(function(c){return c.cp==='Si';}).length;
+
+    var tipoColor = m.tipo==='Magister'?'#AFA9EC':m.tipo==='Diploma'?'#5DCAA5':'#EF9F27';
+    var tipoCls   = m.tipo==='Magister'?'mag':m.tipo==='Diploma'?'dip':'cur';
+
+    var html = '<div class="malla-wrap">';
+    // Header del programa
+    html += '<div class="malla-prog-header">';
+    html += '<div>';
+    html += '<div class="malla-prog-tipo tipo-pill '+tipoCls+' active" style="display:inline-block;margin-bottom:6px">'+esc(m.tipo||'Programa')+'</div>';
+    html += '<div class="malla-prog-nombre">'+(m.nombre?esc(m.nombre):'<span style="color:var(--t4);font-style:italic">Sin nombre — ingresa el nombre arriba</span>')+'</div>';
+    html += '<div class="malla-prog-stats">';
+    html += '<div class="malla-prog-stat"><div class="malla-prog-stat-v">'+cursos.length+'</div><div class="malla-prog-stat-l">Asignaturas</div></div>';
+    html += '<div class="malla-prog-stat"><div class="malla-prog-stat-v">'+totalCS+'</div><div class="malla-prog-stat-l">Créditos totales</div></div>';
+    html += '<div class="malla-prog-stat"><div class="malla-prog-stat-v">'+totalHA+'</div><div class="malla-prog-stat-l">Horas académicas</div></div>';
+    html += '<div class="malla-prog-stat"><div class="malla-prog-stat-v">'+totalRT+'</div><div class="malla-prog-stat-l">Req. término</div></div>';
+    html += '<div class="malla-prog-stat"><div class="malla-prog-stat-v">'+totalCP+'</div><div class="malla-prog-stat-l">Suman promedio</div></div>';
+    html += '</div></div></div>';
+
+    // Tabla por período
+    periodos.forEach(function(per){
+      var pcursos = cursos.filter(function(c){return c.periodo==per;});
+      html += '<div class="malla-periodo-title"><span class="malla-periodo-badge">Período '+per+'</span> '+pcursos.length+' asignaturas</div>';
+      html += '<div class="tbl-wrap"><table class="malla-table"><thead><tr>';
+      html += '<th>Sigla</th><th>Nombre del Curso</th><th>Tipo</th>';
+      html += '<th class="num">Créditos</th><th class="num">Horas</th><th class="num">H.Pres</th><th class="num">H.No Pres</th>';
+      html += '<th>Req. Término</th><th>Suma Promedio</th>';
+      html += '</tr></thead><tbody>';
+      pcursos.forEach(function(cu){
+        var rtBadge = cu.rt==='Si'
+          ? '<span class="malla-badge-si">✓ Sí</span>'
+          : '<span class="malla-badge-no">— No</span>';
+        var cpBadge = cu.cp==='Si'
+          ? '<span class="malla-badge-si">✓ Sí</span>'
+          : '<span class="malla-badge-no">— No</span>';
+        var tipoCls2 = (cu.ta||'').toUpperCase()==='TALLER' ? 'malla-tipo-taller' : 'malla-tipo-regular';
+        var tipoLbl  = (cu.ta||'Regular');
+        html += '<tr>';
+        html += '<td style="font-family:monospace;font-size:10px;color:var(--t4)">'+esc(cu.sigla||'')+'</td>';
+        html += '<td class="curso-name">'+esc(cu.nombre||'')+'</td>';
+        html += '<td><span class="malla-tipo-tag '+tipoCls2+'">'+esc(tipoLbl)+'</span></td>';
+        html += '<td class="num"><strong>'+esc(String(cu.cs||''))+'</strong></td>';
+        html += '<td class="num">'+esc(String(cu.ha||''))+'</td>';
+        html += '<td class="num">'+esc(String(cu.hp||''))+'</td>';
+        html += '<td class="num">'+esc(String(cu.hnp||''))+'</td>';
+        html += '<td>'+rtBadge+'</td>';
+        html += '<td>'+cpBadge+'</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    });
+    html += '</div>';
+    return html;
+  }).join('<div style="height:24px;border-top:2px solid var(--border);margin:16px 0"></div>');
+}
+
+function mallaActualizarNombre(val){
+  var mallas = mallaLoad();
+  if(mallas.length){ mallas[0].nombre = val; mallaSave(mallas); }
+  // Update display header instantly
+  var hdr = document.querySelector('.malla-prog-nombre');
+  if(hdr) hdr.innerHTML = val ? esc(val) : '<span style="color:var(--t4);font-style:italic">Sin nombre — ingresa el nombre arriba</span>';
+}
+
+function mallaSelTipo(btn){
+  document.querySelectorAll('#mallaNombreWrap .tipo-pill').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  var tipo = btn.dataset.tipo || 'Magister';
+  var mallas = mallaLoad();
+  if(mallas.length){ mallas[0].tipo = tipo; mallaSave(mallas); }
+  // Update badge in header
+  var badge = document.querySelector('.malla-prog-tipo');
+  if(badge){
+    badge.className = 'malla-prog-tipo tipo-pill '+(tipo==='Magister'?'mag':tipo==='Diploma'?'dip':'cur')+' active';
+    badge.textContent = tipo;
+  }
+}
+
+function mallaCargaArchivo(input){
+  var f = input.files[0]; if(!f) return;
+  mallaCargarFile(f);
+}
+
+function mallaCargarFile(file){
+  if(typeof XLSX === 'undefined'){ showToast('XLSX no disponible','err'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var wb  = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      var ws  = wb.Sheets[wb.SheetNames[0]];
+      var raw = XLSX.utils.sheet_to_json(ws, {defval:''});
+      var cursos = mallaParseCursos(raw);
+      if(!cursos.length){ showToast('No se encontraron cursos en el archivo','err'); return; }
+
+      // Obtener mallas existentes para preservar nombre/tipo
+      var existing = mallaLoad();
+      var nombre = existing.length ? existing[0].nombre : '';
+      var tipo   = existing.length ? existing[0].tipo   : 'Magister';
+
+      var nuevaMalla = [{nombre:nombre, tipo:tipo, cursos:cursos}];
+      mallaSave(nuevaMalla);
+      renderMalla();
+      showToast(cursos.length+' asignaturas cargadas','ok');
+    } catch(err){
+      showToast('Error leyendo la malla: '+err.message,'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function mallaParseCursos(rows){
+  if(!rows.length) return [];
+  // Detectar columnas por nombre (flexible)
+  var sample = rows[0];
+  var keys   = Object.keys(sample);
+
+  function findCol(candidates){
+    for(var i=0;i<candidates.length;i++){
+      var cand = candidates[i].toUpperCase();
+      var found = keys.find(function(k){ return k.toUpperCase().includes(cand); });
+      if(found) return found;
+    }
+    return null;
+  }
+
+  var colPer  = findCol(['PER','PERIODO','SEMESTER','MOD','SEMESTRE']) || keys[0];
+  var colSig  = findCol(['SIGLA','CODIGO','CODE','SIG']) || keys[1];
+  var colNom  = findCol(['NOMBRE','NAME','ASIGNATURA','CURSO']) || keys[2];
+  var colCS   = findCol(['CS','CREDITO','CREDIT','CR']) || keys[3];
+  var colHA   = findCol(['HA','HORA','HOUR','HT']) || keys[4];
+  var colHP   = findCol(['HP','PRES']) || keys[5];
+  var colHNP  = findCol(['HNP','NO PRES','NP']) || keys[6];
+  var colTA   = findCol(['TA','TIPO ASIG','TIPO A']) || findCol(['TN','TIPO N']) || null;
+  var colCP   = findCol(['CP','PROMEDIO','SUMA','AVG']) || keys[9];
+  var colRT   = findCol(['RT','REQUISITO','TERM']) || keys[10];
+
+  return rows.filter(function(r){ return r[colNom]; }).map(function(r){
+    var nombre = mallaFixName(String(r[colNom]||'').trim());
+    return {
+      periodo: r[colPer] || 1,
+      sigla:   String(r[colSig]||'').trim(),
+      nombre:  nombre,
+      cs:      r[colCS]  || 0,
+      ha:      r[colHA]  || 0,
+      hp:      r[colHP]  || 0,
+      hnp:     r[colHNP] || 0,
+      ta:      String(r[colTA]||'Regular').trim(),
+      cp:      String(r[colCP]||'').trim(),
+      rt:      String(r[colRT]||'').trim(),
+    };
+  });
+}
+
+function mallaLimpiar(){
+  if(!confirm('¿Eliminar la malla cargada?')) return;
+  mallaSave([]);
+  renderMalla();
+  showToast('Malla eliminada','info');
+}
+
+function mallaExport(){
+  var mallas = mallaLoad();
+  var rows = [];
+  mallas.forEach(function(m){
+    (m.cursos||[]).forEach(function(cu){
+      rows.push({
+        'Tipo Programa': m.tipo||'',
+        'Nombre Programa': m.nombre||'',
+        'Período': cu.periodo,
+        'Sigla': cu.sigla,
+        'Nombre Curso': cu.nombre,
+        'Créditos': cu.cs,
+        'Horas Académicas': cu.ha,
+        'Horas Presenciales': cu.hp,
+        'Horas No Presenciales': cu.hnp,
+        'Tipo Asignatura': cu.ta,
+        'Requisito Término': cu.rt,
+        'Suma Promedio': cu.cp,
+      });
+    });
+  });
+  return rows;
+}
+
+/* ══════════════════════════════════════════════════════
+   OFERTA ACADEMICA — ESPACIOS DISPONIBLES
+══════════════════════════════════════════════════════ */
+let _espacios = [];        // Todos los espacios cargados
+let _espSelIdx = [];       // Indices seleccionados para asignar
+let _asignarCursoIdx = -1; // Curso destino al asignar
+
+// ── Cargar Excel de espacios ────────────────────────────────
+function ofertaCargar(input){
+  const f = input.files[0]; if(!f) return;
+  ofertaCargarFile(f);
+}
+
+function ofertaCargarFile(file){
+  if(typeof XLSX === 'undefined'){ showToast('XLSX no disponible','err'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb  = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {defval:''});
+      _espacios = ofertaNormalize(raw);
+      ofertaRenderGrid();
+      ofertaActualizarFiltros();
+      const st = $('ofertaStatus');
+      if(st) st.textContent = _espacios.length + ' espacios cargados — selecciona los que quieres asignar a un programa';
+      showToast(_espacios.length + ' espacios cargados','ok');
+    } catch(err){
+      showToast('Error leyendo el archivo: '+err.message,'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function ofertaNormalize(rows){
+  function xlTime(v){
+    if(typeof v==='string'&&v.includes(':')) return v.trim();
+    if(typeof v==='number'&&v>=0&&v<1){var m=Math.round(v*1440);return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);}
+    if(v instanceof Date) return ('0'+v.getHours()).slice(-2)+':'+('0'+v.getMinutes()).slice(-2);
+    return String(v||'').trim();
+  }
+  return rows.map(function(r,i){
+    var keys=Object.keys(r).map(function(k){return String(k).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();});
+    var vals=Object.values(r);
+    function get(){
+      for(var a=0;a<arguments.length;a++){
+        var n=arguments[a];
+        var ki=keys.findIndex(function(k){return k===n||k.indexOf(n)>=0;});
+        if(ki>=0) return vals[ki]!==undefined?vals[ki]:'';
+      }
+      return '';
+    }
+    var rawF=get('FECHA','DATE','DIA');
+    var fecha=null;
+    if(rawF instanceof Date&&!isNaN(rawF)){fecha=rawF;}
+    else if(typeof rawF==='string'&&rawF.trim()){
+      var s=rawF.trim();
+      var m1=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if(m1){var y=+m1[3]<100?+m1[3]+2000:+m1[3];fecha=new Date(y,+m1[2]-1,+m1[1]);}
+      if(!fecha||isNaN(fecha)){var m2=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);if(m2)fecha=new Date(+m2[1],+m2[2]-1,+m2[3]);}
+      if(fecha&&isNaN(fecha))fecha=null;
+    } else if(typeof rawF==='number'){
+      var d=new Date(Math.round((rawF-25569)*86400000));if(!isNaN(d))fecha=d;
+    }
+    var hIni=xlTime(get('HORA INICIO','HORAINICIO','H INICIO','INICIO','FROM','START'));
+    var hFin=xlTime(get('HORA FIN','HORAFIN','H FIN','FIN','TO','END','TERMINO'));
+    var sala=String(get('SALA','ROOM','AULA')||'').trim();
+    var sede=String(get('SEDE','CAMPUS','LOCATION')||'').trim();
+    var DS=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+    var fechaStr=fecha?fecha.toLocaleDateString('es-CL',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}):String(rawF||'').trim();
+    var diaSemana=fecha?DS[fecha.getDay()]:'';
+    return {idx:i,fecha:fecha,fechaStr:fechaStr,diaSemana:diaSemana,
+            horario:hIni&&hFin?hIni+' a '+hFin:(hIni||hFin||''),
+            hIni:hIni,hFin:hFin,sala:sala,sede:sede,asignado:false};
+  }).filter(function(e){return e.fecha||e.fechaStr;});
+}
+function ofertaActualizarFiltros(){
+  if(!_espacios.length) return;
+  const sedes = [...new Set(_espacios.map(e=>e.sede).filter(Boolean))];
+  const dias  = [...new Set(_espacios.map(e=>e.diaSemana).filter(Boolean))];
+  // Actualizar dropdowns si existen
+  const sf = $('dfwrap_ofSede');
+  const df = $('dfwrap_ofDia');
+  if(sf && _DF['ofSede']) { _DF['ofSede'].values = sedes; }
+  if(df && _DF['ofDia'])  { _DF['ofDia'].values  = dias;  }
+}
+
+function ofertaFiltrar(){
+  ofertaRenderGrid();
+}
+
+function ofertaRenderGrid(){
+  const grid = $('ofertaGrid'); if(!grid) return;
+
+  let lista = _espacios;
+
+  // Aplicar filtros dropdown si existen
+  const selSede = typeof getDF_sel==='function' ? getDF_sel('ofSede') : [];
+  const selDia  = typeof getDF_sel==='function' ? getDF_sel('ofDia')  : [];
+  if(selSede.length) lista = lista.filter(e=>selSede.includes(e.sede));
+  if(selDia.length)  lista = lista.filter(e=>selDia.includes(e.diaSemana));
+
+  if(!lista.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--t4);font-size:11px;padding:20px">'
+      +(_espacios.length ? 'Sin espacios con ese filtro.' : 'Sin espacios cargados')+'</div>';
+    return;
+  }
+
+  grid.innerHTML = lista.map(e=>{
+    const sel = _espSelIdx.includes(e.idx);
+    const cls = e.asignado ? 'asignado' : sel ? 'seleccionado' : '';
+    const chk = e.asignado ? '&#10003;' : sel ? '&#10003;' : '';
+    return `<div class="espacio-card ${cls}" onclick="ofertaToggle(${e.idx})" data-eidx="${e.idx}">
+      <div class="espacio-check">${chk}</div>
+      <div class="espacio-fecha">${e.fechaStr}${e.diaSemana?' &nbsp;·&nbsp; '+e.diaSemana:''}</div>
+      <div class="espacio-hora">${e.horario||'Sin horario'}</div>
+      <div class="espacio-sala">${e.sala||'Sin sala'}</div>
+      ${e.sede?`<div class="espacio-sede">&#9657; ${esc(e.sede)}</div>`:''}
+    </div>`;
+  }).join('');
+
+  ofertaActualizarContador();
+}
+
+function ofertaToggle(eidx){
+  const esp = _espacios.find(e=>e.idx===eidx);
+  if(!esp || esp.asignado) return;
+  const pos = _espSelIdx.indexOf(eidx);
+  if(pos>=0) _espSelIdx.splice(pos,1);
+  else _espSelIdx.push(eidx);
+  ofertaRenderGrid();
+  ofertaActualizarContador();
+}
+
+function ofertaActualizarContador(){
+  const cnt = $('ofertaSelCnt');
+  const btn = $('btnAsignarEsp');
+  const n   = _espSelIdx.length;
+  if(cnt) cnt.textContent = n + ' espacio' + (n!==1?'s':'') + ' seleccionado' + (n!==1?'s':'');
+  if(btn) btn.style.display = n>0 ? 'inline-flex' : 'none';
+}
+
+function ofertaLimpiarSel(){
+  _espSelIdx = [];
+  ofertaRenderGrid();
+  ofertaActualizarContador();
+}
+
+// ── Modal para elegir a qué programa asignar ────────────────
+function ofertaAsignarModal(cursoIdx){
+  _asignarCursoIdx = cursoIdx;
+  if(!_espSelIdx.length){
+    showToast('Selecciona espacios en la oferta académica primero','warn'); return;
+  }
+  ofertaAsignar();
+}
+
+function ofertaAsignar(){
+  if(_asignarCursoIdx < 0){
+    // Abrir picker de programa
+    const cursos = planLoad();
+    if(!cursos.length){ showToast('Agrega un programa primero','warn'); return; }
+    const nombres = cursos.map((cu,i)=>(i+': '+(cu.tipo||'')+' - '+(cu.nombre||'Sin nombre'))).join('\n');
+    const input   = prompt('Asignar '+_espSelIdx.length+' espacios a que programa?\nNumero:\n\n'+nombres);
+    if(input===null) return;
+    const idx = parseInt(input);
+    if(isNaN(idx)||idx<0||idx>=cursos.length){ showToast('Número inválido','err'); return; }
+    _asignarCursoIdx = idx;
+  }
+
+  const cursos = planLoad();
+  const cu     = cursos[_asignarCursoIdx];
+  if(!cu){ showToast('Programa no encontrado','err'); return; }
+
+  // Construir sesiones desde los espacios seleccionados
+  const nuevasSesiones = _espSelIdx
+    .map(eidx => _espacios.find(e=>e.idx===eidx))
+    .filter(Boolean)
+    .sort((a,b)=> (a.fecha||0)-(b.fecha||0))
+    .map((e,i)=>({
+      n:       (cu.sesiones||[]).length + i + 1,
+      fecha:   e.fecha ? e.fecha.toLocaleDateString('es-CL') : e.fechaStr,
+      dia:     e.diaSemana||'',
+      horario: e.horario||'',
+      sala:    e.sala||'',
+      sede:    e.sede||'',
+      hIni:    e.hIni||'',
+      hFin:    e.hFin||'',
+    }));
+
+  cu.sesiones = [...(cu.sesiones||[]), ...nuevasSesiones];
+
+  // Marcar espacios como asignados
+  _espSelIdx.forEach(eidx=>{
+    const e=_espacios.find(x=>x.idx===eidx);
+    if(e) e.asignado=true;
+  });
+  _espSelIdx = [];
+  _asignarCursoIdx = -1;
+
+  planSave(cursos);
+  ofertaRenderGrid();
+  planRender(_planFiltro);
+  showToast(nuevasSesiones.length+' sesiones asignadas a "'+cu.nombre+'"','ok');
+}
+
+
 /* ══════════════════════════════════════════════════════
    MANUAL & FAQs
 ══════════════════════════════════════════════════════ */
@@ -2913,6 +4221,7 @@ function renderFAQs(){
   ];
   $('page').innerHTML=`<div class="page-title">Preguntas Frecuentes</div>${FAQS.map(([q,a])=>`<div class="faq"><div class="faq-q">❓ ${q}</div><div class="faq-a">${a}</div></div>`).join('')}`;
 }
+
 
 /* ══════════════════════════════════════════════════════
    INIT
@@ -2972,5 +4281,89 @@ function init(){
 document.addEventListener('DOMContentLoaded', init);
 
 </script>
+
+<!-- MODAL GENERADOR DE CALENDARIO -->
+<div class="gen-modal-bg" id="genModal">
+  <div class="gen-modal">
+    <div class="gen-modal-head">
+      <div>
+        <div class="gen-modal-title" id="genModalTitle">Generar Calendario</div>
+        <div class="gen-modal-sub" id="genModalSub">Define la frecuencia y parametros de las sesiones</div>
+      </div>
+      <button class="gen-modal-close" onclick="genCerrar()">&#10005;</button>
+    </div>
+    <div class="gen-modal-body">
+      <div class="gen-row">
+        <div class="gen-field">
+          <span class="gen-lbl">Frecuencia</span>
+          <select class="gen-sel" id="genFreq" onchange="genPreview()">
+            <option value="semanal">Semanal</option>
+            <option value="quincenal">Quincenal (cada 2 semanas)</option>
+            <option value="mensual">Mensual</option>
+          </select>
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">N° max de sesiones <span style="font-weight:400;text-transform:none">(opcional)</span></span>
+          <input class="gen-inp" id="genMaxSes" type="number" min="1" max="100" placeholder="Sin limite" oninput="genPreview()">
+        </div>
+      </div>
+      <div class="gen-field" style="margin-bottom:10px">
+        <span class="gen-lbl">Dias de la semana</span>
+        <div class="gen-dias" id="genDias">
+          <label class="gen-dia" id="gdLun"><input type="checkbox" value="1" onchange="genToggleDia(this,'gdLun');genPreview()">Lun</label>
+          <label class="gen-dia" id="gdMar"><input type="checkbox" value="2" onchange="genToggleDia(this,'gdMar');genPreview()">Mar</label>
+          <label class="gen-dia" id="gdMie"><input type="checkbox" value="3" onchange="genToggleDia(this,'gdMie');genPreview()">Mie</label>
+          <label class="gen-dia" id="gdJue"><input type="checkbox" value="4" onchange="genToggleDia(this,'gdJue');genPreview()">Jue</label>
+          <label class="gen-dia" id="gdVie"><input type="checkbox" value="5" onchange="genToggleDia(this,'gdVie');genPreview()">Vie</label>
+          <label class="gen-dia" id="gdSab"><input type="checkbox" value="6" onchange="genToggleDia(this,'gdSab');genPreview()">Sab</label>
+        </div>
+      </div>
+      <div class="gen-row tri">
+        <div class="gen-field">
+          <span class="gen-lbl">Hora inicio</span>
+          <input class="gen-inp" id="genHIni" type="time" value="17:00" oninput="genPreview()">
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">Hora termino</span>
+          <input class="gen-inp" id="genHFin" type="time" value="21:00" oninput="genPreview()">
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">Modalidad</span>
+          <select class="gen-sel" id="genModal2">
+            <option>Presencial</option>
+            <option>Online</option>
+            <option>Hibrido</option>
+          </select>
+        </div>
+      </div>
+      <div class="gen-row">
+        <div class="gen-field">
+          <span class="gen-lbl">Sede</span>
+          <input class="gen-inp" id="genSede" placeholder="Ej. Vitacura">
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">Sala</span>
+          <input class="gen-inp" id="genSala" placeholder="Ej. Sala 3">
+        </div>
+      </div>
+      <!-- PREVIEW -->
+      <div class="gen-preview">
+        <div class="gen-preview-title">
+          Vista previa de sesiones
+          <span class="gen-preview-cnt" id="genCnt">0 sesiones</span>
+        </div>
+        <div class="gen-session-list" id="genList">
+          <div style="color:var(--t4);font-size:11px">Selecciona al menos un dia de la semana para ver el preview.</div>
+        </div>
+      </div>
+    </div>
+    <div class="gen-modal-foot">
+      <span id="genFootMsg" style="font-size:11px;color:var(--red);flex:1;display:none"></span>
+      <button class="btn btn-g" onclick="genCerrar()">Cancelar</button>
+      <button class="btn btn-p" onclick="genDescargar()" id="genBtnXls">Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
