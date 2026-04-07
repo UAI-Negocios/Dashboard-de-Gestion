@@ -2444,7 +2444,7 @@ function updRes() {
       Avance:       avance,
       encuesta,
       encuestaProg,
-      asigEncuestas,    // [{nombre, fin}] de asignaturas que finalizan en 7 días
+      asigEncuestas,
       _rows:        d.rows,
       _fin:         d.fin,
     };
@@ -2470,6 +2470,15 @@ function updRes() {
 
     return `
       <div class="detail-title">Cursos / Asignaturas del programa</div>
+      ${(()=>{
+        const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
+        return allProfs.length
+          ? '<div style="margin-bottom:10px;display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">'
+            + '<span style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding-top:2px">Docentes del programa</span>'
+            + allProfs.map(p=>'<span style="font-size:10px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.15);color:var(--t3);padding:2px 9px;border-radius:10px">'+esc(p)+'</span>').join('')
+            + '</div>'
+          : '';
+      })()}
       <div class="tbl-wrap">
         <table class="dt" style="font-size:10.5px">
           <thead><tr>
@@ -4367,3 +4376,4 @@ document.addEventListener('DOMContentLoaded', init);
 
 </body>
 </html>
+
