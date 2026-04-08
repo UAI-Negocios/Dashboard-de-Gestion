@@ -460,6 +460,57 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
   border:1px solid var(--border2);font-size:10px}
 .plan-curso-info-item{display:flex;align-items:center;gap:4px;color:var(--t3)}
 .plan-curso-info-item strong{color:var(--t1)}
+
+/* PANEL FECHAS DOCENTE */
+.doc-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;
+  background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.15);
+  color:var(--t3);padding:2px 10px;border-radius:10px;cursor:pointer;
+  transition:all .18s;user-select:none}
+.doc-tag:hover{background:rgba(56,189,248,.18);border-color:var(--blue);color:var(--blue)}
+.doc-tag.active{background:rgba(56,189,248,.18);border-color:var(--blue);color:var(--blue);font-weight:700}
+.doc-tag .doc-cnt{font-size:9px;background:rgba(56,189,248,.2);
+  border-radius:8px;padding:0 5px;font-weight:700}
+.doc-fechas-panel{margin:8px 0 4px;padding:10px 12px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);
+  display:none}
+.doc-fechas-panel.open{display:block}
+.doc-fechas-title{font-size:10px;font-weight:700;color:var(--t2);margin-bottom:8px;
+  display:flex;align-items:center;gap:8px}
+.doc-fechas-grid{display:flex;flex-wrap:wrap;gap:5px}
+.doc-fecha-chip{font-size:10px;padding:3px 10px;border-radius:6px;
+  background:var(--bg2);border:1px solid var(--border2);
+  display:flex;align-items:center;gap:5px}
+.doc-fecha-day{font-weight:700;color:var(--blue);white-space:nowrap}
+.doc-fecha-asig{color:var(--t4);font-size:9px;white-space:nowrap;
+  max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.doc-fecha-hora{color:var(--t3);font-size:9px;white-space:nowrap}
+
+/* DETALLE SESIONES POR ASIGNATURA */
+.asig-row{cursor:pointer}
+.asig-row:hover td{background:rgba(56,189,248,.06)!important}
+.asig-row.active td{background:rgba(56,189,248,.08)!important;border-left:2px solid var(--blue)}
+.asig-toggle{font-size:10px;color:var(--t4);margin-right:5px;display:inline-block;transition:transform .18s}
+.asig-row.active .asig-toggle{transform:rotate(90deg);color:var(--blue)}
+/* Panel debajo de la tabla */
+.asig-detail-panel{display:none;margin-top:8px;padding:12px 14px;
+  background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);
+  border-top:2px solid var(--blue)}
+.asig-detail-panel.open{display:block}
+.asig-detail-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.asig-detail-nombre{font-size:12px;font-weight:700;color:var(--t1)}
+.asig-detail-cnt{font-size:10px;color:var(--t4)}
+.asig-ses-grid{display:flex;flex-wrap:wrap;gap:5px}
+.asig-ses-chip{display:flex;align-items:center;gap:7px;padding:5px 12px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);
+  font-size:10px}
+.asig-ses-n{font-size:9px;font-weight:700;color:var(--t4);min-width:16px}
+.asig-ses-fecha{font-weight:700;color:var(--blue);white-space:nowrap}
+.asig-ses-dia{color:var(--t4);font-size:9px;white-space:nowrap}
+.asig-ses-sep{color:var(--border);font-size:10px}
+.asig-ses-prof{color:var(--t2);white-space:nowrap}
+.asig-ses-hora{color:var(--t3);font-size:9px;white-space:nowrap}
+.asig-ses-hrs{font-weight:800;color:var(--blue);background:rgba(56,189,248,.1);
+  padding:1px 7px;border-radius:4px;font-size:9px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -2396,11 +2447,13 @@ function updRes() {
   const pm={};
   df.forEach(r=>{
     const p=r['PROGRAMA']; if(!p) return;
-    if(!pm[p]) pm[p]={ini:r['DIAS/FECHAS'],fin:r['DIAS/FECHAS'],ses:0,coords:new Set(),rows:[]};
+    if(!pm[p]) pm[p]={ini:r['DIAS/FECHAS'],fin:r['DIAS/FECHAS'],ses:0,coords:new Set(),abrev:'',cc:'',rows:[]};
     const d=r['DIAS/FECHAS'];
     if(d){if(d<pm[p].ini)pm[p].ini=d; if(d>pm[p].fin)pm[p].fin=d;}
     pm[p].ses++;
     pm[p].coords.add(r['COORDINADORA RESPONSABLE']);
+    if(!pm[p].abrev && r['NOMBRE ABREVIADO']) pm[p].abrev = r['NOMBRE ABREVIADO'];
+    if(!pm[p].cc    && r['CC'])               pm[p].cc    = r['CC'];
     pm[p].rows.push(r);
   });
 
@@ -2437,6 +2490,8 @@ function updRes() {
 
     return {
       PROGRAMA:     prog,
+      Abrev:        d.abrev || abbr(prog,20),
+      CC:           d.cc    || '—',
       Inicio:       fmtDate(d.ini),
       Fin:          fmtDate(d.fin),
       Sesiones:     d.ses,
@@ -2468,45 +2523,81 @@ function updRes() {
 
     if(!asigs.length) return '<p style="color:var(--t4);font-size:11px">Sin detalle disponible.</p>';
 
-    return `
-      <div class="detail-title">Cursos / Asignaturas del programa</div>
-      ${(()=>{
-        const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
-        return allProfs.length
-          ? '<div style="margin-bottom:10px;display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">'
-            + '<span style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding-top:2px">Docentes del programa</span>'
-            + allProfs.map(p=>'<span style="font-size:10px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.15);color:var(--t3);padding:2px 9px;border-radius:10px">'+esc(p)+'</span>').join('')
-            + '</div>'
-          : '';
-      })()}
-      <div class="tbl-wrap">
-        <table class="dt" style="font-size:10.5px">
-          <thead><tr>
-            <th>Asignatura / Curso</th>
-            <th>Inicio</th>
-            <th>Fin</th>
-            <th style="text-align:right">Sesiones</th>
-            <th>Profesor(es)</th>
-          </tr></thead>
-          <tbody>${(()=>{
-            const hoyA=today(),en7A=new Date(hoyA);en7A.setDate(en7A.getDate()+7);
-            return asigs.map(a=>{
-              const asigEnc=a.fin&&a.fin>=hoyA&&a.fin<=en7A;
-              const asigFin=a.fin&&a.fin<hoyA;
-              return `<tr style="${asigEnc?'background:rgba(245,158,11,.04)':''}">
-                <td style="font-weight:600;max-width:280px">
-                  ${esc(a.name)}
-                  ${asigEnc?'<span class=\"enc-badge-asig\" title=\"Finaliza en 7 dias — encuesta pendiente\">&#9888; Encuesta</span>':''}
-                </td>
-                <td style="white-space:nowrap;color:var(--blue);font-weight:700">${a.ini?fmtDate(a.ini):'—'}</td>
-                <td style="white-space:nowrap;color:${asigEnc?'var(--orange)':asigFin?'var(--t4)':'var(--t3)'};font-weight:${asigEnc?700:400}">${a.fin?fmtDate(a.fin):'—'}</td>
-                <td style="text-align:right">${a.ses}</td>
-                <td style="color:var(--t3);max-width:200px">${esc(a.profs.slice(0,2).map(p=>abbr(p,22)).join(' / '))}</td>
-              </tr>`;
-            }).join('');
-          })()}</tbody>
-        </table>
-      </div>`;
+    // Agrupar sesiones por asignatura (con todas las filas originales)
+    const amRows={};
+    rows.forEach(r=>{
+      const a=r['ASIGNATURA']||'Sin asignatura';
+      if(!amRows[a]) amRows[a]=[];
+      amRows[a].push(r);
+    });
+    const detId='det_'+Math.random().toString(36).slice(2,7);
+
+    // Docentes section
+    const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
+    let profSection='';
+    if(allProfs.length){
+      const panelId='dp_'+Math.random().toString(36).slice(2,7);
+      const profData2={};
+      rows.forEach(r=>{
+        const p=r['PROFESOR']; if(!p||IGNORE_VALS.has(p.toLowerCase())) return;
+        if(!profData2[p]) profData2[p]=[];
+        if(r['DIAS/FECHAS']) profData2[p].push(r);
+      });
+      window['_dpData_'+panelId]=profData2;
+      const tags=allProfs.map(function(p){
+        const cnt=(profData2[p]||[]).length;
+        const safeP=esc(p);
+        return '<span class="doc-tag" data-pid="'+panelId+'" data-prof="'+safeP+'" onclick="docToggleFechas(this,this.dataset.pid,this.dataset.prof)">'
+          +esc(abbr(p,26))+(cnt?' <span class="doc-cnt">'+cnt+'</span>':'')+'</span>';
+      }).join('');
+      profSection='<div style="margin-bottom:4px">'
+        +'<div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+        +'<span style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding-top:6px">Docentes del programa</span>'
+        +tags+'</div>'
+        +'<div class="doc-fechas-panel" id="'+panelId+'"></div></div>';
+    }
+
+    // Filas de asignaturas — tabla simple con clic que activa panel externo
+    const hoyA=today(),en7A=new Date(hoyA);en7A.setDate(en7A.getDate()+7);
+    // Serializar sesiones por asignatura para el panel externo
+    const sesData={};
+    asigs.forEach(function(a){
+      sesData[a.name]=(amRows[a.name]||[])
+        .filter(function(r){return r['DIAS/FECHAS'];})
+        .sort(function(x,y){return x['DIAS/FECHAS']-y['DIAS/FECHAS'];});
+    });
+    window['_sesData_'+detId]=sesData;
+
+    let tbodyHtml='';
+    asigs.forEach(function(a,ai){
+      const asigEnc=a.fin&&a.fin>=hoyA&&a.fin<=en7A;
+      const asigFin=a.fin&&a.fin<hoyA;
+      const rowId=detId+'_a'+ai;
+      tbodyHtml+='<tr class="asig-row" id="'+rowId+'"'
+        +' data-rid="'+rowId+'" data-did="'+detId+'" data-aname="'+esc(a.name)+'"'
+        +' onclick="asigToggle(this)"'
+        +' style="'+(asigEnc?'background:rgba(245,158,11,.04)':'')+'">'
+        +'<td style="font-weight:600;max-width:300px">'
+          +'<span class="asig-toggle">&#9658;</span>'+esc(a.name)
+          +(asigEnc?'<span class="enc-badge-asig" title="Finaliza en 7 dias">&#9888; Encuesta</span>':'')
+        +'</td>'
+        +'<td style="white-space:nowrap;color:var(--blue);font-weight:700">'+(a.ini?fmtDate(a.ini):'—')+'</td>'
+        +'<td style="white-space:nowrap;color:'+(asigEnc?'var(--orange)':asigFin?'var(--t4)':'var(--t3)')+';font-weight:'+(asigEnc?700:400)+'">'+(a.fin?fmtDate(a.fin):'—')+'</td>'
+        +'<td style="text-align:right">'+a.ses+'</td>'
+        +'<td style="color:var(--t3);max-width:200px">'+esc(a.profs.slice(0,2).map(function(p){return abbr(p,22);}).join(' / '))+'</td>'
+        +'</tr>';
+    });
+
+    // Panel de detalle DEBAJO de la tabla (fuera del table)
+    const panelHtml='<div class="asig-detail-panel" id="panel_'+detId+'"></div>';
+
+    return '<div class="detail-title">Cursos / Asignaturas del programa</div>'
+      +profSection
+      +'<div class="tbl-wrap"><table class="dt" style="font-size:10.5px"><thead><tr>'
+      +'<th>Asignatura / Curso</th><th>Inicio</th><th>Fin</th>'
+      +'<th style="text-align:right">Sesiones</th><th>Profesor(es)</th>'
+      +'</tr></thead><tbody>'+tbodyHtml+'</tbody></table></div>'
+      +panelHtml;
   }
 
   // ── Renderizar tabla con filas expandibles ─────────────────────────────
@@ -2555,6 +2646,8 @@ function updRes() {
         </div>
         ${encCursos}
       </td>
+      <td style="font-size:10px;color:var(--t3)" title="${esc(r.Abrev)}">${esc(abbr(r.Abrev,18))}</td>
+      <td style="font-size:10px;font-family:monospace;color:var(--t4);white-space:nowrap">${esc(r.CC)}</td>
       <td style="white-space:nowrap;color:var(--blue);font-weight:700">${r.Inicio}</td>
       <td style="white-space:nowrap;color:${r.encuesta?'var(--orange)':'var(--t3)'};font-weight:${r.encuesta?'700':'400'}">${r.Fin}</td>
       <td style="text-align:right">${r.Sesiones}</td>
@@ -2568,7 +2661,7 @@ function updRes() {
     </tr>`;
     // Fila de detalle (oculta por defecto)
     tbody+=`<tr class="prog-detail-row" id="pdet_${idx}">
-      <td class="prog-detail-cell" colspan="7">
+      <td class="prog-detail-cell" colspan="9">
         <div class="prog-detail-inner" id="pdetin_${idx}"></div>
       </td>
     </tr>`;
@@ -2580,6 +2673,8 @@ function updRes() {
         <thead><tr>
           <th style="width:28px"></th>
           <th>Programa</th>
+          <th>Abreviado</th>
+          <th>C. Costo</th>
           <th>Inicio</th>
           <th>Fin</th>
           <th style="text-align:right">Sesiones</th>
@@ -2634,6 +2729,120 @@ function toggleProgDetail(idx){
 
   // Scroll suave para que el detalle quede visible
   setTimeout(()=>mainRow.scrollIntoView({behavior:'smooth',block:'start'}),60);
+}
+
+
+
+function asigToggle(tr){
+  const detId   = tr.dataset.did;
+  const aname   = tr.dataset.aname;
+  const panel   = $('panel_'+detId);
+  if(!panel) return;
+
+  const isActive = tr.classList.contains('active') && panel.classList.contains('open');
+
+  // Desactivar todas las filas de la tabla
+  const tbl = tr.closest('table');
+  if(tbl) tbl.querySelectorAll('.asig-row.active').forEach(function(r){ r.classList.remove('active'); });
+
+  if(isActive){
+    // Era la misma → cerrar panel
+    panel.classList.remove('open');
+    return;
+  }
+
+  // Activar esta fila
+  tr.classList.add('active');
+
+  // Construir contenido del panel con las sesiones de esta asignatura
+  const sesData = window['_sesData_'+detId] || {};
+  const sesRows = sesData[aname] || [];
+
+  if(!sesRows.length){
+    panel.innerHTML='<div style="color:var(--t4);font-size:11px">Sin sesiones registradas para esta asignatura.</div>';
+    panel.classList.add('open');
+    return;
+  }
+
+  const chips = sesRows.map(function(r,i){
+    const prof = r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()) ? r['PROFESOR'] : '';
+    const dia  = r['Dia_Semana'] || '';
+    const hora = r['HORARIO'] || '';
+    const hrs  = r['HORAS']   ? String(r['HORAS'])+'h' : '';
+    return '<div class="asig-ses-chip">'
+      +'<span class="asig-ses-n">'+(i+1)+'</span>'
+      +'<span class="asig-ses-fecha">'+esc(fmtDate(r['DIAS/FECHAS']))+'</span>'
+      +(dia  ?'<span class="asig-ses-dia">'+esc(dia)+'</span>':'')
+      +(prof ?'<span class="asig-ses-sep">·</span><span class="asig-ses-prof">'+esc(abbr(prof,26))+'</span>':'')
+      +(hora ?'<span class="asig-ses-sep">·</span><span class="asig-ses-hora">'+esc(hora)+'</span>':'')
+      +(hrs  ?'<span class="asig-ses-hrs">'+esc(hrs)+'</span>':'')
+      +'</div>';
+  }).join('');
+
+  panel.innerHTML =
+    '<div class="asig-detail-header">'
+    +'<span class="asig-detail-nombre">'+esc(aname)+'</span>'
+    +'<span class="asig-detail-cnt">'+sesRows.length+' sesi'+(sesRows.length!==1?'ones':'ón')+'</span>'
+    +'</div>'
+    +'<div class="asig-ses-grid">'+chips+'</div>';
+
+  panel.classList.add('open');
+  setTimeout(function(){ panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 60);
+}
+
+/* ══════════════════════════════════════════════════════
+   PANEL FECHAS DOCENTE
+══════════════════════════════════════════════════════ */
+function docToggleFechas(tag, panelId, profName){
+  const panel = $(panelId); if(!panel) return;
+  const isOpen = panel.classList.contains('open') && panel.dataset.prof === profName;
+
+  // Cerrar siempre primero
+  panel.classList.remove('open');
+  // Desactivar todos los tags del mismo panel
+  const wrap = panel.previousElementSibling;
+  if(wrap) wrap.querySelectorAll('.doc-tag').forEach(t=>t.classList.remove('active'));
+
+  if(isOpen) return; // era el mismo → solo cerrar
+
+  // Abrir con datos del docente seleccionado
+  panel.dataset.prof = profName;
+  tag.classList.add('active');
+
+  const data = window['_dpData_'+panelId] || {};
+  const sesiones = (data[profName]||[])
+    .filter(r=>r['DIAS/FECHAS'])
+    .sort((a,b)=>a['DIAS/FECHAS']-b['DIAS/FECHAS']);
+
+  if(!sesiones.length){
+    panel.innerHTML='<div style="color:var(--t4);font-size:11px">Sin sesiones registradas.</div>';
+    panel.classList.add('open');
+    return;
+  }
+
+  const chips = sesiones.map(r=>{
+    const dow  = r['Dia_Semana']||'';
+    const asig = abbr(r['ASIGNATURA']||'',32);
+    const hora = r['HORARIO']||'';
+    const hrs  = r['HORAS'] ? String(r['HORAS'])+'h' : '';
+    return '<div class="doc-fecha-chip">'
+      +'<span class="doc-fecha-day">'+esc(fmtDate(r['DIAS/FECHAS']))+(dow?' &nbsp;'+esc(dow.slice(0,3)):'')+'</span>'
+      +(asig?'<span class="doc-fecha-asig">'+esc(asig)+'</span>':'')
+      +(hora?'<span class="doc-fecha-hora">'+esc(hora)+'</span>':'')
+      +(hrs?'<span style="font-size:9px;font-weight:700;color:var(--blue);white-space:nowrap;background:rgba(56,189,248,.1);padding:0 5px;border-radius:4px">'+esc(hrs)+'</span>':'')
+      +'</div>';
+  }).join('');
+
+  panel.innerHTML =
+    '<div class="doc-fechas-title">'
+    +'<span style="color:var(--blue)">&#128100;</span>'
+    +esc(profName)
+    +'<span style="font-size:9px;color:var(--t4);font-weight:400">'+sesiones.length+' sesion'+(sesiones.length!==1?'es':'')+'</span>'
+    +'</div>'
+    +'<div class="doc-fechas-grid">'+chips+'</div>';
+
+  panel.classList.add('open');
+  setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
 
 /* ══════════════════════════════════════════════════════
