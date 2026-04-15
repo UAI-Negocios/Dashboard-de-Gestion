@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎓 Calendario Postgrado Ejecutivos</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -511,6 +514,281 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 .asig-ses-hora{color:var(--t3);font-size:9px;white-space:nowrap}
 .asig-ses-hrs{font-weight:800;color:var(--blue);background:rgba(56,189,248,.1);
   padding:1px 7px;border-radius:4px;font-size:9px;white-space:nowrap}
+
+/* DECLARACIÓN DE HORAS */
+.decl-doc{max-width:860px;margin:0 auto;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.decl-header{background:linear-gradient(135deg,rgba(56,189,248,.12),rgba(83,74,183,.08));padding:24px 32px;border-bottom:1px solid var(--border)}
+.decl-logo{font-size:11px;font-weight:800;letter-spacing:.15em;color:var(--blue);margin-bottom:4px}
+.decl-title{font-size:20px;font-weight:800;color:var(--t1);line-height:1.2;margin-bottom:6px}
+.decl-subtitle{font-size:11px;color:var(--t3)}
+.decl-meta{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)}
+.decl-meta-item{display:flex;flex-direction:column;gap:2px}
+.decl-meta-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em}
+.decl-meta-val{font-size:11px;color:var(--t2);font-weight:600}
+.decl-body{padding:24px 32px}
+.decl-section{margin-bottom:24px}
+.decl-section-title{font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--border2)}
+.decl-section-num{width:22px;height:22px;border-radius:50%;background:var(--blue);color:#0f172a;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.decl-text{font-size:11.5px;color:var(--t2);line-height:1.75}
+.decl-text p{margin-bottom:8px}
+.decl-resp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:8px}
+.decl-resp-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px}
+.decl-resp-role{font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.decl-resp-item{font-size:10.5px;color:var(--t2);padding:3px 0;border-bottom:1px solid var(--border2);display:flex;align-items:flex-start;gap:6px;line-height:1.4}
+.decl-resp-item:last-child{border-bottom:none}
+.decl-resp-dot{width:5px;height:5px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px}
+.decl-flow{display:flex;flex-direction:column;gap:0;margin-top:8px;position:relative}
+.decl-step{display:flex;gap:12px;align-items:flex-start;padding:10px 0}
+.decl-step-num{width:28px;height:28px;border-radius:50%;background:rgba(56,189,248,.12);border:2px solid var(--blue);color:var(--blue);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1}
+.decl-step-line{position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--border2);z-index:0}
+.decl-step-content{flex:1;padding-bottom:4px}
+.decl-step-title{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:3px}
+.decl-step-desc{font-size:10.5px;color:var(--t3);line-height:1.5}
+.decl-step-tag{display:inline-flex;align-items:center;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;margin-left:6px;vertical-align:middle}
+.decl-req-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.decl-req-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--r2);border:1px solid var(--border2);font-size:10.5px;color:var(--t2);line-height:1.4}
+.decl-req-ico{font-size:14px;flex-shrink:0}
+.decl-stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.decl-stat-box{flex:1;min-width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:10px 14px;text-align:center}
+.decl-stat-v{font-size:22px;font-weight:800;color:var(--blue);line-height:1}
+.decl-stat-l{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.decl-footer{padding:16px 32px;border-top:1px solid var(--border);background:var(--bg1);display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:center}
+.decl-firma-box{display:flex;gap:20px;flex-wrap:wrap}
+.decl-firma{text-align:center;min-width:140px}
+.decl-firma-line{border-top:1px solid var(--border);padding-top:4px;margin-top:32px;font-size:9px;color:var(--t4);font-weight:600}
+
+/* BADGES DECLARACIÓN HORAS */
+.decl-alert-wrap{margin-bottom:16px}
+.decl-alert-prog{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;margin-bottom:8px}
+.decl-alert-prog-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.decl-alert-prog-name{font-size:12px;font-weight:700;color:var(--t1)}
+.decl-badge-decl{display:inline-flex;align-items:center;gap:4px;background:rgba(239,68,68,.15);
+  color:#ef4444;border:1px solid rgba(239,68,68,.35);border-radius:4px;padding:2px 8px;
+  font-size:9px;font-weight:800;letter-spacing:.04em;animation:enc-pulse 2s ease-in-out infinite;
+  white-space:nowrap}
+.decl-badge-asig{display:inline-flex;align-items:center;gap:3px;background:rgba(239,68,68,.1);
+  color:#ef4444;border:1px solid rgba(239,68,68,.2);border-radius:3px;padding:2px 7px;
+  font-size:9px;font-weight:700;white-space:nowrap}
+.decl-asig-row{display:flex;align-items:flex-start;gap:8px;padding:5px 0;
+  border-bottom:1px solid var(--border2);flex-wrap:wrap}
+.decl-asig-row:last-child{border-bottom:none}
+.decl-asig-name{font-size:11px;font-weight:600;color:var(--t1);flex:1;min-width:180px}
+.decl-asig-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.decl-asig-prof{font-size:10px;color:var(--t3)}
+.decl-asig-fecha{font-size:10px;color:var(--t4);white-space:nowrap}
+.decl-asig-hrs{font-size:11px;font-weight:800;color:#ef4444;white-space:nowrap;
+  background:rgba(239,68,68,.08);padding:1px 8px;border-radius:4px}
+
+/* BPMN DIAGRAM */
+.bpmn-wrap{margin:16px 0;overflow-x:auto}
+.bpmn-svg{min-width:720px;width:100%;display:block}
+.bpmn-lane-label{font:700 11px/1 'Outfit',sans-serif;letter-spacing:.06em;text-transform:uppercase}
+.bpmn-step-title{font:700 10px/1.3 'Outfit',sans-serif}
+.bpmn-step-desc{font:400 9px/1.4 'Outfit',sans-serif}
+.bpmn-actor{font:800 9.5px/1 'Outfit',sans-serif;letter-spacing:.12em;text-transform:uppercase}
+
+/* CUADRO RESUMEN CURSOS DEL PROGRAMA */
+.prog-cursos-resumen{margin-top:16px;padding:14px 16px;background:var(--bg1);
+  border:1px solid var(--border);border-radius:var(--r);border-top:2px solid rgba(56,189,248,.4)}
+.prog-cursos-resumen-title{font-size:10px;font-weight:700;color:var(--blue);
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px}
+.pcr-table{width:100%;border-collapse:collapse}
+.pcr-table th{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;
+  letter-spacing:.07em;padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.pcr-table th.r{text-align:right}
+.pcr-table td{font-size:10.5px;padding:7px 8px;border-bottom:1px solid var(--border2);
+  color:var(--t2);vertical-align:middle}
+.pcr-table tr:last-child td{border-bottom:none}
+.pcr-table tr:hover td{background:rgba(56,189,248,.04)}
+.pcr-table td.bold{font-weight:700;color:var(--t1)}
+.pcr-table td.r{text-align:right}
+.pcr-table td.blue{color:var(--blue);font-weight:700;white-space:nowrap}
+.pcr-table td.muted{color:var(--t4);white-space:nowrap}
+.pcr-table td.orange{color:var(--orange);font-weight:700;white-space:nowrap}
+
+/* ALERTA EMITIR CONTRATO */
+.contrato-alert{display:flex;align-items:center;gap:8px;margin-top:8px;
+  padding:8px 12px;background:rgba(245,158,11,.08);
+  border:1px solid rgba(245,158,11,.3);border-radius:var(--r2);
+  font-size:10.5px;color:var(--orange);font-weight:600;animation:enc-pulse 2.5s ease-in-out infinite}
+.contrato-alert-ico{font-size:15px;flex-shrink:0}
+.contrato-alert-txt{flex:1;line-height:1.4}
+.contrato-alert-txt small{display:block;font-weight:400;color:var(--t3);font-size:9px;margin-top:1px}
+.asig-ses-chip.ultima{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.05)}
+.asig-ses-chip.ultima .asig-ses-fecha{color:var(--orange)}
+
+/* ANÁLISIS DE COHERENCIA */
+.coh-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+.coh-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden}
+.coh-kpi-bar{position:absolute;bottom:0;left:0;height:3px;border-radius:0 0 var(--r) var(--r);transition:width .6s}
+.coh-kpi-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.coh-kpi-val{font-size:28px;font-weight:800;line-height:1;margin-bottom:3px}
+.coh-kpi-sub{font-size:10px;color:var(--t3)}
+.coh-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-bottom:14px}
+.coh-section-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border2)}
+.coh-section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.coh-section-title{font-size:13px;font-weight:700;color:var(--t1)}
+.coh-section-sub{font-size:10px;color:var(--t4);margin-top:1px}
+.coh-prog-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2)}
+.coh-prog-row:last-child{border-bottom:none}
+.coh-prog-name{font-size:11px;font-weight:600;color:var(--t1);flex:1;min-width:0}
+.coh-prog-abrev{font-size:9px;color:var(--t4);margin-top:1px}
+.coh-bar-wrap{width:120px;height:6px;background:var(--bg3);border-radius:3px;flex-shrink:0}
+.coh-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.coh-pct{font-size:11px;font-weight:700;width:38px;text-align:right;flex-shrink:0}
+.coh-delta{font-size:9px;padding:2px 6px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+.coh-chip-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.coh-chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--r2);font-size:10px;border:1px solid var(--border2);background:var(--bg3)}
+.coh-chip-ico{font-size:13px;flex-shrink:0}
+.coh-mit-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2)}
+.coh-mit-item:last-child{border-bottom:none}
+.coh-mit-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px}
+.coh-mit-text{flex:1}
+.coh-mit-title{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:3px}
+.coh-mit-desc{font-size:10.5px;color:var(--t3);line-height:1.5}
+.coh-gauge{position:relative;width:120px;height:60px;margin:0 auto 8px}
+.coh-exec-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:8px;font-size:9px;font-weight:700}
+
+/* DECLARADO VS OBLIGACIÓN */
+.dvo-drop{border:2px dashed var(--border);border-radius:var(--r);padding:28px 20px;text-align:center;cursor:pointer;transition:all .25s;background:var(--bg2);margin-bottom:16px;position:relative}
+.dvo-drop:hover,.dvo-drop.over{border-color:var(--blue);background:rgba(56,189,248,.05)}
+.dvo-drop.loaded{border-color:var(--green);border-style:solid;background:rgba(16,185,129,.04)}
+.dvo-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2;width:100%;height:100%}
+.dvo-drop-inner{position:relative;z-index:1;pointer-events:none}
+.dvo-drop-ico{font-size:28px;margin-bottom:8px;transition:transform .2s}
+.dvo-drop:hover .dvo-drop-ico{transform:translateY(-3px)}
+.dvo-drop-txt{font-size:12px;font-weight:700;color:var(--t2)}
+.dvo-drop-sub{font-size:10px;color:var(--t4);margin-top:4px}
+.dvo-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px}
+.dvo-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
+.dvo-kpi-bar{position:absolute;bottom:0;left:0;height:3px;border-radius:0}
+.dvo-kpi-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.dvo-kpi-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:2px}
+.dvo-kpi-sub{font-size:10px;color:var(--t3)}
+.dvo-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.dvo-section-title{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:12px;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--border2)}
+.dvo-section-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+/* Heatmap */
+.dvo-heat-wrap{overflow-x:auto}
+.dvo-heat{border-collapse:collapse;min-width:100%;font-size:10px}
+.dvo-heat th{padding:5px 8px;font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;text-align:right;border-bottom:1px solid var(--border)}
+.dvo-heat th:first-child{text-align:left}
+.dvo-heat td{padding:5px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;text-align:right;transition:background .2s}
+.dvo-heat td:first-child{text-align:left;font-weight:600;color:var(--t1);max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.dvo-heat tr:hover td{background:rgba(56,189,248,.06)!important}
+/* Bar chart */
+.dvo-chart-wrap{display:flex;flex-direction:column;gap:8px}
+.dvo-bar-row{display:flex;align-items:center;gap:10px}
+.dvo-bar-lbl{font-size:10px;color:var(--t2);width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dvo-bar-track{flex:1;height:18px;background:var(--bg3);border-radius:3px;overflow:hidden;position:relative}
+.dvo-bar-fill{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;transition:width .5s;min-width:2px}
+.dvo-bar-val{font-size:9px;font-weight:700;color:#fff;white-space:nowrap}
+.dvo-bar-num{font-size:10px;color:var(--t3);width:70px;text-align:right;flex-shrink:0}
+/* Tipo pill */
+.dvo-tipo{font-size:8px;font-weight:700;padding:1px 6px;border-radius:6px;white-space:nowrap}
+
+/* VISUALIZACIONES AVANZADAS */
+.viz-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.viz-title{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.viz-sub{font-size:10px;color:var(--t4);margin-bottom:14px}
+.viz-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+/* Radar */
+.radar-wrap{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.radar-legend{display:flex;flex-direction:column;gap:6px;min-width:160px}
+.radar-leg-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2)}
+.radar-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* Waterfall */
+.wf-wrap{overflow-x:auto;padding-bottom:8px}
+.wf-svg{display:block}
+/* Treemap */
+.tm-wrap{position:relative;width:100%;border-radius:var(--r2);overflow:hidden;cursor:default}
+.tm-cell{position:absolute;box-sizing:border-box;border:2px solid var(--bg1);border-radius:4px;overflow:hidden;cursor:default;transition:opacity .15s}
+.tm-cell:hover{opacity:.85;z-index:10}
+.tm-label{padding:5px 7px;line-height:1.3}
+.tm-lbl-cc{font-size:9px;font-weight:800;color:rgba(255,255,255,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-lbl-hrs{font-size:11px;font-weight:800;color:#fff}
+.tm-lbl-pct{font-size:9px;color:rgba(255,255,255,.75)}
+.tm-tooltip{position:fixed;background:var(--bg1);border:1px solid var(--border);border-radius:var(--r2);padding:8px 12px;font-size:10px;pointer-events:none;z-index:999;display:none;max-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+
+/* DVO AETHER — KPI + layout */
+.dvo-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.dvo-kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px 18px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:6px}
+.dvo-kpi-label{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;
+  letter-spacing:.09em;display:flex;align-items:center;justify-content:space-between}
+.dvo-kpi-label-arrow{font-size:10px;color:var(--t4)}
+.dvo-kpi-value{font-size:28px;font-weight:800;line-height:1;color:var(--t1)}
+.dvo-kpi-meta{font-size:10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.dvo-kpi-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px}
+.dvo-kpi-badge.up{background:rgba(16,185,129,.15);color:#34d399}
+.dvo-kpi-badge.dn{background:rgba(239,68,68,.12);color:#ef4444}
+.dvo-kpi-badge.ne{background:rgba(56,189,248,.12);color:#38bdf8}
+.dvo-kpi-spark{position:absolute;bottom:0;right:0;opacity:.35;pointer-events:none}
+.dvo-main-grid{display:grid;grid-template-columns:1fr 380px;gap:14px;margin-bottom:14px}
+.dvo-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px}
+.dvo-panel-title{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:3px;
+  display:flex;align-items:center;justify-content:space-between}
+.dvo-panel-sub{font-size:10px;color:var(--t4);margin-bottom:14px}
+.dvo-panel-tag{font-size:9px;font-weight:600;padding:2px 8px;border-radius:8px;
+  background:rgba(56,189,248,.1);color:#38bdf8}
+.dvo-canvas-wrap{position:relative;width:100%;overflow:hidden}
+.dvo-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.dvo-hbar-list{display:flex;flex-direction:column;gap:7px}
+.dvo-hbar-item{display:flex;flex-direction:column;gap:3px}
+.dvo-hbar-top{display:flex;align-items:center;justify-content:space-between;font-size:10px}
+.dvo-hbar-name{color:var(--t2);font-weight:600;max-width:200px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.dvo-hbar-right{display:flex;align-items:center;gap:8px}
+.dvo-hbar-val{color:var(--t1);font-weight:700}
+.dvo-hbar-pct{color:var(--t4);font-size:9px}
+.dvo-hbar-track{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.dvo-hbar-fill{height:100%;border-radius:3px;transition:width .5s}
+.dvo-donut-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.dvo-donut-legend{display:flex;flex-direction:column;gap:8px;flex:1;min-width:120px}
+.dvo-donut-leg-item{display:flex;align-items:center;justify-content:space-between;
+  gap:8px;font-size:10px}
+.dvo-donut-leg-left{display:flex;align-items:center;gap:7px;color:var(--t2)}
+.dvo-donut-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dvo-donut-pct{font-weight:700;color:var(--t1)}
+.dvo-tx-table{width:100%;border-collapse:collapse;font-size:10.5px}
+.dvo-tx-table thead th{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;
+  letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--border2);text-align:left}
+.dvo-tx-table tbody td{padding:7px 8px;border-bottom:1px solid var(--border2);
+  color:var(--t2);vertical-align:middle}
+.dvo-tx-table tbody tr:last-child td{border-bottom:none}
+.dvo-tx-table tbody tr:hover td{background:rgba(56,189,248,.04)}
+.dvo-tx-tipo{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;
+  font-size:9px;font-weight:700;white-space:nowrap}
+
+/* AUDITORÍA */
+.aud-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.aud-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
+.aud-kpi-lbl{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.aud-kpi-val{font-size:28px;font-weight:800;line-height:1}
+.aud-kpi-sub{font-size:9px;color:var(--t4);margin-top:3px}
+.aud-kpi-ico{position:absolute;right:12px;top:12px;font-size:20px;opacity:.25}
+.aud-tabs{display:flex;gap:2px;margin-bottom:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:3px}
+.aud-tab{flex:1;text-align:center;padding:6px 8px;border-radius:5px;font-size:10px;font-weight:700;color:var(--t4);cursor:pointer;transition:all .15s;border:none;background:transparent}
+.aud-tab.active{background:var(--bg3);color:var(--t1)}
+.aud-table{width:100%;border-collapse:collapse;font-size:10.5px}
+.aud-table thead th{font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;border-bottom:1px solid var(--border2);text-align:left;white-space:nowrap}
+.aud-table tbody td{padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--t2);vertical-align:middle}
+.aud-table tbody tr:hover td{background:rgba(56,189,248,.04)}
+.aud-table tbody tr:last-child td{border-bottom:none}
+.aud-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;font-size:9px;font-weight:700;white-space:nowrap}
+.aud-badge-red{background:rgba(239,68,68,.12);color:#ef4444}
+.aud-badge-amber{background:rgba(245,158,11,.14);color:var(--orange)}
+.aud-badge-blue{background:rgba(56,189,248,.12);color:#38bdf8}
+.aud-badge-green{background:rgba(16,185,129,.12);color:#34d399}
+.aud-search{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:6px 10px;font-size:11px;color:var(--t1);margin-bottom:10px;font-family:inherit;outline:none}
+.aud-search:focus{border-color:var(--blue)}
+.aud-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.aud-panel-title{font-size:11px;font-weight:700;color:var(--t1);margin-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+.aud-panel-sub{font-size:10px;color:var(--t4);margin-bottom:12px}
+.aud-empty{text-align:center;padding:32px;color:var(--t4);font-size:11px}
+.aud-prog-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:3px}
+.aud-prog-fill{height:100%;border-radius:2px;transition:width .4s}
 </style>
 </head>
 <body>
@@ -615,6 +893,17 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
+/* ── Global error handler ── */
+window.onerror = function(msg, src, line, col, err) {
+  var div = document.createElement('div');
+  div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#ef4444;color:#fff;padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:80px;overflow:auto';
+  div.textContent = '⚠ JS Error: ' + msg + ' (línea ' + line + ')';
+  document.body.appendChild(div);
+  setTimeout(function(){div.remove();},8000);
+  return false;
+};
+
+
 
 /* ══════════════════════════════════════════════════════
    GLOBAL STATE
@@ -631,6 +920,11 @@ if (typeof XLSX === 'undefined') {
   });
 }
 
+/* ══════════════════════════════════════════════════════
+   DATOS AUDITORIA — generados automáticamente
+══════════════════════════════════════════════════════ */
+const _AUDIT = {sin_sala:[],solapamientos:[],topes:[],feriados:[],contratos:[],stats:{total_sesiones:0,total_programas:0,total_profesores:0,total_sin_sala:0,total_solapamientos:0,total_topes:0,total_contratos:0}};
+
 const APP = {
   df: [],
   dfRes: [],
@@ -646,10 +940,10 @@ const APP = {
 // Tab keys: simple ASCII only — no emoji, no special chars
 const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
-  programas:    ['resumen','calidad'],
+  programas:    ['resumen','calidad','declaracion','coherencia','declarado'],
   calendarios:  ['calendario','reservas'],
   planificador: ['plancursos','malla'],
-  admin:        ['gestion','turnos','validaciones'],
+  admin:        ['gestion','turnos','validaciones','auditoria'],
   ayuda:        ['manual','faqs'],
 };
 
@@ -662,11 +956,17 @@ const TAB_LABELS = {
   analytics:    'Analytics',
   resumen:      'Resumen',
   calidad:      'Calidad & Sede',
+  declaracion:  'Declaración de Horas',
+  coherencia:   'Análisis de Coherencia',
+  declarado:    'Declarado vs Obligación',
   calendario:   'Calendario',
   reservas:     'Reservas',
   gestion:      'Gestión',
   turnos:       'Turnos',
   validaciones: 'Validaciones',
+  auditoria:    'Auditoría',
+  plancursos:   'Planificador General',
+  malla:        'Malla Curricular',
   manual:       'Manual',
   faqs:         'FAQs',
 };
@@ -1496,7 +1796,9 @@ function toggleSB() {
 function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
-  if (!APP.df.length && !['manual','faqs'].includes(APP.tab)) {
+  // Tabs que tienen su propia fuente de datos o no requieren el calendario
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla'];
+  if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
   const FN = {
@@ -1507,11 +1809,15 @@ function refreshView() {
     analytics:    renderAnalytics,
     resumen:      renderResumen,
     calidad:      renderCalidad,
+    declaracion:  renderDeclaracion,
+    coherencia:   renderCoherencia,
+    declarado:    renderDeclarado,
     calendario:   renderCalendario,
     reservas:     renderReservas,
     gestion:      renderGestion,
     turnos:       renderTurnos,
     validaciones: renderValidaciones,
+    auditoria:    renderAuditoria,
     plancursos:   renderPlanificador,
     malla:        renderMalla,
     manual:       renderManual,
@@ -1911,31 +2217,18 @@ function switchProgTab(tab) {
 function renderGlobal() {
   const df=getDF();
   const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
-  const now=new Date();
-  $('page').innerHTML=`
-  <div class="page-title">Vision Global</div>
-  <div class="frow" style="flex-wrap:wrap;gap:6px">
-    ${mkDF('gYear','Año',  years,'updGlobal()')}
-    ${mkDF('gMes', 'Mes',  Object.values(MESES),'updGlobal()')}
-    ${mkDF('gProg','Programa',uniq(df.map(r=>r['Programa_Abrev'])),'updGlobal()')}
-  </div>
-  <div class="page-subtitle">Distribucion Mensual por Programa</div>
-  <div class="card"><div class="chart-box" style="height:380px"><canvas id="chartGBar"></canvas></div></div>
-  <div class="page-subtitle">Mapa de Calor: Carga por Coordinadora</div>
-  <div class="card" id="gHeatmapCard"><div id="gHeatmap"></div><div id="gHeatCaption" style="font-size:11px;color:var(--t4);margin-top:6px;text-align:center"></div></div>
-  `;
+  $('page').innerHTML='<div class="page-title">Vision Global</div>'
+    +'<div class="frow" style="flex-wrap:wrap;gap:6px" id="gFiltros"></div>'
+    +'<div class="page-subtitle">Distribucion Mensual por Programa</div>'
+    +'<div class="card"><div class="chart-box" style="height:380px"><canvas id="chartGBar"></canvas></div></div>'
+    +'<div class="page-subtitle">Mapa de Calor: Carga por Coordinadora</div>'
+    +'<div class="card" id="gHeatmapCard"><div id="gHeatmap"></div>'
+    +'<div id="gHeatCaption" style="font-size:11px;color:var(--t4);margin-top:6px;text-align:center"></div></div>';
+  var gf=document.getElementById('gFiltros');
+  if(gf) gf.innerHTML=mkDF('gYear','Año',years,'updGlobal()')+mkDF('gMes','Mes',Object.values(MESES),'updGlobal()')+mkDF('gProg','Programa',uniq(df.map(r=>r['Programa_Abrev'])),'updGlobal()');
   updGlobal();
 }
-
-
-/* ══════════════════════════════════════════════════════
-   DROPDOWN FILTER COMPONENT v2
-   Usage : mkDF(id, label, values, onChangeStr)
-   Read  : getDF_sel(id) → string[]
-   Reset : resetDF(id)
-══════════════════════════════════════════════════════ */
-const _DF = {};
-
+const _DF = {}; // Dropdown filter state — GLOBAL
 function mkDF(id, label, values, onChangeStr) {
   // Store state — onChange as callable via eval (safe: only internal strings)
   _DF[id] = {
@@ -2111,27 +2404,26 @@ function updGlobal() {
 ══════════════════════════════════════════════════════ */
 function renderCoord() {
   const df=getDF();
-  $('page').innerHTML=`
-  <div class="page-title">Coordinadoras</div>
-  <div class="frow" style="flex-wrap:wrap;gap:6px" id="cFilters">
-    ${mkDF('cYear','Año',   uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updCoord()')}
-    ${mkDF('cMes', 'Mes',  Object.values(MESES),'updCoord()')}
-    ${mkDF('cSede','Sede', uniq(df.map(r=>r['SEDE'])),'updCoord()')}
-    ${mkDF('cMod', 'Modalidad',['Presencial','Online','Híbrido'],'updCoord()')}
-    ${mkDF('cCoord','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCoord()')}
-    ${mkDF('cProg', 'Programa',   uniq(df.map(r=>r['PROGRAMA'])),'updCoord()')}
-    ${mkDF('cProf', 'Profesor',   uniq(df.map(r=>r['PROFESOR'])),'updCoord()')}
-    ${mkDF('cDia',  'Dia semana', DAYS_MON,'updCoord()')}
-  </div>
-  <div class="metrics" id="cKPIs"></div>
-  <div class="card"><div class="chart-box" style="height:280px"><canvas id="chartCBar"></canvas></div></div>
-  <div class="page-subtitle">🚨 Días Críticos (&gt;2 programas)</div>
-  <div id="cCrit"></div>
-  <div class="page-subtitle">📅 Detalle</div>
-  <div id="cTable"></div>`;
+  $('page').innerHTML='<div class="page-title">Coordinadoras</div>'
+    +'<div class="frow" style="flex-wrap:wrap;gap:6px" id="cFiltros"></div>'
+    +'<div class="metrics" id="cKPIs"></div>'
+    +'<div class="card"><div class="chart-box" style="height:280px"><canvas id="chartCBar"></canvas></div></div>'
+    +'<div class="page-subtitle">&#128680; Días Críticos (&gt;2 programas)</div>'
+    +'<div id="cCrit"></div>'
+    +'<div class="page-subtitle">&#128197; Detalle</div>'
+    +'<div id="cTable"></div>';
+  var cf=document.getElementById('cFiltros');
+  if(cf) cf.innerHTML=
+    mkDF('cYear','Año',uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updCoord()')+
+    mkDF('cMes','Mes',Object.values(MESES),'updCoord()')+
+    mkDF('cSede','Sede',uniq(df.map(r=>r['SEDE'])),'updCoord()')+
+    mkDF('cMod','Modalidad',['Presencial','Online','Híbrido'],'updCoord()')+
+    mkDF('cCoord','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCoord()')+
+    mkDF('cProg','Programa',uniq(df.map(r=>r['PROGRAMA'])),'updCoord()')+
+    mkDF('cProf','Profesor',uniq(df.map(r=>r['PROFESOR'])),'updCoord()')+
+    mkDF('cDia','Dia semana',DAYS_MON,'updCoord()');
   updCoord();
 }
-
 function updCoord() {
   let df=getDF();
   const sy=getDF_sel('cYear'),sm=getDF_sel('cMes'),ss=getDF_sel('cSede'),smod=getDF_sel('cMod');
@@ -2196,18 +2488,18 @@ function updCoord() {
 ══════════════════════════════════════════════════════ */
 function renderComparativa() {
   const df=getDF();
-  $('page').innerHTML=`
-  <div class="page-title">Comparativa de Carga</div>
-  <div class="frow" style="flex-wrap:wrap;gap:6px">
-    ${mkDF('t2Y','Año',        uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updComp()')}
-    ${mkDF('t2C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updComp()')}
-    ${mkDF('t2M','Modalidad',   ['Presencial','Online','Híbrido'],'updComp()')}
-  </div>
-  <div class="g2">
-    <div class="card"><div class="card-title">🏆 Ranking por Sesiones</div><div class="chart-box" style="height:320px"><canvas id="chartRank"></canvas></div></div>
-    <div class="card"><div class="card-title">🔥 Calor Semanal</div><div id="compHeat"></div></div>
-  </div>
-  <div class="page-subtitle">📋 Resumen</div><div id="compRes"></div>`;
+  $('page').innerHTML='<div class="page-title">Comparativa de Carga</div>'
+    +'<div class="frow" style="flex-wrap:wrap;gap:6px" id="compFiltros"></div>'
+    +'<div class="g2">'
+    +'<div class="card"><div class="card-title">&#127942; Ranking por Sesiones</div><div class="chart-box" style="height:320px"><canvas id="chartRank"></canvas></div></div>'
+    +'<div class="card"><div class="card-title">&#128293; Calor Semanal</div><div id="compHeat"></div></div>'
+    +'</div>'
+    +'<div class="page-subtitle">&#128203; Resumen</div><div id="compRes"></div>';
+  var cpf=document.getElementById('compFiltros');
+  if(cpf) cpf.innerHTML=
+    mkDF('t2Y','Año',uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updComp()')+
+    mkDF('t2C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updComp()')+
+    mkDF('t2M','Modalidad',['Presencial','Online','Híbrido'],'updComp()');
   updComp();
 }
 function updComp() {
@@ -2420,19 +2712,19 @@ function updCarga() {
 let _lastStats=[];
 function renderResumen() {
   const df=getDF();
-  $('page').innerHTML=`
-  <div class="page-title">Resumen de Programas</div>
-  <div class="frow" style="flex-wrap:wrap;gap:6px">
-    ${mkDF('p4Y','Año',        uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updRes()')}
-    ${mkDF('p4C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updRes()')}
-    ${mkDF('p4P','Programa',    uniq(df.map(r=>r['PROGRAMA'])),'updRes()')}
-  </div>
-  <div id="resTable"></div>
-  <div class="btn-row">
-    <button class="btn btn-ghost btn-sm" onclick="DL.excel(_lastStats,'Resumen_Programas.xlsx')">📊 Excel</button>
-    <button class="btn btn-ghost btn-sm" onclick="DL.csv(_lastStats,'Resumen_Programas.csv')">📄 CSV</button>
-    <button class="btn btn-ghost btn-sm" onclick="DL.ics(getDF(),'Calendario.ics')">📅 iCal</button>
-  </div>`;
+  $('page').innerHTML='<div class="pg-title">Resumen de Programas</div>'
+    +'<div class="frow" style="flex-wrap:wrap;gap:6px;margin-bottom:12px" id="resFiltros"></div>'
+    +'<div id="resTable"></div>'
+    +'<div class="btn-row">'
+    +'<button class="btn btn-ghost btn-sm" onclick="DL.excel(_lastStats,&quot;Resumen_Programas.xlsx&quot;)">&#128202; Excel</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="DL.csv(_lastStats,&quot;Resumen_Programas.csv&quot;)">&#128196; CSV</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="DL.ics(getDF(),&quot;Calendario.ics&quot;)">&#128197; iCal</button>'
+    +'</div>';
+  var rf=document.getElementById('resFiltros');
+  if(rf) rf.innerHTML=
+    mkDF('p4Y','Año',uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updRes()')+
+    mkDF('p4C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updRes()')+
+    mkDF('p4P','Programa',uniq(df.map(r=>r['PROGRAMA'])),'updRes()');
   updRes();
 }
 function updRes() {
@@ -2506,99 +2798,8 @@ function updRes() {
   }).sort((a,b)=>b.Avance-a.Avance);
 
   // ── Construir detalle de cursos (asignaturas) por programa ─────────────
-  function buildProgDetail(rows){
-    // Agrupar por ASIGNATURA → fecha min/max, nº sesiones, profesores
-    const am={};
-    rows.forEach(r=>{
-      const a=r['ASIGNATURA']||'Sin asignatura'; if(!am[a])am[a]={ini:null,fin:null,ses:0,profs:new Set()};
-      const d=r['DIAS/FECHAS'];
-      if(d){if(!am[a].ini||d<am[a].ini)am[a].ini=d; if(!am[a].fin||d>am[a].fin)am[a].fin=d;}
-      am[a].ses++;
-      if(r['PROFESOR']&&r['PROFESOR'].trim()) am[a].profs.add(r['PROFESOR'].trim());
-    });
 
-    const asigs=Object.entries(am)
-      .sort((a,b)=> (a[1].ini||0)-(b[1].ini||0))
-      .map(([name,d])=>({name,ini:d.ini,fin:d.fin,ses:d.ses,profs:[...d.profs]}));
-
-    if(!asigs.length) return '<p style="color:var(--t4);font-size:11px">Sin detalle disponible.</p>';
-
-    // Agrupar sesiones por asignatura (con todas las filas originales)
-    const amRows={};
-    rows.forEach(r=>{
-      const a=r['ASIGNATURA']||'Sin asignatura';
-      if(!amRows[a]) amRows[a]=[];
-      amRows[a].push(r);
-    });
-    const detId='det_'+Math.random().toString(36).slice(2,7);
-
-    // Docentes section
-    const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
-    let profSection='';
-    if(allProfs.length){
-      const panelId='dp_'+Math.random().toString(36).slice(2,7);
-      const profData2={};
-      rows.forEach(r=>{
-        const p=r['PROFESOR']; if(!p||IGNORE_VALS.has(p.toLowerCase())) return;
-        if(!profData2[p]) profData2[p]=[];
-        if(r['DIAS/FECHAS']) profData2[p].push(r);
-      });
-      window['_dpData_'+panelId]=profData2;
-      const tags=allProfs.map(function(p){
-        const cnt=(profData2[p]||[]).length;
-        const safeP=esc(p);
-        return '<span class="doc-tag" data-pid="'+panelId+'" data-prof="'+safeP+'" onclick="docToggleFechas(this,this.dataset.pid,this.dataset.prof)">'
-          +esc(abbr(p,26))+(cnt?' <span class="doc-cnt">'+cnt+'</span>':'')+'</span>';
-      }).join('');
-      profSection='<div style="margin-bottom:4px">'
-        +'<div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
-        +'<span style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding-top:6px">Docentes del programa</span>'
-        +tags+'</div>'
-        +'<div class="doc-fechas-panel" id="'+panelId+'"></div></div>';
-    }
-
-    // Filas de asignaturas — tabla simple con clic que activa panel externo
-    const hoyA=today(),en7A=new Date(hoyA);en7A.setDate(en7A.getDate()+7);
-    // Serializar sesiones por asignatura para el panel externo
-    const sesData={};
-    asigs.forEach(function(a){
-      sesData[a.name]=(amRows[a.name]||[])
-        .filter(function(r){return r['DIAS/FECHAS'];})
-        .sort(function(x,y){return x['DIAS/FECHAS']-y['DIAS/FECHAS'];});
-    });
-    window['_sesData_'+detId]=sesData;
-
-    let tbodyHtml='';
-    asigs.forEach(function(a,ai){
-      const asigEnc=a.fin&&a.fin>=hoyA&&a.fin<=en7A;
-      const asigFin=a.fin&&a.fin<hoyA;
-      const rowId=detId+'_a'+ai;
-      tbodyHtml+='<tr class="asig-row" id="'+rowId+'"'
-        +' data-rid="'+rowId+'" data-did="'+detId+'" data-aname="'+esc(a.name)+'"'
-        +' onclick="asigToggle(this)"'
-        +' style="'+(asigEnc?'background:rgba(245,158,11,.04)':'')+'">'
-        +'<td style="font-weight:600;max-width:300px">'
-          +'<span class="asig-toggle">&#9658;</span>'+esc(a.name)
-          +(asigEnc?'<span class="enc-badge-asig" title="Finaliza en 7 dias">&#9888; Encuesta</span>':'')
-        +'</td>'
-        +'<td style="white-space:nowrap;color:var(--blue);font-weight:700">'+(a.ini?fmtDate(a.ini):'—')+'</td>'
-        +'<td style="white-space:nowrap;color:'+(asigEnc?'var(--orange)':asigFin?'var(--t4)':'var(--t3)')+';font-weight:'+(asigEnc?700:400)+'">'+(a.fin?fmtDate(a.fin):'—')+'</td>'
-        +'<td style="text-align:right">'+a.ses+'</td>'
-        +'<td style="color:var(--t3);max-width:200px">'+esc(a.profs.slice(0,2).map(function(p){return abbr(p,22);}).join(' / '))+'</td>'
-        +'</tr>';
-    });
-
-    // Panel de detalle DEBAJO de la tabla (fuera del table)
-    const panelHtml='<div class="asig-detail-panel" id="panel_'+detId+'"></div>';
-
-    return '<div class="detail-title">Cursos / Asignaturas del programa</div>'
-      +profSection
-      +'<div class="tbl-wrap"><table class="dt" style="font-size:10.5px"><thead><tr>'
-      +'<th>Asignatura / Curso</th><th>Inicio</th><th>Fin</th>'
-      +'<th style="text-align:right">Sesiones</th><th>Profesor(es)</th>'
-      +'</tr></thead><tbody>'+tbodyHtml+'</tbody></table></div>'
-      +panelHtml;
-  }
+  // buildProgDetail is now a global function
 
   // ── Renderizar tabla con filas expandibles ─────────────────────────────
   let tbody='';
@@ -2719,11 +2920,14 @@ function toggleProgDetail(idx){
 
   // Renderizar detalle lazy (solo la primera vez)
   if(!detIn.dataset.loaded){
-    const stats   = (window._resStatsRows||[])[idx];
-    const builder = window._buildProgDetail;
-    if(stats && builder){
-      detIn.innerHTML = builder(stats._rows||[]);
+    const stats = (window._resStatsRows||[])[idx];
+    if(stats && typeof buildProgDetail === 'function'){
+      detIn.innerHTML = buildProgDetail(stats._rows||[]);
       detIn.dataset.loaded='1';
+    } else if(stats){
+      // fallback: forzar rebuild
+      detIn.innerHTML = '<p style="color:var(--t4);font-size:11px">Cargando detalle...</p>';
+      setTimeout(function(){ if(typeof buildProgDetail==='function'){ detIn.innerHTML=buildProgDetail(stats._rows||[]); detIn.dataset.loaded='1'; } }, 100);
     }
   }
 
@@ -2764,27 +2968,48 @@ function asigToggle(tr){
     return;
   }
 
+  const hoyC = today();
+  const ultimaIdx = sesRows.length - 1;
+  const ultimaSes = sesRows[ultimaIdx];
+  // La alerta aplica si la última sesión ya ocurrió o es hoy
+  const ultimaYaPaso = ultimaSes && ultimaSes['DIAS/FECHAS'] && ultimaSes['DIAS/FECHAS'] <= hoyC;
+
   const chips = sesRows.map(function(r,i){
-    const prof = r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()) ? r['PROFESOR'] : '';
-    const dia  = r['Dia_Semana'] || '';
-    const hora = r['HORARIO'] || '';
-    const hrs  = r['HORAS']   ? String(r['HORAS'])+'h' : '';
-    return '<div class="asig-ses-chip">'
+    const prof    = r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()) ? r['PROFESOR'] : '';
+    const dia     = r['Dia_Semana'] || '';
+    const hora    = r['HORARIO'] || '';
+    const hrs     = r['HORAS']   ? String(r['HORAS'])+'h' : '';
+    const esUltima= i === ultimaIdx;
+    return '<div class="asig-ses-chip'+(esUltima?' ultima':'')+'">'
       +'<span class="asig-ses-n">'+(i+1)+'</span>'
       +'<span class="asig-ses-fecha">'+esc(fmtDate(r['DIAS/FECHAS']))+'</span>'
       +(dia  ?'<span class="asig-ses-dia">'+esc(dia)+'</span>':'')
       +(prof ?'<span class="asig-ses-sep">·</span><span class="asig-ses-prof">'+esc(abbr(prof,26))+'</span>':'')
       +(hora ?'<span class="asig-ses-sep">·</span><span class="asig-ses-hora">'+esc(hora)+'</span>':'')
       +(hrs  ?'<span class="asig-ses-hrs">'+esc(hrs)+'</span>':'')
+      +(esUltima?'<span style="font-size:9px;font-weight:700;color:var(--orange);background:rgba(245,158,11,.1);padding:1px 7px;border-radius:4px;white-space:nowrap">Última sesión</span>':'')
       +'</div>';
   }).join('');
+
+  // Alerta de contrato — solo si la última sesión ya pasó o es hoy
+  const contratoAlert = ultimaYaPaso
+    ? '<div class="contrato-alert">'
+      +'<span class="contrato-alert-ico">&#9888;</span>'
+      +'<div class="contrato-alert-txt">'
+        +'Emitir contrato si corresponde'
+        +'<small>El curso <strong>'+esc(aname)+'</strong> ha finalizado su última sesión ('+esc(fmtDate(ultimaSes['DIAS/FECHAS']))+')'
+        +' — verificar si se requiere renovación o nuevo contrato para el docente.</small>'
+      +'</div>'
+      +'</div>'
+    : '';
 
   panel.innerHTML =
     '<div class="asig-detail-header">'
     +'<span class="asig-detail-nombre">'+esc(aname)+'</span>'
     +'<span class="asig-detail-cnt">'+sesRows.length+' sesi'+(sesRows.length!==1?'ones':'ón')+'</span>'
     +'</div>'
-    +'<div class="asig-ses-grid">'+chips+'</div>';
+    +'<div class="asig-ses-grid">'+chips+'</div>'
+    +contratoAlert;
 
   panel.classList.add('open');
   setTimeout(function(){ panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 60);
@@ -2845,57 +3070,2135 @@ function docToggleFechas(tag, panelId, profName){
   setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
 
+
+
 /* ══════════════════════════════════════════════════════
-   CALIDAD & SEDE
+   BPMN DIAGRAM — Declaración y Pago de Horas
 ══════════════════════════════════════════════════════ */
-function renderCalidad() {
-  const df=getDF();
-  $('page').innerHTML=`
-  <div class="page-title">Calidad y Sede</div>
-  <div class="frow" style="flex-wrap:wrap;gap:6px">
-    ${mkDF('t5Y','Año',        uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear()))),'updCalidad()')}
-    ${mkDF('t5C','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCalidad()')}
-  </div>
-  <div class="g2">
-    <div class="card"><div class="card-title">Modalidad</div><div class="chart-box" style="height:200px"><canvas id="chartMod"></canvas></div></div>
-    <div class="card"><div class="card-title">Sede (Top 10)</div><div class="chart-box" style="height:200px"><canvas id="chartSede"></canvas></div></div>
-  </div>
-  <div class="g2">
-    <div class="card"><div class="card-title">🕸️ Radar Sedes</div><div class="chart-box" style="height:220px"><canvas id="chartRS"></canvas></div></div>
-    <div class="card"><div class="card-title">🕸️ Radar Modalidades</div><div class="chart-box" style="height:220px"><canvas id="chartRM"></canvas></div></div>
-  </div>
-  <div class="page-subtitle">🧹 Auditoría de Datos</div><div id="auditTable"></div>`;
+function bpmnDiagram(){
+  // Layout constants
+  const W=900, PAD=14;
+  // Lane heights
+  const LH = {doc:130, coord:130, fin:130};
+  const LW = 56; // lane label width
+  const CX = LW + PAD; // content start x
+  const CW = W - LW - PAD*2; // content width
+
+  // Lane Y positions
+  const Y_DOC   = 44;
+  const Y_COORD = Y_DOC   + LH.doc;
+  const Y_FIN   = Y_COORD + LH.coord;
+  const H_TOTAL = Y_FIN   + LH.fin + 20;
+
+  // Node dimensions
+  const NW=120, NH=52, NR=8; // task box
+  const DW=52,  DH=52;       // diamond (gateway)
+  const CR=18;               // circle radius (event)
+
+  // Color palette (dark theme compatible)
+  const C = {
+    doc:   {fill:'rgba(16,185,129,.10)', stroke:'#34d399', text:'#34d399', lane:'rgba(16,185,129,.05)'},
+    coord: {fill:'rgba(56,189,248,.10)', stroke:'#38bdf8', text:'#38bdf8', lane:'rgba(56,189,248,.05)'},
+    fin:   {fill:'rgba(245,158,11,.10)', stroke:'#f59e0b', text:'#f59e0b', lane:'rgba(245,158,11,.05)'},
+    arrow: '#64748b',
+    gw:    {fill:'rgba(139,92,246,.12)', stroke:'#a78bfa'},
+    event: {fill:'rgba(56,189,248,.15)', stroke:'#38bdf8'},
+    end:   {fill:'rgba(239,68,68,.15)',  stroke:'#ef4444'},
+  };
+
+  // ── Helper: SVG shapes ──────────────────────────────────────────
+  function task(x, y, label, desc, col, id){
+    const mid = x+NW/2, cy=y+NH/2;
+    return '<g id="'+id+'">'
+      +'<rect x="'+x+'" y="'+y+'" width="'+NW+'" height="'+NH+'" rx="'+NR+'"'
+        +' fill="'+col.fill+'" stroke="'+col.stroke+'" stroke-width="1.5"/>'
+      // top colored bar
+      +'<rect x="'+x+'" y="'+y+'" width="'+NW+'" height="5" rx="'+NR+'"'
+        +' fill="'+col.stroke+'" opacity="0.7"/>'
+      +'<text x="'+mid+'" y="'+(y+18)+'" text-anchor="middle"'
+        +' font-family="Outfit,sans-serif" font-size="9.5" font-weight="700" fill="'+col.text+'">'+label+'</text>'
+      +(desc ? '<text x="'+mid+'" y="'+(y+30)+'" text-anchor="middle"'
+        +' font-family="Outfit,sans-serif" font-size="8" fill="#94a3b8">'+desc.slice(0,52)+'</text>'
+        +(desc.length>52?'<text x="'+mid+'" y="'+(y+40)+'" text-anchor="middle"'
+          +' font-family="Outfit,sans-serif" font-size="8" fill="#94a3b8">'+desc.slice(52,100)+'</text>':'')
+        : '')
+      +'</g>';
+  }
+
+  function gateway(x, y, label){
+    const mid=x+DW/2;
+    return '<g>'
+      +'<polygon points="'+(x+DW/2)+','+(y)+' '+(x+DW)+','+(y+DH/2)+' '+(x+DW/2)+','+(y+DH)+' '+x+','+(y+DH/2)+'"'
+        +' fill="'+C.gw.fill+'" stroke="'+C.gw.stroke+'" stroke-width="1.5"/>'
+      +'<text x="'+mid+'" y="'+(y-6)+'" text-anchor="middle"'
+        +' font-family="Outfit,sans-serif" font-size="8" fill="#a78bfa">'+label+'</text>'
+      +'</g>';
+  }
+
+  function startEvent(cx, cy){
+    return '<circle cx="'+cx+'" cy="'+cy+'" r="'+CR+'"'
+      +' fill="'+C.event.fill+'" stroke="'+C.event.stroke+'" stroke-width="2"/>'
+      +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(CR-5)+'"'
+      +' fill="none" stroke="'+C.event.stroke+'" stroke-width="1" opacity="0.5"/>';
+  }
+
+  function endEvent(cx, cy){
+    return '<circle cx="'+cx+'" cy="'+cy+'" r="'+CR+'"'
+      +' fill="'+C.end.fill+'" stroke="'+C.end.stroke+'" stroke-width="3"/>'
+      +'<rect x="'+(cx-7)+'" y="'+(cy-7)+'" width="14" height="14" rx="2"'
+      +' fill="'+C.end.stroke+'" opacity="0.7"/>';
+  }
+
+  function arr(x1,y1,x2,y2,label,bend){
+    var d;
+    if(bend){
+      var mx=(x1+x2)/2;
+      d='M'+x1+','+y1+' C'+mx+','+y1+' '+mx+','+y2+' '+x2+','+y2;
+    } else {
+      d='M'+x1+','+y1+' L'+x2+','+y2;
+    }
+    return '<path d="'+d+'" fill="none" stroke="'+C.arrow+'" stroke-width="1.5" marker-end="url(#bpmnArrow)"/>'
+      +(label?'<text x="'+((x1+x2)/2)+'" y="'+((y1+y2)/2-4)+'" text-anchor="middle"'
+        +' font-family="Outfit,sans-serif" font-size="8" fill="#64748b">'+label+'</text>':'');
+  }
+
+  function arrV(x,y1,y2,label){ return arr(x,y1,x,y2,label); }
+  function arrH(x1,y1,x2,label){ return arr(x1,y1,x2,y1,label); }
+
+  // ── Layout positions (left→right, 7 main steps + gateway) ──────
+  // Row layout: start | T1 | T2 | T3 | GW | T4 | T5 | T6 | T7 | end
+  const COL = [
+    CX+10,        // 0: start event
+    CX+48,        // 1: T1 Ejecución
+    CX+186,       // 2: T2 Declaración
+    CX+324,       // 3: T3 Envío
+    CX+462,       // 4: GW ¿Válido?
+    CX+532,       // 5: T4 Validación
+    CX+670,       // 6: T5 Firma Conf.
+    CX+532,       // 7: T6 Liquidación (fila fin)
+    CX+670,       // 8: T7 Notif+Archivo
+    CX+810,       // 9: end event
+  ];
+
+  // Lane center Y for each actor
+  const YC = {
+    doc:   Y_DOC   + LH.doc/2,
+    coord: Y_COORD + LH.coord/2,
+    fin:   Y_FIN   + LH.fin/2,
+  };
+
+  // Task vertical centers
+  const TY = {
+    doc:   Y_DOC   + (LH.doc   - NH)/2,
+    coord: Y_COORD + (LH.coord - NH)/2,
+    fin:   Y_FIN   + (LH.fin   - NH)/2,
+  };
+
+  var s = '';
+
+  // ── SVG header ──────────────────────────────────────────────────
+  s += '<svg class="bpmn-svg" viewBox="0 0 '+W+' '+H_TOTAL
+    +'" xmlns="http://www.w3.org/2000/svg">';
+
+  // Arrow marker
+  s += '<defs><marker id="bpmnArrow" viewBox="0 0 10 10" refX="8" refY="5"'
+    +' markerWidth="5" markerHeight="5" orient="auto-start-reverse">'
+    +'<path d="M1 1L9 5L1 9" fill="none" stroke="'+C.arrow+'" stroke-width="1.8"'
+    +' stroke-linecap="round" stroke-linejoin="round"/></marker></defs>';
+
+  // ── Pool border ─────────────────────────────────────────────────
+  s += '<rect x="0" y="'+Y_DOC+'" width="'+W+'" height="'+(H_TOTAL-Y_DOC-20)+'"'
+    +' rx="6" fill="none" stroke="#334155" stroke-width="1.5"/>';
+
+  // Pool label
+  s += '<rect x="0" y="'+Y_DOC+'" width="28" height="'+(H_TOTAL-Y_DOC-20)+'"'
+    +' rx="6" fill="rgba(56,189,248,.06)" stroke="#334155" stroke-width="1.5"/>';
+  s += '<text x="14" y="'+(Y_DOC+(H_TOTAL-Y_DOC)/2)+'" text-anchor="middle"'
+    +' font-family="Outfit,sans-serif" font-size="9" font-weight="800" fill="#38bdf8"'
+    +' transform="rotate(-90,14,'+(Y_DOC+(H_TOTAL-Y_DOC-20)/2)+')">'
+    +'PROCESO: DECLARACI\u00d3N DE HORAS UAI</text>';
+
+  // ── Lanes ───────────────────────────────────────────────────────
+  var lanes=[
+    {y:Y_DOC,   h:LH.doc,   col:C.doc,   label:'DOCENTE'},
+    {y:Y_COORD, h:LH.coord, col:C.coord, label:'COORDINADORA'},
+    {y:Y_FIN,   h:LH.fin,   col:C.fin,   label:'FINANZAS'},
+  ];
+  lanes.forEach(function(l){
+    s += '<rect x="28" y="'+l.y+'" width="'+(W-28)+'" height="'+l.h+'"'
+      +' fill="'+l.col.lane+'" stroke="#334155" stroke-width="0.5"/>';
+    // Lane label box
+    s += '<rect x="28" y="'+l.y+'" width="'+LW+'" height="'+l.h+'"'
+      +' fill="'+l.col.fill+'" stroke="#334155" stroke-width="0.5"/>';
+    s += '<text x="'+(28+LW/2)+'" y="'+(l.y+l.h/2)+'" text-anchor="middle"'
+      +' font-family="Outfit,sans-serif" font-size="8.5" font-weight="800" fill="'+l.col.stroke+'"'
+      +' transform="rotate(-90,'+(28+LW/2)+','+(l.y+l.h/2)+')">'
+      +l.label+'</text>';
+  });
+
+  // ── Header above lanes ──────────────────────────────────────────
+  s += '<rect x="0" y="0" width="'+W+'" height="'+Y_DOC+'" rx="6" fill="rgba(15,23,42,0.8)" stroke="#334155" stroke-width="1.5"/>';
+  s += '<text x="'+W/2+'" y="16" text-anchor="middle" font-family="Outfit,sans-serif" font-size="11" font-weight="800" fill="#38bdf8">Procedimiento: Declaraci\u00f3n y Pago de Horas Acad\u00e9micas</text>';
+  s += '<text x="'+W/2+'" y="30" text-anchor="middle" font-family="Outfit,sans-serif" font-size="8.5" font-weight="400" fill="#64748b">Universidad Adolfo Ib\u00e1\u00f1ez \u00b7 Direcci\u00f3n de Postgrado \u00b7 Versi\u00f3n 1.0</text>';
+  // Lane headers
+  var lhLabels=['Docente','Coordinadora del Programa','Finanzas'];
+  var lhColors=['#34d399','#38bdf8','#f59e0b'];
+  [Y_DOC,Y_COORD,Y_FIN].forEach(function(ly,i){
+    s+='<text x="'+(28+LW+8)+'" y="'+(ly+13)+'" font-family="Outfit,sans-serif" font-size="8" font-weight="700" fill="'+lhColors[i]+'">'+lhLabels[i]+'</text>';
+  });
+
+  // ── Start event ─────────────────────────────────────────────────
+  var SE_X=COL[0], SE_Y=YC.doc;
+  s += startEvent(SE_X, SE_Y);
+  s += '<text x="'+SE_X+'" y="'+(SE_Y+CR+11)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">Inicio</text>';
+
+  // ── T1: Ejecución clase (Docente) ───────────────────────────────
+  var T1X=COL[1], T1Y=TY.doc;
+  s += task(T1X, T1Y, 'Ejecuci\u00f3n de', 'clase \u2014 Registra asistencia', C.doc, 't1');
+  s += '<text x="'+(T1X+NW/2)+'" y="'+(T1Y+42)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">y bit\u00e1cora</text>';
+
+  // ── T2: Declaración (Docente) ───────────────────────────────────
+  var T2X=COL[2], T2Y=TY.doc;
+  s += task(T2X, T2Y, 'Declara horas', 'Formulario oficial', C.doc, 't2');
+  s += '<text x="'+(T2X+NW/2)+'" y="'+(T2Y+42)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">m\u00e1x. 3 d\u00edas h\u00e1biles</text>';
+
+  // ── T3: Envío (Docente) ─────────────────────────────────────────
+  var T3X=COL[3], T3Y=TY.doc;
+  s += task(T3X, T3Y, 'Env\u00eda a', 'Coordinadora', C.doc, 't3');
+  s += '<text x="'+(T3X+NW/2)+'" y="'+(T3Y+42)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">+ respaldos firmados</text>';
+
+  // ── GW: ¿Válido? (Coordinadora) ────────────────────────────────
+  var GWX=COL[4], GWY=Y_COORD+(LH.coord-DH)/2;
+  s += gateway(GWX, GWY, '\u00bfV\u00e1lido?');
+
+  // ── T4: Validación (Coordinadora) ──────────────────────────────
+  var T4X=COL[5], T4Y=TY.coord;
+  s += task(T4X, T4Y, 'Valida vs', 'calendario dashboard', C.coord, 't4');
+
+  // ── T5: Firma conformidad (Coordinadora) ───────────────────────
+  var T5X=COL[6], T5Y=TY.coord;
+  s += task(T5X, T5Y, 'Firma conformidad', 'Env\u00eda a Finanzas', C.coord, 't5');
+  s += '<text x="'+(T5X+NW/2)+'" y="'+(T5Y+42)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">antes del d\u00eda 25</text>';
+
+  // ── T6: Liquidación (Finanzas) ──────────────────────────────────
+  var T6X=COL[7], T6Y=TY.fin;
+  s += task(T6X, T6Y, 'Verifica y', 'liquida pago', C.fin, 't6');
+  s += '<text x="'+(T6X+NW/2)+'" y="'+(T6Y+42)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">5 d\u00edas h\u00e1biles</text>';
+
+  // ── T7: Notificación (Finanzas) ─────────────────────────────────
+  var T7X=COL[8], T7Y=TY.fin;
+  s += task(T7X, T7Y, 'Notifica y', 'archiva', C.fin, 't7');
+
+  // ── End event ───────────────────────────────────────────────────
+  var EE_X=COL[9]+CR, EE_Y=YC.fin;
+  s += endEvent(EE_X, EE_Y);
+  s += '<text x="'+EE_X+'" y="'+(EE_Y+CR+11)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">Fin</text>';
+
+  // ── Arrows / sequence flows ─────────────────────────────────────
+  // Start → T1
+  s += arrH(SE_X+CR, SE_Y, T1X, '');
+  // T1 → T2
+  s += arrH(T1X+NW, TY.doc+NH/2, T2X, '');
+  // T2 → T3
+  s += arrH(T2X+NW, TY.doc+NH/2, T3X, '');
+  // T3 → GW (doc→coord, bend down)
+  s += arr(T3X+NW/2, TY.doc+NH, T3X+NW/2, GWY+DH/2, '', false);
+  // actually route T3 right edge → GW left
+  // T3 right → GW left (same Y approximately)
+  // Reroute: T3 bottom → GW (need cross-lane arrow)
+  // Use curved path: T3 center bottom → GW left point
+  var t3bx=T3X+NW/2, t3by=TY.doc+NH;
+  var gwlx=GWX, gwly=GWY+DH/2;
+  s += '<path d="M'+t3bx+','+t3by+' L'+t3bx+','+(Y_COORD-8)+' L'+gwlx+','+(Y_COORD-8)+' L'+gwlx+','+gwly+'"'
+    +' fill="none" stroke="'+C.arrow+'" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#bpmnArrow)"/>';
+  s += '<text x="'+(t3bx+40)+'" y="'+(Y_COORD-11)+'" font-family="Outfit,sans-serif" font-size="7.5" fill="#64748b">env\u00edo</text>';
+
+  // GW → T4 (sí, válido)
+  s += arrH(GWX+DW, GWY+DH/2, T4X, 'S\u00ed');
+  // GW → T3 (no, observaciones — loop back) — dashed loop
+  var loopY = Y_DOC+8;
+  s += '<path d="M'+GWX+','+GWY+' L'+GWX+','+loopY+' L'+(T3X+NW/2)+','+loopY+' L'+(T3X+NW/2)+','+(TY.doc)+'"'
+    +' fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="5 2" marker-end="url(#bpmnArrow)"/>';
+  s += '<text x="'+(GWX-40)+'" y="'+(loopY+10)+'" font-family="Outfit,sans-serif" font-size="7.5" fill="#a78bfa">No (obs.)</text>';
+
+  // T4 → T5
+  s += arrH(T4X+NW, TY.coord+NH/2, T5X, '');
+
+  // T5 bottom → T6 (coord→fin, cross-lane)
+  var t5bx=T5X+NW/2, t5by=TY.coord+NH;
+  var t6tx=T6X+NW/2, t6ty=TY.fin;
+  s += '<path d="M'+t5bx+','+t5by+' L'+t5bx+','+(Y_FIN-8)+' L'+t6tx+','+(Y_FIN-8)+' L'+t6tx+','+t6ty+'"'
+    +' fill="none" stroke="'+C.arrow+'" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#bpmnArrow)"/>';
+
+  // T6 → T7
+  s += arrH(T6X+NW, TY.fin+NH/2, T7X, '');
+  // T7 → End
+  s += arrH(T7X+NW, TY.fin+NH/2, EE_X-CR, '');
+
+  // ── Legend ──────────────────────────────────────────────────────
+  var LGX=CX+LW, LGY=H_TOTAL-16;
+  var lgItems=[
+    [C.doc.stroke,   'Docente'],
+    [C.coord.stroke, 'Coordinadora'],
+    [C.fin.stroke,   'Finanzas'],
+    ['#a78bfa',      'Devoluci\u00f3n (No v\u00e1lido)'],
+  ];
+  lgItems.forEach(function(lg,i){
+    var lx=LGX+i*160;
+    s+='<rect x="'+lx+'" y="'+(LGY-7)+'" width="20" height="7" rx="2" fill="'+lg[0]+'" opacity="0.3"/>';
+    s+='<line x1="'+lx+'" y1="'+(LGY-4)+'" x2="'+(lx+20)+'" y2="'+(LGY-4)+'" stroke="'+lg[0]+'" stroke-width="2"/>';
+    s+='<text x="'+(lx+24)+'" y="'+LGY+'" font-family="Outfit,sans-serif" font-size="8" fill="#64748b">'+lg[1]+'</text>';
+  });
+
+  s += '</svg>';
+  return s;
+}
+
+/* ══════════════════════════════════════════════════════
+   DECLARACIÓN DE HORAS ACADÉMICAS
+══════════════════════════════════════════════════════ */
+function renderCalidad(){
+  const df = getDF();
+
+  // ── Filtros (sin mkDF en template literal) ─────────────────────
+  const years = uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
+  const coords = uniq(df.map(r=>r['COORDINADORA RESPONSABLE']));
+
+  // ── Render shell primero ────────────────────────────────────────
+  const pg = $('page'); if(!pg) return;
+  pg.innerHTML =
+    '<div class="pg-title">Calidad &amp; Sede</div>' +
+    '<div id="calFiltros" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>' +
+    '<div id="calContent"></div>';
+
+  // ── Inyectar filtros mkDF en el div ya existente ────────────────
+  const filtrosEl = document.getElementById('calFiltros');
+  if(filtrosEl){
+    filtrosEl.innerHTML =
+      mkDF('t5Y','Año',         years,  'updCalidad()') +
+      mkDF('t5C','Coordinadora',coords, 'updCalidad()');
+  }
+
+  // ── Renderizar contenido ────────────────────────────────────────
   updCalidad();
 }
-function updCalidad() {
-  let df=getDF();
-  const sy=getDF_sel('t5Y'),sc=getDF_sel('t5C');
-  if(sy.length)df=df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
-  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
 
-  const modC={};df.forEach(r=>{modC[r['Modalidad_Calc']]=(modC[r['Modalidad_Calc']]||0)+1});
-  const mL=Object.keys(modC),mV=Object.values(modC);
-  makeChart('chartMod',{type:'doughnut',data:{labels:mL,datasets:[{data:mV,backgroundColor:COLORS.slice(0,mL.length),borderWidth:2,borderColor:'#172337'}]},options:{plugins:{legend:{position:'bottom'}}}});
+function updCalidad(){
+  const df0 = getDF();
+  const sy  = getDF_sel('t5Y');
+  const sc  = getDF_sel('t5C');
+  let df = df0.slice();
+  if(sy.length) df = df.filter(r=>r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear())));
+  if(sc.length) df = df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
 
-  const sedeC={};df.forEach(r=>{sedeC[r['SEDE']]=(sedeC[r['SEDE']]||0)+1});
-  const sArr=Object.entries(sedeC).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  makeChart('chartSede',{type:'bar',data:{labels:sArr.map(([s])=>abbr(s,18)),datasets:[{label:'Sesiones',data:sArr.map(([,v])=>v),backgroundColor:'rgba(56,189,248,.6)',borderColor:'#38bdf8',borderWidth:1}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:40,color:'#94a3b8',font:{size:10}}},y:{ticks:{color:'#94a3b8'}}}}});
+  const el = document.getElementById('calContent');
+  if(!el) return;
 
-  const top8S=sArr.slice(0,8);
-  makeChart('chartRS',{type:'radar',data:{labels:top8S.map(([s])=>abbr(s,14)),datasets:[{label:'Sesiones',data:top8S.map(([,v])=>v),backgroundColor:'rgba(45,212,191,.2)',borderColor:'#2dd4bf',pointBackgroundColor:'#2dd4bf'}]},options:{plugins:{legend:{display:false}},scales:{r:{ticks:{color:'#94a3b8',backdropColor:'transparent'},grid:{color:'#2a3f5a'},angleLines:{color:'#2a3f5a'}}}}});
-  makeChart('chartRM',{type:'radar',data:{labels:mL,datasets:[{label:'Sesiones',data:mV,backgroundColor:'rgba(56,189,248,.2)',borderColor:'#38bdf8',pointBackgroundColor:'#38bdf8'}]},options:{plugins:{legend:{display:false}},scales:{r:{ticks:{color:'#94a3b8',backdropColor:'transparent'},grid:{color:'#2a3f5a'},angleLines:{color:'#2a3f5a'}}}}});
+  if(!df.length){
+    el.innerHTML = '<div class="banner b-warn">Sin sesiones con los filtros seleccionados.</div>';
+    return;
+  }
 
-  const FULL_DF=APP.df;
-  const tot=FULL_DF.length;
-  const auditFields=['DIAS/FECHAS','PROGRAMA','COORDINADORA RESPONSABLE','Modalidad_Calc','SEDE','HORARIO'];
-  const aud=auditFields.map(f=>({Campo:f,Faltantes:FULL_DF.filter(r=>!r[f]||IGNORE_VALS.has(String(r[f]).toLowerCase())).length,'%':+(FULL_DF.filter(r=>!r[f]||IGNORE_VALS.has(String(r[f]).toLowerCase())).length/tot*100).toFixed(1)+'%'}));
-  $('auditTable').innerHTML=buildTable(aud,['Campo','Faltantes','%'],false);
+  // ── Agrupar por Sede ──────────────────────────────────────────
+  const bySede = {};
+  df.forEach(function(r){
+    var s = (r['SEDE']||'Sin sede').trim()||'Sin sede';
+    if(!bySede[s]) bySede[s]={n:0,progs:new Set(),coords:new Set(),docs:new Set()};
+    bySede[s].n++;
+    if(r['PROGRAMA'])                  bySede[s].progs.add(r['PROGRAMA']);
+    if(r['COORDINADORA RESPONSABLE'])  bySede[s].coords.add(r['COORDINADORA RESPONSABLE']);
+    if(r['PROFESOR'])                  bySede[s].docs.add(r['PROFESOR']);
+  });
+
+  // ── Agrupar por Modalidad ─────────────────────────────────────
+  const byMod = {};
+  df.forEach(function(r){
+    var m = r['Modalidad_Calc']||'Sin modalidad';
+    if(!byMod[m]) byMod[m]={n:0};
+    byMod[m].n++;
+  });
+
+  // ── Agrupar por Programa ──────────────────────────────────────
+  const byProg = {};
+  df.forEach(function(r){
+    var p = r['PROGRAMA']||'Sin programa';
+    if(!byProg[p]) byProg[p]={n:0,sede:r['SEDE']||''};
+    byProg[p].n++;
+  });
+
+  const totalSes = df.length;
+  const maxSede  = Math.max.apply(null, Object.values(bySede).map(function(d){return d.n;})||[1]);
+
+  // ── KPIs ──────────────────────────────────────────────────────
+  var kpisHtml =
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">';
+  [['Sesiones',df.length,'var(--blue)'],
+   ['Programas',new Set(df.map(function(r){return r['PROGRAMA'];})).size,'var(--green)'],
+   ['Sedes',Object.keys(bySede).length,'var(--orange)'],
+   ['Modalidades',Object.keys(byMod).length,'var(--t2)'],
+  ].forEach(function(item){
+    kpisHtml += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px">'
+      +'<div style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">'+item[0]+'</div>'
+      +'<div style="font-size:26px;font-weight:800;color:'+item[2]+'">'+item[1]+'</div>'
+      +'</div>';
+  });
+  kpisHtml += '</div>';
+
+  // ── Barras por sede ───────────────────────────────────────────
+  var sedeBarHtml = '';
+  Object.entries(bySede).sort(function(a,b){return b[1].n-a[1].n;}).forEach(function(entry){
+    var s=entry[0], d=entry[1];
+    var pct=Math.round(d.n/totalSes*100);
+    var w=Math.round(d.n/maxSede*100);
+    sedeBarHtml +=
+      '<div style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+      +'<span style="font-size:11px;font-weight:600;color:var(--t1)">'+esc(s)+'</span>'
+      +'<div style="display:flex;gap:8px;font-size:10px;color:var(--t3)">'
+      +'<strong style="color:var(--blue)">'+d.n+'</strong> ses. &nbsp; '
+      +d.progs.size+' prog.'
+      +'<span style="font-size:9px;background:rgba(56,189,248,.1);color:#38bdf8;padding:1px 6px;border-radius:6px;font-weight:700">'+pct+'%</span>'
+      +'</div></div>'
+      +'<div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden">'
+      +'<div style="height:100%;width:'+w+'%;background:var(--blue);border-radius:3px"></div>'
+      +'</div>'
+      +'</div>';
+  });
+
+  // ── Modalidades ───────────────────────────────────────────────
+  var modHtml = '';
+  Object.entries(byMod).sort(function(a,b){return b[1].n-a[1].n;}).forEach(function(entry){
+    var m=entry[0], d=entry[1];
+    var pct=Math.round(d.n/totalSes*100);
+    var col=m==='Presencial'?'#34d399':m==='Online'?'#38bdf8':'var(--orange)';
+    modHtml +=
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+      +'<div style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0"></div>'
+      +'<span style="font-size:11px;color:var(--t2);flex:1">'+esc(m)+'</span>'
+      +'<strong style="font-size:11px;color:var(--t1)">'+d.n+'</strong>'
+      +'<span style="font-size:9px;background:rgba(56,189,248,.08);color:var(--t4);padding:1px 6px;border-radius:6px">'+pct+'%</span>'
+      +'</div>';
+  });
+
+  // ── Top programas ─────────────────────────────────────────────
+  var progHtml = '';
+  Object.entries(byProg).sort(function(a,b){return b[1].n-a[1].n;}).slice(0,8).forEach(function(entry){
+    var p=entry[0], d=entry[1];
+    progHtml +=
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border2);font-size:10px">'
+      +'<span style="color:var(--t2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(p)+'">'+esc(abbr(p,28))+'</span>'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'
+      +'<span style="color:var(--t4)">'+esc(d.sede)+'</span>'
+      +'<strong style="color:var(--blue)">'+d.n+'</strong>'
+      +'</div></div>';
+  });
+
+  // ── Tabla detalle ─────────────────────────────────────────────
+  var tableRows = '';
+  Object.entries(bySede).sort(function(a,b){return b[1].n-a[1].n;}).forEach(function(entry){
+    var s=entry[0], d=entry[1];
+    tableRows +=
+      '<tr>'
+      +'<td style="font-weight:600">'+esc(s)+'</td>'
+      +'<td style="text-align:right;color:var(--blue);font-weight:700">'+d.n+'</td>'
+      +'<td style="text-align:right">'+Math.round(d.n/totalSes*100)+'%</td>'
+      +'<td style="text-align:right">'+d.progs.size+'</td>'
+      +'<td style="text-align:right">'+d.coords.size+'</td>'
+      +'<td style="text-align:right">'+d.docs.size+'</td>'
+      +'</tr>';
+  });
+  tableRows +=
+    '<tr style="border-top:2px solid var(--border);font-weight:700">'
+    +'<td>TOTAL</td>'
+    +'<td style="text-align:right;color:var(--blue)">'+totalSes+'</td>'
+    +'<td style="text-align:right">100%</td>'
+    +'<td style="text-align:right">'+new Set(df.map(function(r){return r['PROGRAMA'];})).size+'</td>'
+    +'<td style="text-align:right">'+new Set(df.map(function(r){return r['COORDINADORA RESPONSABLE'];})).size+'</td>'
+    +'<td style="text-align:right">'+new Set(df.map(function(r){return r['PROFESOR'];})).size+'</td>'
+    +'</tr>';
+
+  // ── Ensamblar ─────────────────────────────────────────────────
+  el.innerHTML = kpisHtml
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+      +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px">'
+        +'<div class="pg-sub" style="margin-top:0;margin-bottom:12px">Sesiones por Sede</div>'
+        +sedeBarHtml
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:14px">'
+        +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px">'
+          +'<div class="pg-sub" style="margin-top:0;margin-bottom:10px">Sesiones por Modalidad</div>'
+          +modHtml
+        +'</div>'
+        +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px">'
+          +'<div class="pg-sub" style="margin-top:0;margin-bottom:10px">Top programas</div>'
+          +progHtml
+        +'</div>'
+      +'</div>'
+    +'</div>'
+    +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px">'
+      +'<div class="pg-sub" style="margin-top:0;margin-bottom:10px">Detalle por Sede</div>'
+      +'<div style="overflow-x:auto"><table class="dt" style="font-size:11px;width:100%">'
+        +'<thead><tr>'
+          +'<th>Sede</th>'
+          +'<th style="text-align:right">Sesiones</th>'
+          +'<th style="text-align:right">%</th>'
+          +'<th style="text-align:right">Programas</th>'
+          +'<th style="text-align:right">Coordinadoras</th>'
+          +'<th style="text-align:right">Docentes</th>'
+        +'</tr></thead>'
+        +'<tbody>'+tableRows+'</tbody>'
+      +'</table></div>'
+    +'</div>';
 }
 
+function renderDeclaracion(){
+  const df  = getDF();
+  const hoy = today();
+  // Fin del mes actual
+  const finMes = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0); // último día del mes
+
+  // Estadísticas
+  const nProgs  = new Set(df.map(r=>r['PROGRAMA'])).size;
+  const nProfs  = new Set(df.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR'])).size;
+  const hrsEjec = Math.round(df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0));
+  const totalHrs= Math.round(df.reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0));
+  const sesEjec = df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).length;
+  const fechaDoc= hoy.toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  const periodo = (()=>{
+    const fs=df.filter(r=>r['DIAS/FECHAS']).map(r=>r['DIAS/FECHAS']);
+    if(!fs.length) return 'Sin datos';
+    const mn=new Date(Math.min(...fs)),mx=new Date(Math.max(...fs));
+    return mn.toLocaleDateString('es-CL',{month:'long',year:'numeric'})
+      +' — '+mx.toLocaleDateString('es-CL',{month:'long',year:'numeric'});
+  })();
+
+  // ── Construir sección de cursos a declarar ─────────────────────
+  // Agrupar por programa → asignatura → docente
+  // Un docente por fila (si hay 3 docentes en una asignatura → 3 filas)
+  const pm = {};
+  df.forEach(r=>{
+    const p=r['PROGRAMA']; if(!p||!r['ASIGNATURA']) return;
+    const a=r['ASIGNATURA'];
+    const prof=(r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))?r['PROFESOR']:'Sin docente';
+    const key=p+'|||'+a+'|||'+prof;
+    if(!pm[key]) pm[key]={prog:p,abrev:r['NOMBRE ABREVIADO']||abbr(p,30),asig:a,prof:prof,ini:null,fin:null,hrs:0};
+    const d=r['DIAS/FECHAS'];
+    if(d){
+      if(!pm[key].ini||d<pm[key].ini) pm[key].ini=d;
+      if(!pm[key].fin||d>pm[key].fin) pm[key].fin=d;
+    }
+    pm[key].hrs += parseFloat(r['HORAS'])||0;
+  });
+
+  // Filtrar: solo cursos que terminan en los próximos 4 días
+  const filas = Object.values(pm).filter(function(x){
+    return x.fin && x.fin >= hoy && x.fin <= finMes;
+  }).sort(function(a,b){ return a.fin-b.fin || a.prog.localeCompare(b.prog); });
+
+  // Construir HTML de la sección declaración
+  let declHtml = '';
+  if(filas.length){
+    // Agrupar visualmente por programa
+    const porProg = {};
+    filas.forEach(function(f){
+      if(!porProg[f.prog]) porProg[f.prog]={abrev:f.abrev,filas:[]};
+      porProg[f.prog].filas.push(f);
+    });
+    Object.entries(porProg).forEach(function([prog,pd]){
+      declHtml += '<div class="decl-alert-prog">';
+      declHtml += '<div class="decl-alert-prog-top">';
+      declHtml += '<span class="decl-alert-prog-name">'+esc(pd.abrev)+'</span>';
+      declHtml += '<span class="decl-badge-decl">&#9888; Declaraci\u00f3n pendiente</span>';
+      declHtml += '</div>';
+      // Tabla
+      declHtml += '<table class="dt" style="font-size:10.5px;margin-top:8px"><thead><tr>'
+        +'<th>Asignatura / Curso</th><th>Docente</th>'
+        +'<th>Inicio</th><th>Fin</th><th style="text-align:right">Hrs a declarar</th>'
+        +'</tr></thead><tbody>';
+      pd.filas.forEach(function(f){
+        const hrs = Math.round(f.hrs*10)/10;
+        declHtml += '<tr style="background:rgba(239,68,68,.04)">'
+          +'<td style="font-weight:600">'
+            +'<span class="decl-badge-asig">&#9888; Declarar</span> '+esc(f.asig)
+          +'</td>'
+          +'<td style="color:var(--t2)">&#128100; '+esc(f.prof)+'</td>'
+          +'<td style="white-space:nowrap;color:var(--blue);font-weight:700">'+(f.ini?fmtDate(f.ini):'—')+'</td>'
+          +'<td style="white-space:nowrap;color:#ef4444;font-weight:700">'+(f.fin?fmtDate(f.fin):'—')+'</td>'
+          +'<td style="text-align:right;font-weight:800;color:#ef4444">'+hrs+' hrs</td>'
+          +'</tr>';
+      });
+      declHtml += '</tbody></table></div>';
+    });
+  } else {
+    declHtml = '<div class="banner b-ok" style="margin-bottom:12px">&#10003; Sin cursos que finalicen este mes.</div>';
+  }
+
+  // ── Renderizar página ─────────────────────────────────────────
+  var html = '';
+  html += '<div class="pg-title">Declaraci\u00f3n de Horas Acad\u00e9micas</div>';
+
+  // Sección declaración pendiente
+  html += '<div class="decl-alert-wrap">';
+  html += '<div class="page-subtitle" style="margin-bottom:10px;display:flex;align-items:center;gap:10px">';
+  html += 'Cursos con Horas a Declarar';
+  const mesNombre = hoy.toLocaleDateString('es-CL',{month:'long',year:'numeric'});
+  html += '<span style="font-size:10px;font-weight:400;color:var(--t4)">cursos que finalizan en '+esc(mesNombre)+' \u2014 un registro por docente</span>';
+  html += '</div>';
+  html += declHtml;
+  html += '</div>';
+
+  // ── Cuadro detalle de todos los cursos del mes con fechas ──────
+  // Agrupar TODAS las asignaturas por programa → mostrar con estado
+  const pmDet={};
+  df.forEach(function(r){
+    const p=r['PROGRAMA']; if(!p||!r['ASIGNATURA']) return;
+    if(!pmDet[p]) pmDet[p]={abrev:r['NOMBRE ABREVIADO']||abbr(p,30),asigs:{}};
+    const a=r['ASIGNATURA'];
+    if(!pmDet[p].asigs[a]) pmDet[p].asigs[a]={ini:null,fin:null,ses:0,profs:new Set()};
+    const d=r['DIAS/FECHAS'];
+    if(d){
+      if(!pmDet[p].asigs[a].ini||d<pmDet[p].asigs[a].ini) pmDet[p].asigs[a].ini=d;
+      if(!pmDet[p].asigs[a].fin||d>pmDet[p].asigs[a].fin) pmDet[p].asigs[a].fin=d;
+    }
+    pmDet[p].asigs[a].ses++;
+    if(r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())) pmDet[p].asigs[a].profs.add(r['PROFESOR']);
+  });
+
+  // Filtrar programas que tienen al menos una asignatura activa o que termina este mes
+  const progsDet = Object.entries(pmDet).filter(function([prog,pd]){
+    return Object.values(pd.asigs).some(function(a){
+      return a.fin && a.fin >= hoy;
+    });
+  }).sort(function([a],[b]){ return a.localeCompare(b); });
+
+  let detalleMesHtml = '';
+  progsDet.forEach(function([prog,pd]){
+    const asigsSorted = Object.entries(pd.asigs)
+      .map(function([name,a]){ return Object.assign({name:name}, a, {profs:[...a.profs]}); })
+      .sort(function(a,b){ return (a.ini||0)-(b.ini||0); });
+
+    let rows='';
+    asigsSorted.forEach(function(a){
+      const esFin    = a.fin && a.fin < hoy;
+      const esMesA   = a.fin && a.fin >= hoy && a.fin <= finMes;
+      const esActual = a.ini && a.ini <= hoy && (!a.fin||a.fin>=hoy);
+      if(esFin) return; // omitir finalizados
+      const estado = esMesA
+        ? '<span style="font-size:9px;background:rgba(239,68,68,.12);color:#ef4444;padding:1px 7px;border-radius:8px;font-weight:700">&#9888; Termina este mes</span>'
+        : esActual
+        ? '<span style="font-size:9px;background:rgba(16,185,129,.12);color:#34d399;padding:1px 7px;border-radius:8px;font-weight:700">En curso</span>'
+        : '<span style="font-size:9px;background:rgba(56,189,248,.12);color:#38bdf8;padding:1px 7px;border-radius:8px;font-weight:700">Próximo</span>';
+      const profs = a.profs.slice(0,2).map(function(p){return abbr(p,22);}).join(' · ')||'—';
+      rows += '<tr style="'+(esMesA?'background:rgba(239,68,68,.03)':'')+'">'
+        +'<td style="font-weight:600;color:var(--t1)">'+esc(a.name)+'</td>'
+        +'<td style="color:var(--blue);font-weight:700;white-space:nowrap">'+(a.ini?fmtDate(a.ini):'—')+'</td>'
+        +'<td style="color:'+(esMesA?'#ef4444':'var(--t3)')+';font-weight:'+(esMesA?700:400)+';white-space:nowrap">'+(a.fin?fmtDate(a.fin):'—')+'</td>'
+        +'<td style="text-align:right">'+a.ses+'</td>'
+        +'<td style="color:var(--t3);font-size:10px">'+esc(profs)+'</td>'
+        +'<td>'+estado+'</td>'
+        +'</tr>';
+    });
+    if(!rows) return;
+
+    detalleMesHtml += '<div class="prog-cursos-resumen" style="margin-bottom:12px">'
+      +'<div class="prog-cursos-resumen-title">'
+      +'<span style="color:var(--blue)">&#9783;</span>'+esc(pd.abrev)
+      +'<span style="font-size:9px;font-weight:400;color:var(--t4);text-transform:none">'+asigsSorted.filter(function(a){return !a.fin||a.fin>=hoy;}).length+' cursos activos</span>'
+      +'</div>'
+      +'<div class="tbl-wrap"><table class="pcr-table"><thead><tr>'
+      +'<th>Asignatura / Curso</th><th>Inicio</th><th>Término</th>'
+      +'<th class="r">Ses.</th><th>Docente(s)</th><th>Estado</th>'
+      +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'</div>';
+  });
+
+  if(detalleMesHtml){
+    html += '<div class="page-subtitle" style="margin-bottom:10px;display:flex;align-items:center;gap:10px">';
+    html += 'Detalle de Cursos y Fechas';
+    html += '<span style="font-size:10px;font-weight:400;color:var(--t4)">programas activos este período — cursos en curso y próximos</span>';
+    html += '</div>';
+    html += detalleMesHtml;
+  }
+
+  // Stats
+  html += '<div class="decl-stats-bar">';
+  html += '<div class="decl-stat-box"><div class="decl-stat-v">'+nProgs+'</div><div class="decl-stat-l">Programas activos</div></div>';
+  html += '<div class="decl-stat-box"><div class="decl-stat-v">'+nProfs+'</div><div class="decl-stat-l">Docentes</div></div>';
+  html += '<div class="decl-stat-box"><div class="decl-stat-v">'+sesEjec+'</div><div class="decl-stat-l">Sesiones ejecutadas</div></div>';
+  html += '<div class="decl-stat-box"><div class="decl-stat-v">'+hrsEjec+'</div><div class="decl-stat-l">Horas ejecutadas</div></div>';
+  html += '<div class="decl-stat-box"><div class="decl-stat-v">'+totalHrs+'</div><div class="decl-stat-l">Horas totales</div></div>';
+  html += '</div>';
+
+  // Documento formal
+  html += '<div class="decl-doc">';
+
+  // Encabezado
+  html += '<div class="decl-header">';
+  html += '<div class="decl-logo">Universidad Adolfo Ib\u00e1\u00f1ez \u2014 Postgrado</div>';
+  html += '<div class="decl-title">Procedimiento para la Declaraci\u00f3n<br>y Pago de Horas Acad\u00e9micas</div>';
+  html += '<div class="decl-subtitle">Documento normativo interno \u00b7 Direcci\u00f3n de Postgrado</div>';
+  html += '<div class="decl-meta">';
+  html += '<div class="decl-meta-item"><span class="decl-meta-lbl">Versi\u00f3n</span><span class="decl-meta-val">1.0</span></div>';
+  html += '<div class="decl-meta-item"><span class="decl-meta-lbl">Fecha de emisi\u00f3n</span><span class="decl-meta-val">'+esc(fechaDoc)+'</span></div>';
+  html += '<div class="decl-meta-item"><span class="decl-meta-lbl">Per\u00edodo cubierto</span><span class="decl-meta-val">'+esc(periodo)+'</span></div>';
+  html += '<div class="decl-meta-item"><span class="decl-meta-lbl">Programas</span><span class="decl-meta-val">'+nProgs+' programas \u00b7 '+nProfs+' docentes</span></div>';
+  html += '<div class="decl-meta-item"><span class="decl-meta-lbl">Estado</span><span class="decl-meta-val" style="color:var(--green)">Vigente</span></div>';
+  html += '</div></div>';
+
+  html += '<div class="decl-body">';
+
+  // 1. Objetivo
+  html += '<div class="decl-section">';
+  html += '<div class="decl-section-title"><span class="decl-section-num">1</span>Objetivo</div>';
+  html += '<div class="decl-text"><p>Estandarizar el proceso de reporte, validaci\u00f3n y pago de horas acad\u00e9micas de los docentes que imparten clases en los programas de postgrado de la Universidad Adolfo Ib\u00e1\u00f1ez, asegurando la exactitud de la informaci\u00f3n declarada y la oportunidad en el pago de honorarios.</p>';
+  html += '<p>Este procedimiento busca garantizar que cada hora ejecutada \u2014 presencial, virtual o tutoría \u2014 quede debidamente registrada, validada contra el calendario acad\u00e9mico vigente y aprobada por las instancias correspondientes antes de su pago.</p></div></div>';
+
+  // 2. Alcance
+  html += '<div class="decl-section">';
+  html += '<div class="decl-section-title"><span class="decl-section-num">2</span>Alcance</div>';
+  html += '<div class="decl-text"><p>Aplica a todos los docentes de programas de postgrado (Magister, Diplomas y Cursos), desde la ejecuci\u00f3n de la primera sesi\u00f3n hasta la aprobaci\u00f3n del pago. Incluye clases presenciales, online sinc\u00f3nica e h\u00edbridas. Excluye preparaci\u00f3n de material, correcci\u00f3n de evaluaciones y reuniones de coordinaci\u00f3n salvo que est\u00e9n en el contrato.</p></div></div>';
+
+  // 3. Responsabilidades
+  html += '<div class="decl-section">';
+  html += '<div class="decl-section-title"><span class="decl-section-num">3</span>Responsabilidades</div>';
+  html += '<div class="decl-resp-grid">';
+  // Docente
+  html += '<div class="decl-resp-card"><div class="decl-resp-role">Docente</div>';
+  ['Ejecutar clases seg\u00fan calendario acad\u00e9mico',
+   'Completar declaraci\u00f3n dentro de 3 d\u00edas h\u00e1biles post-sesi\u00f3n',
+   'Adjuntar lista de asistencia firmada por alumnos',
+   'Registrar bit\u00e1cora con contenido y modalidad',
+   'Firmar y enviar formulario a la coordinadora'].forEach(function(t){
+    html+='<div class="decl-resp-item"><span class="decl-resp-dot"></span>'+t+'</div>';
+  });
+  html += '</div>';
+  // Coordinadora
+  html += '<div class="decl-resp-card"><div class="decl-resp-role">Coordinadora del Programa</div>';
+  ['Recibir y revisar declaraci\u00f3n en 24h h\u00e1biles',
+   'Validar horas contra calendario del dashboard',
+   'Verificar modalidad declarada vs planificada',
+   'Aprobar o devolver con observaciones',
+   'Enviar a Finanzas antes del d\u00eda 25 del mes'].forEach(function(t){
+    html+='<div class="decl-resp-item"><span class="decl-resp-dot"></span>'+t+'</div>';
+  });
+  html += '</div>';
+  // Finanzas
+  html += '<div class="decl-resp-card"><div class="decl-resp-role">\u00c1rea de Finanzas</div>';
+  ['Recibir declaraciones aprobadas por coordinadora',
+   'Verificar monto vs contrato vigente del docente',
+   'Procesar pago en 5 d\u00edas h\u00e1biles del mes siguiente',
+   'Emitir comprobante y notificar al docente',
+   'Archivar documentaci\u00f3n seg\u00fan normativa (5 a\u00f1os)'].forEach(function(t){
+    html+='<div class="decl-resp-item"><span class="decl-resp-dot"></span>'+t+'</div>';
+  });
+  html += '</div></div></div>';
+
+  // 4. Flujo — diagrama BPMN
+  html += '<div class="decl-section">';
+  html += '<div class="decl-section-title"><span class="decl-section-num">4</span>Flujo del Proceso (BPMN)</div>';
+  html += '<div class="bpmn-wrap">'+bpmnDiagram()+'</div>';
+  html += '</div>';
+
+  // 5. Requisitos
+  html += '<div class="decl-section">';
+  html += '<div class="decl-section-title"><span class="decl-section-num">5</span>Requisitos y Documentaci\u00f3n</div>';
+  html += '<div class="decl-req-list">';
+  var reqs=[
+    ['\ud83d\udccb','Formulario de Declaraci\u00f3n de Horas','Documento oficial con programa, asignatura, fecha, horario, modalidad, horas dictadas y firma del docente.'],
+    ['\u270d\ufe0f','Lista de asistencia firmada','Nombres, RUT y firma de alumnos. Online: reporte de plataforma (Zoom/Teams).'],
+    ['\ud83d\udcd3','Bit\u00e1cora de clases','Registro del contenido tem\u00e1tico por sesi\u00f3n, vinculado al programa de estudios.'],
+    ['\ud83d\udcc5','Calendario acad\u00e9mico validado','El calendario del dashboard sirve como referencia para validar fechas y horarios.'],
+    ['\ud83d\udcc4','Contrato o acuerdo de servicios','Establece el valor hora, vigencia y condiciones. Debe estar vigente.'],
+    ['\ud83d\udda5\ufe0f','Evidencia clases online','Grabaci\u00f3n, reporte de asistencia o screenshot con fecha/hora visible.'],
+  ];
+  reqs.forEach(function(r){
+    html+='<div class="decl-req-item"><span class="decl-req-ico">'+r[0]+'</span>'
+      +'<div><strong>'+r[1]+'</strong> \u2014 '+r[2]+'</div></div>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // decl-body
+
+  // Firmas + botones
+  html += '<div class="decl-footer">';
+  html += '<div class="decl-firma-box">';
+  ['Docente','Coordinadora del Programa','Director de Postgrado','Finanzas'].forEach(function(f){
+    html+='<div class="decl-firma"><div class="decl-firma-line">'+f+'</div></div>';
+  });
+  html += '</div>';
+  html += '<div style="text-align:right">';
+  html += '<button class="btn btn-p btn-sm" onclick="declDescargarPDF()" style="margin-bottom:6px;display:block;margin-left:auto">&#128462; Descargar PDF</button>';
+  html += '<button class="btn btn-g btn-sm" onclick="declExportarExcel()">&#128202; Exportar resumen</button>';
+  html += '</div></div>';
+
+  html += '</div>'; // decl-doc
+
+  $('page').innerHTML = html;
+}
+
+function declDescargarPDF(){
+  // Cargar jsPDF dinámicamente
+  if(window.jspdf && window.jspdf.jsPDF){
+    _declGeneratePDF(); return;
+  }
+  const s1=document.createElement('script');
+  s1.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s1.onload=function(){
+    const s2=document.createElement('script');
+    s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+    s2.onload=_declGeneratePDF;
+    s2.onerror=function(){ showToast('Error cargando jsPDF','err'); };
+    document.head.appendChild(s2);
+  };
+  s1.onerror=function(){ showToast('Error cargando librería PDF','err'); };
+  document.head.appendChild(s1);
+  showToast('Cargando generador PDF...','info');
+}
+
+function _declGeneratePDF(){
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const hoy = today();
+    const df  = getDF();
+    const W   = doc.internal.pageSize.getWidth();
+    const fechaDoc = hoy.toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+
+    // ── Colores UAI ──────────────────────────────────────────────
+    const BLUE   = [56,189,248];
+    const DARK   = [15,23,42];
+    const GRAY   = [100,116,139];
+    const LGRAY  = [241,245,249];
+    const WHITE  = [255,255,255];
+    const RED    = [239,68,68];
+
+    // ── Encabezado ───────────────────────────────────────────────
+    doc.setFillColor(...DARK); doc.rect(0,0,W,28,'F');
+    doc.setFillColor(...BLUE); doc.rect(0,26,W,2,'F');
+    doc.setTextColor(...BLUE); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text('UNIVERSIDAD ADOLFO IBÁÑEZ — POSTGRADO',14,10);
+    doc.setTextColor(...WHITE); doc.setFontSize(14);
+    doc.text('Procedimiento: Declaración y Pago de Horas Académicas',14,20);
+
+    // ── Meta info ────────────────────────────────────────────────
+    let y = 36;
+    doc.setTextColor(...GRAY); doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text('Versión 1.0  ·  Emisión: '+fechaDoc+'  ·  Estado: Vigente',14,y);
+    y += 10;
+
+    // ── Estadísticas ─────────────────────────────────────────────
+    const progs = new Set(df.map(r=>r['PROGRAMA'])).size;
+    const profs = new Set(df.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR'])).size;
+    const hrsEj = Math.round(df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0));
+    const stats = [['Programas',progs],['Docentes',profs],['Hrs ejecutadas',hrsEj]];
+    const sw = (W-28)/stats.length;
+    stats.forEach(([lbl,val],i)=>{
+      const bx=14+i*sw;
+      doc.setFillColor(...LGRAY); doc.roundedRect(bx,y,sw-4,14,2,2,'F');
+      doc.setTextColor(...BLUE); doc.setFontSize(13); doc.setFont('helvetica','bold');
+      doc.text(String(val),bx+4,y+8);
+      doc.setTextColor(...GRAY); doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text(lbl,bx+4,y+13);
+    });
+    y += 22;
+
+    // ── Sección helper ───────────────────────────────────────────
+    const addSection = (num,title)=>{
+      doc.setFillColor(...BLUE); doc.circle(14,y+2.5,3,'F');
+      doc.setTextColor(...WHITE); doc.setFontSize(7); doc.setFont('helvetica','bold');
+      doc.text(String(num),14,y+3.2,{align:'center'});
+      doc.setTextColor(...DARK); doc.setFontSize(10); doc.setFont('helvetica','bold');
+      doc.text(title,20,y+4);
+      doc.setDrawColor(...BLUE); doc.setLineWidth(0.3);
+      doc.line(20,y+6,W-14,y+6);
+      y+=12;
+    };
+    const addText = (txt,indent=14)=>{
+      doc.setTextColor(...GRAY); doc.setFontSize(8); doc.setFont('helvetica','normal');
+      const lines=doc.splitTextToSize(txt,W-indent-14);
+      doc.text(lines,indent,y);
+      y+=lines.length*4.5+2;
+    };
+    const checkPage = (need=20)=>{
+      if(y+need>280){ doc.addPage(); y=16;
+        doc.setFillColor(...BLUE); doc.rect(0,0,W,4,'F'); }
+    };
+
+    // 1. OBJETIVO
+    addSection(1,'Objetivo');
+    addText('Estandarizar el proceso de reporte, validación y pago de horas académicas de los docentes de postgrado UAI, asegurando exactitud en la información declarada y oportunidad en el pago de honorarios.');
+    checkPage();
+
+    // 2. ALCANCE
+    addSection(2,'Alcance');
+    addText('Aplica a todos los docentes de programas de postgrado (Magister, Diplomas y Cursos), desde la ejecución de la primera sesión hasta la aprobación del pago. Incluye clases presenciales, online sincrónica e híbridas.');
+    checkPage();
+
+    // 3. RESPONSABILIDADES
+    addSection(3,'Responsabilidades');
+    const respCols = ['Docente','Coordinadora','Finanzas'];
+    const respRows = [
+      ['Ejecutar clases según calendario','Recibir y revisar declaración 24h','Verificar monto vs contrato'],
+      ['Completar declaración en 3 días','Validar horas vs calendario dashboard','Procesar pago en 5 días hábiles'],
+      ['Adjuntar lista de asistencia firmada','Aprobar o devolver con observaciones','Emitir comprobante de pago'],
+      ['Registrar bitácora de clases','Enviar a Finanzas antes del día 25','Archivar documentación 5 años'],
+    ];
+    doc.autoTable({
+      startY:y, head:[respCols], body:respRows,
+      headStyles:{fillColor:DARK,textColor:BLUE,fontStyle:'bold',fontSize:8},
+      bodyStyles:{fontSize:7.5,textColor:[50,60,80]},
+      alternateRowStyles:{fillColor:LGRAY},
+      margin:{left:14,right:14}, theme:'grid',
+    });
+    y = doc.lastAutoTable.finalY+8; checkPage();
+
+    // 4. FLUJO
+    addSection(4,'Flujo del Proceso');
+    const steps=[
+      ['1','Docente','Ejecución de la clase. Registrar asistencia y bitácora de contenidos.'],
+      ['2','Docente','Completar Formulario de Declaración de Horas (máx. 3 días hábiles post-sesión).'],
+      ['3','Docente','Firmar y enviar formulario + respaldos a la coordinadora del programa.'],
+      ['4','Coordinadora','Validar horas declaradas contra el calendario académico del dashboard.'],
+      ['5','Coordinadora','Firmar conformidad y remitir a Finanzas antes del día hábil 25 del mes.'],
+      ['6','Finanzas','Verificar contrato vigente, calcular monto y procesar liquidación.'],
+      ['7','Finanzas','Notificar comprobante al docente y archivar documentación.'],
+    ];
+    doc.autoTable({
+      startY:y, head:[['#','Actor','Descripción']], body:steps,
+      headStyles:{fillColor:DARK,textColor:BLUE,fontStyle:'bold',fontSize:8},
+      bodyStyles:{fontSize:7.5,textColor:[50,60,80]},
+      columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:28},2:{cellWidth:'auto'}},
+      alternateRowStyles:{fillColor:LGRAY},
+      margin:{left:14,right:14}, theme:'grid',
+    });
+    y = doc.lastAutoTable.finalY+8; checkPage(40);
+
+    // 5. REQUISITOS
+    addSection(5,'Requisitos y Documentación');
+    const reqs=[
+      ['Formulario de Declaración de Horas','Documento oficial con programa, asignatura, fecha, horario, modalidad y firma.'],
+      ['Lista de asistencia firmada','Nombres, RUT y firma de alumnos. Online: reporte de plataforma (Zoom/Teams).'],
+      ['Bitácora de clases','Registro del contenido temático por sesión, vinculado al programa de estudios.'],
+      ['Calendario académico validado','El calendario del dashboard sirve como referencia para validar fechas y horarios.'],
+      ['Contrato o acuerdo de servicios','Establece el valor hora, vigencia y condiciones. Debe estar vigente.'],
+      ['Evidencia clases online','Grabación, reporte de asistencia o screenshot con fecha/hora visible.'],
+    ];
+    doc.autoTable({
+      startY:y, head:[['Documento','Descripción']], body:reqs,
+      headStyles:{fillColor:DARK,textColor:BLUE,fontStyle:'bold',fontSize:8},
+      bodyStyles:{fontSize:7.5,textColor:[50,60,80]},
+      columnStyles:{0:{cellWidth:52,fontStyle:'bold'}},
+      alternateRowStyles:{fillColor:LGRAY},
+      margin:{left:14,right:14}, theme:'grid',
+    });
+    y = doc.lastAutoTable.finalY+12; checkPage(40);
+
+    // ── Cursos con declaración pendiente ──────────────────────────
+    doc.setFillColor(...BLUE); doc.rect(0,y-2,W,8,'F');
+    doc.setTextColor(...WHITE); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('Cursos con Horas a Declarar',14,y+4);
+    y+=12;
+
+    // Solo cursos que terminan en los próximos 4 días — un registro por docente
+    const en4pdf = new Date(hoy); en4pdf.setDate(hoy.getDate()+4);
+    const pm3={};
+    df.forEach(function(r){
+      const p=r['PROGRAMA'],a=r['ASIGNATURA']||'Sin asignatura';
+      const prof=(r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))?r['PROFESOR']:'Sin docente';
+      const key=p+'|||'+a+'|||'+prof;
+      if(!pm3[key]) pm3[key]={prog:p,abrev:r['NOMBRE ABREVIADO']||abbr(p,20),asig:a,prof:prof,ini:null,fin:null,hrs:0};
+      const d=r['DIAS/FECHAS'];
+      if(d){
+        if(!pm3[key].ini||d<pm3[key].ini) pm3[key].ini=d;
+        if(!pm3[key].fin||d>pm3[key].fin) pm3[key].fin=d;
+      }
+      pm3[key].hrs+=parseFloat(r['HORAS'])||0;
+    });
+    const declRows=Object.values(pm3)
+      .filter(function(x){return x.fin&&x.fin>=hoy&&x.fin<=en4pdf;})
+      .sort(function(a,b){return a.fin-b.fin||a.prog.localeCompare(b.prog);})
+      .map(function(x){return[
+        abbr(x.abrev||x.prog,22),
+        abbr(x.asig,32),
+        abbr(x.prof,24),
+        x.ini?fmtDate(x.ini):'—',
+        x.fin?fmtDate(x.fin):'—',
+        String(Math.round(x.hrs*10)/10),
+        'DECLARAR',
+      ];});
+    if(declRows.length){
+      doc.autoTable({
+        startY:y,
+        head:[['Programa','Asignatura / Curso','Docente','Inicio','Fin','Hrs','Estado']],
+        body:declRows,
+        headStyles:{fillColor:[30,40,60],textColor:BLUE,fontStyle:'bold',fontSize:7.5},
+        bodyStyles:{fontSize:7,textColor:[50,60,80]},
+        columnStyles:{
+          0:{cellWidth:28},1:{cellWidth:46},2:{cellWidth:32},
+          3:{cellWidth:18,halign:'center'},4:{cellWidth:18,halign:'center'},
+          5:{cellWidth:10,halign:'center'},6:{cellWidth:18,halign:'center'},
+        },
+        alternateRowStyles:{fillColor:LGRAY},
+        didParseCell: (data)=>{
+          if(data.column.index===6&&data.cell.raw==='VENCIDA')
+            data.cell.styles.textColor=RED;
+          if(data.column.index===6&&data.cell.raw==='URGENTE')
+            data.cell.styles.textColor=[245,158,11];
+        },
+        margin:{left:14,right:14}, theme:'grid',
+      });
+      y = doc.lastAutoTable.finalY+10;
+    } else {
+      doc.setTextColor(...GRAY); doc.setFontSize(8);
+      doc.text('Sin cursos con declaraciones pendientes en el período.',14,y+4);
+      y+=12;
+    }
+
+    // ── Firmas ───────────────────────────────────────────────────
+    checkPage(30);
+    const firmas=['Docente','Coordinadora del Programa','Director de Postgrado','Finanzas'];
+    const fw=(W-28)/firmas.length;
+    firmas.forEach((f,i)=>{
+      const fx=14+i*fw;
+      doc.setDrawColor(...GRAY); doc.setLineWidth(0.3);
+      doc.line(fx,y+18,fx+fw-6,y+18);
+      doc.setTextColor(...GRAY); doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text(f,fx+(fw-6)/2,y+22,{align:'center'});
+    });
+
+    // ── Pie de página en todas las páginas ───────────────────────
+    const pages=doc.getNumberOfPages();
+    for(let p=1;p<=pages;p++){
+      doc.setPage(p);
+      doc.setFillColor(...DARK); doc.rect(0,290,W,10,'F');
+      doc.setTextColor(...GRAY); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      doc.text('UAI Postgrado — Procedimiento Declaración de Horas Académicas',14,296);
+      doc.text('Pág. '+p+' / '+pages,W-14,296,{align:'right'});
+    }
+
+    doc.save('Procedimiento_Declaracion_Pago_Horas_Academicas_UAI.pdf');
+    showToast('PDF descargado correctamente','ok');
+  } catch(e){
+    console.error('[PDF]',e);
+    showToast('Error generando PDF: '+e.message,'err');
+  }
+}
+
+function declExportarExcel(){
+  const df  = getDF();
+  const hoy = today();
+  // Agrupar sesiones ejecutadas por docente
+  const prof_map = {};
+  df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy&&r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))
+    .forEach(r=>{
+      const p=r['PROFESOR'];
+      if(!prof_map[p]) prof_map[p]={prof:p,prog:new Set(),ses:0,hrs:0};
+      prof_map[p].prog.add(r['PROGRAMA']);
+      prof_map[p].ses++;
+      prof_map[p].hrs += parseFloat(r['HORAS'])||0;
+    });
+  const rows = Object.values(prof_map).sort((a,b)=>a.prof.localeCompare(b.prof)).map(d=>({
+    'Docente':        d.prof,
+    'Programas':      [...d.prog].join(' / '),
+    'Sesiones ejecutadas': d.ses,
+    'Horas ejecutadas':    Math.round(d.hrs*10)/10,
+    'Estado declaración':  'Pendiente',
+    'Fecha corte':         hoy.toLocaleDateString('es-CL'),
+  }));
+  if(!rows.length){ showToast('No hay sesiones ejecutadas aún','warn'); return; }
+  DL.excel(rows,'Declaracion_Horas_'+hoy.toLocaleDateString('es-CL').replace(/\//g,'-')+'.xlsx');
+  showToast(rows.length+' docentes exportados','ok');
+}
+
+function buildProgDetail(rows){
+  // Agrupar por ASIGNATURA → fecha min/max, nº sesiones, profesores
+  const am={};
+  rows.forEach(r=>{
+    const a=r['ASIGNATURA']||'Sin asignatura'; if(!am[a])am[a]={ini:null,fin:null,ses:0,profs:new Set()};
+    const d=r['DIAS/FECHAS'];
+    if(d){if(!am[a].ini||d<am[a].ini)am[a].ini=d; if(!am[a].fin||d>am[a].fin)am[a].fin=d;}
+    am[a].ses++;
+    if(r['PROFESOR']&&r['PROFESOR'].trim()) am[a].profs.add(r['PROFESOR'].trim());
+  });
+
+  const asigs=Object.entries(am)
+    .sort((a,b)=> (a[1].ini||0)-(b[1].ini||0))
+    .map(([name,d])=>({name,ini:d.ini,fin:d.fin,ses:d.ses,profs:[...d.profs]}));
+
+  if(!asigs.length) return '<p style="color:var(--t4);font-size:11px">Sin detalle disponible.</p>';
+
+  // Agrupar sesiones por asignatura (con todas las filas originales)
+  const amRows={};
+  rows.forEach(r=>{
+    const a=r['ASIGNATURA']||'Sin asignatura';
+    if(!amRows[a]) amRows[a]=[];
+    amRows[a].push(r);
+  });
+  const detId='det_'+Math.random().toString(36).slice(2,7);
+
+  // Docentes section
+  const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
+  let profSection='';
+  if(allProfs.length){
+    const panelId='dp_'+Math.random().toString(36).slice(2,7);
+    const profData2={};
+    rows.forEach(r=>{
+      const p=r['PROFESOR']; if(!p||IGNORE_VALS.has(p.toLowerCase())) return;
+      if(!profData2[p]) profData2[p]=[];
+      if(r['DIAS/FECHAS']) profData2[p].push(r);
+    });
+    window['_dpData_'+panelId]=profData2;
+    const tags=allProfs.map(function(p){
+      const cnt=(profData2[p]||[]).length;
+      const safeP=esc(p);
+      return '<span class="doc-tag" data-pid="'+panelId+'" data-prof="'+safeP+'" onclick="docToggleFechas(this,this.dataset.pid,this.dataset.prof)">'
+        +esc(abbr(p,26))+(cnt?' <span class="doc-cnt">'+cnt+'</span>':'')+'</span>';
+    }).join('');
+    profSection='<div style="margin-bottom:4px">'
+      +'<div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<span style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding-top:6px">Docentes del programa</span>'
+      +tags+'</div>'
+      +'<div class="doc-fechas-panel" id="'+panelId+'"></div></div>';
+  }
+
+  // Filas de asignaturas — tabla simple con clic que activa panel externo
+  const hoyA=today(),en7A=new Date(hoyA);en7A.setDate(en7A.getDate()+7);
+  // Serializar sesiones por asignatura para el panel externo
+  const sesData={};
+  asigs.forEach(function(a){
+    sesData[a.name]=(amRows[a.name]||[])
+      .filter(function(r){return r['DIAS/FECHAS'];})
+      .sort(function(x,y){return x['DIAS/FECHAS']-y['DIAS/FECHAS'];});
+  });
+  window['_sesData_'+detId]=sesData;
+
+  let tbodyHtml='';
+  asigs.forEach(function(a,ai){
+    const asigEnc=a.fin&&a.fin>=hoyA&&a.fin<=en7A;
+    const asigFin=a.fin&&a.fin<hoyA;
+    const rowId=detId+'_a'+ai;
+    tbodyHtml+='<tr class="asig-row" id="'+rowId+'"'
+      +' data-rid="'+rowId+'" data-did="'+detId+'" data-aname="'+esc(a.name)+'"'
+      +' onclick="asigToggle(this)"'
+      +' style="'+(asigEnc?'background:rgba(245,158,11,.04)':'')+'">'
+      +'<td style="font-weight:600;max-width:300px">'
+        +'<span class="asig-toggle">&#9658;</span>'+esc(a.name)
+        +(asigEnc?'<span class="enc-badge-asig" title="Finaliza en 7 dias">&#9888; Encuesta</span>':'')
+      +'</td>'
+      +'<td style="white-space:nowrap;color:var(--blue);font-weight:700">'+(a.ini?fmtDate(a.ini):'—')+'</td>'
+      +'<td style="white-space:nowrap;color:'+(asigEnc?'var(--orange)':asigFin?'var(--t4)':'var(--t3)')+';font-weight:'+(asigEnc?700:400)+'">'+(a.fin?fmtDate(a.fin):'—')+'</td>'
+      +'<td style="text-align:right">'+a.ses+'</td>'
+      +'<td style="color:var(--t3);max-width:200px">'+esc(a.profs.slice(0,2).map(function(p){return abbr(p,22);}).join(' / '))+'</td>'
+      +'</tr>';
+  });
+
+  // Panel de detalle DEBAJO de la tabla (fuera del table)
+  const panelHtml='<div class="asig-detail-panel" id="panel_'+detId+'"></div>';
+
+  // ── Cuadro resumen de cursos y sus fechas ──────────────────────
+  const hoyR=today(), finMesR=new Date(hoyR.getFullYear(),hoyR.getMonth()+1,0);
+  let resumenRows='';
+  asigs.forEach(function(a){
+    const esFin   = a.fin && a.fin < hoyR;
+    const esMes   = a.fin && a.fin >= hoyR && a.fin <= finMesR;
+    const esActual= a.ini && a.ini <= hoyR && (!a.fin || a.fin >= hoyR);
+    const estado  = esFin   ? '<span style="font-size:9px;background:rgba(100,116,139,.12);color:var(--t4);padding:1px 7px;border-radius:8px;font-weight:700">Finalizado</span>'
+                  : esMes   ? '<span style="font-size:9px;background:rgba(239,68,68,.12);color:#ef4444;padding:1px 7px;border-radius:8px;font-weight:700">&#9888; Termina este mes</span>'
+                  : esActual? '<span style="font-size:9px;background:rgba(16,185,129,.12);color:#34d399;padding:1px 7px;border-radius:8px;font-weight:700">En curso</span>'
+                  :           '<span style="font-size:9px;background:rgba(56,189,248,.12);color:#38bdf8;padding:1px 7px;border-radius:8px;font-weight:700">Próximo</span>';
+    const profs = a.profs.slice(0,2).map(function(p){return abbr(p,22);}).join(' · ') || '—';
+    resumenRows +=
+      '<tr>'
+      +'<td class="bold">'+esc(a.name)+'</td>'
+      +'<td class="blue">'+(a.ini?fmtDate(a.ini):'—')+'</td>'
+      +'<td class="'+(esMes?'orange':'muted')+'">'+(a.fin?fmtDate(a.fin):'—')+'</td>'
+      +'<td class="r">'+a.ses+'</td>'
+      +'<td style="color:var(--t3);font-size:10px">'+esc(profs)+'</td>'
+      +'<td>'+estado+'</td>'
+      +'</tr>';
+  });
+
+  return '<div class="detail-title">Cursos / Asignaturas del programa</div>'
+    +profSection
+    +'<div class="tbl-wrap"><table class="dt" style="font-size:10.5px"><thead><tr>'
+    +'<th>Asignatura / Curso</th><th>Inicio</th><th>Fin</th>'
+    +'<th style="text-align:right">Sesiones</th><th>Profesor(es)</th>'
+    +'</tr></thead><tbody>'+tbodyHtml+'</tbody></table></div>'
+    +panelHtml;
+}
+
+
 /* ══════════════════════════════════════════════════════
-   CALENDARIO TAB
+   ANÁLISIS DE COHERENCIA — Ejecución vs Planificación
 ══════════════════════════════════════════════════════ */
-let _calDf=[];
+function renderCoherencia(){
+  const df  = getDF();
+  const hoy = today();
+
+  if(!df.length){
+    $('page').innerHTML='<div class="pg-title">Análisis de Coherencia</div><div class="banner b-info">Carga el archivo del calendario académico para ver el análisis.</div>';
+    return;
+  }
+
+  // ── Métricas globales ──────────────────────────────────────────
+  const totalSes   = df.length;
+  const ejecutadas = df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).length;
+  const pendientes = totalSes - ejecutadas;
+  const pctGlobal  = totalSes>0 ? Math.round(ejecutadas/totalSes*100) : 0;
+
+  const totalHrs   = df.reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0);
+  const hrsEjec    = df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0);
+  const pctHrs     = totalHrs>0 ? Math.round(hrsEjec/totalHrs*100) : 0;
+
+  // Días transcurridos del programa (fecha min → hoy)
+  const fechas   = df.filter(r=>r['DIAS/FECHAS']).map(r=>r['DIAS/FECHAS']);
+  const fechaMin = fechas.length ? new Date(Math.min(...fechas)) : hoy;
+  const fechaMax = fechas.length ? new Date(Math.max(...fechas)) : hoy;
+  const durTotal = Math.max(1,(fechaMax-fechaMin)/86400000);
+  const durTrans = Math.min(durTotal,Math.max(0,(hoy-fechaMin)/86400000));
+  const pctTiempo= Math.round(durTrans/durTotal*100);
+
+  // Índice de coherencia: qué tan alineada está la ejecución con el tiempo transcurrido
+  // Si ejecutaste 40% pero transcurrió 60% del tiempo → brecha de 20 puntos
+  const brecha     = pctTiempo - pctGlobal;
+  const coherencia = Math.max(0,100-Math.abs(brecha));
+
+  // ── Por programa ──────────────────────────────────────────────
+  const pm={};
+  df.forEach(r=>{
+    const p=r['PROGRAMA']; if(!p) return;
+    if(!pm[p]) pm[p]={abrev:r['NOMBRE ABREVIADO']||abbr(p,28),total:0,ejec:0,hrsT:0,hrsE:0,ini:null,fin:null};
+    pm[p].total++;
+    const d=r['DIAS/FECHAS'];
+    if(d){
+      if(!pm[p].ini||d<pm[p].ini) pm[p].ini=d;
+      if(!pm[p].fin||d>pm[p].fin) pm[p].fin=d;
+      if(d<=hoy){ pm[p].ejec++; pm[p].hrsE+=parseFloat(r['HORAS'])||0; }
+    }
+    pm[p].hrsT+=parseFloat(r['HORAS'])||0;
+  });
+
+  const progList = Object.entries(pm).map(([prog,d])=>{
+    const durP   = d.ini&&d.fin ? Math.max(1,(d.fin-d.ini)/86400000) : 1;
+    const transP = d.ini ? Math.min(durP,Math.max(0,(hoy-d.ini)/86400000)) : 0;
+    const tPct   = Math.round(transP/durP*100);
+    const ePct   = d.total>0 ? Math.round(d.ejec/d.total*100) : 0;
+    const gap    = tPct - ePct;
+    return {prog,abrev:d.abrev,total:d.total,ejec:d.ejec,ePct,tPct,gap,
+            hrsE:Math.round(d.hrsE),hrsT:Math.round(d.hrsT)};
+  }).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)); // mayor brecha primero
+
+  // ── Clasificación de brechas ──────────────────────────────────
+  const enRiesgo   = progList.filter(p=>p.gap>20);
+  const adelantado = progList.filter(p=>p.gap<-10);
+  const enLinea    = progList.filter(p=>p.gap>=-10&&p.gap<=20);
+
+  // ── Color helpers ─────────────────────────────────────────────
+  function gapColor(gap){
+    if(gap>20)  return '#ef4444';
+    if(gap>10)  return 'var(--orange)';
+    if(gap<-10) return '#38bdf8';
+    return '#34d399';
+  }
+  function pctColor(pct){
+    if(pct>=80) return '#34d399';
+    if(pct>=50) return 'var(--blue)';
+    if(pct>=30) return 'var(--orange)';
+    return '#ef4444';
+  }
+  function gapLabel(gap){
+    if(gap>20)  return '<span class="coh-exec-badge" style="background:rgba(239,68,68,.12);color:#ef4444">▼ Rezagado '+gap+'pts</span>';
+    if(gap>10)  return '<span class="coh-exec-badge" style="background:rgba(245,158,11,.12);color:var(--orange)">▼ Leve '+gap+'pts</span>';
+    if(gap<-10) return '<span class="coh-exec-badge" style="background:rgba(56,189,248,.12);color:#38bdf8">▲ Adelantado '+Math.abs(gap)+'pts</span>';
+    return '<span class="coh-exec-badge" style="background:rgba(16,185,129,.12);color:#34d399">✓ En línea</span>';
+  }
+
+  // ── Rows por programa ─────────────────────────────────────────
+  const progRows = progList.map(p=>`
+    <div class="coh-prog-row">
+      <div style="flex:1;min-width:0">
+        <div class="coh-prog-name">${esc(p.abrev)}</div>
+        <div class="coh-prog-abrev">${p.ejec}/${p.total} ses · ${p.hrsE}h/${p.hrsT}h</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-size:9px;color:var(--t4);white-space:nowrap">Tiempo: ${p.tPct}%</div>
+        <div class="coh-bar-wrap">
+          <div class="coh-bar-fill" style="width:${p.ePct}%;background:${pctColor(p.ePct)}"></div>
+        </div>
+        <div class="coh-pct" style="color:${pctColor(p.ePct)}">${p.ePct}%</div>
+        ${gapLabel(p.gap)}
+      </div>
+    </div>`).join('');
+
+  // ── Brechas identificadas ─────────────────────────────────────
+  let brechasHtml = '';
+  if(enRiesgo.length){
+    brechasHtml += `<div style="margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:#ef4444;margin-bottom:6px">
+        &#9888; ${enRiesgo.length} programa(s) con rezago significativo (&gt;20 puntos)
+      </div>
+      <div class="coh-chip-grid">
+        ${enRiesgo.map(p=>`<div class="coh-chip">
+          <span class="coh-chip-ico">&#128203;</span>
+          <div>
+            <div style="font-weight:700;color:var(--t1)">${esc(p.abrev)}</div>
+            <div style="color:var(--t4)">Ejec. ${p.ePct}% · Tiempo ${p.tPct}% · Brecha ${p.gap}pts</div>
+          </div>
+        </div>`).join('')}
+      </div>
+      <div style="margin-top:10px;font-size:10.5px;color:var(--t2);line-height:1.6;padding:10px 12px;background:rgba(239,68,68,.04);border-radius:var(--r2);border-left:3px solid #ef4444">
+        <strong>Causas probables:</strong> ajustes de calendario por feriados o contingencias institucionales,
+        licencias médicas de docentes sin reemplazo inmediato, reprogramación de sesiones acordada con los estudiantes,
+        o incorporación tardía de nuevos grupos al programa. Estos desfases son frecuentes en el primer y último
+        tercio de cada período académico.
+      </div>
+    </div>`;
+  }
+  if(adelantado.length){
+    brechasHtml += `<div style="margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:#38bdf8;margin-bottom:6px">
+        &#9650; ${adelantado.length} programa(s) adelantados respecto al cronograma
+      </div>
+      <div class="coh-chip-grid">
+        ${adelantado.map(p=>`<div class="coh-chip">
+          <span class="coh-chip-ico">&#9989;</span>
+          <div>
+            <div style="font-weight:700;color:var(--t1)">${esc(p.abrev)}</div>
+            <div style="color:var(--t4)">Ejec. ${p.ePct}% · Tiempo ${p.tPct}%</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+  if(!enRiesgo.length&&!adelantado.length){
+    brechasHtml = `<div class="banner b-ok">&#10003; Todos los programas se ejecutan dentro del margen de coherencia esperado (±10 puntos).</div>`;
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+  $('page').innerHTML = `
+  <div class="pg-title">Análisis de Coherencia</div>
+  <div style="font-size:11px;color:var(--t3);margin-bottom:18px">
+    Ejecución declarada vs. planificación académica · Corte al ${hoy.toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'})}
+  </div>
+
+  <!-- KPIs -->
+  <div class="coh-kpi-grid">
+    <div class="coh-kpi">
+      <div class="coh-kpi-lbl">Cumplimiento de sesiones</div>
+      <div class="coh-kpi-val" style="color:${pctColor(pctGlobal)}">${pctGlobal}%</div>
+      <div class="coh-kpi-sub">${ejecutadas} ejecutadas de ${totalSes} planificadas</div>
+      <div class="coh-kpi-bar" style="width:${pctGlobal}%;background:${pctColor(pctGlobal)}"></div>
+    </div>
+    <div class="coh-kpi">
+      <div class="coh-kpi-lbl">Cumplimiento de horas</div>
+      <div class="coh-kpi-val" style="color:${pctColor(pctHrs)}">${pctHrs}%</div>
+      <div class="coh-kpi-sub">${Math.round(hrsEjec)}h ejecutadas de ${Math.round(totalHrs)}h totales</div>
+      <div class="coh-kpi-bar" style="width:${pctHrs}%;background:${pctColor(pctHrs)}"></div>
+    </div>
+    <div class="coh-kpi">
+      <div class="coh-kpi-lbl">Avance temporal del período</div>
+      <div class="coh-kpi-val" style="color:var(--blue)">${pctTiempo}%</div>
+      <div class="coh-kpi-sub">${Math.round(durTrans)} de ${Math.round(durTotal)} días transcurridos</div>
+      <div class="coh-kpi-bar" style="width:${pctTiempo}%;background:var(--blue)"></div>
+    </div>
+    <div class="coh-kpi">
+      <div class="coh-kpi-lbl">Índice de coherencia</div>
+      <div class="coh-kpi-val" style="color:${pctColor(coherencia)}">${coherencia}%</div>
+      <div class="coh-kpi-sub">Alineación ejecución vs tiempo · Brecha ${brecha>0?'+':''}${brecha}pts</div>
+      <div class="coh-kpi-bar" style="width:${coherencia}%;background:${pctColor(coherencia)}"></div>
+    </div>
+    <div class="coh-kpi">
+      <div class="coh-kpi-lbl">Programas en riesgo</div>
+      <div class="coh-kpi-val" style="color:${enRiesgo.length?'#ef4444':'#34d399'}">${enRiesgo.length}</div>
+      <div class="coh-kpi-sub">de ${progList.length} programas · ${enLinea.length} en línea</div>
+      <div class="coh-kpi-bar" style="width:${progList.length?Math.round(enRiesgo.length/progList.length*100):0}%;background:#ef4444"></div>
+    </div>
+    <div class="coh-kpi">
+      <div class="coh-kpi-lbl">Sesiones pendientes</div>
+      <div class="coh-kpi-val" style="color:var(--orange)">${pendientes}</div>
+      <div class="coh-kpi-sub">${Math.round(totalHrs-hrsEjec)}h académicas por ejecutar</div>
+      <div class="coh-kpi-bar" style="width:${totalSes?Math.round(pendientes/totalSes*100):0}%;background:var(--orange)"></div>
+    </div>
+  </div>
+
+  <!-- 1. Cumplimiento por programa -->
+  <div class="coh-section">
+    <div class="coh-section-head">
+      <div class="coh-section-icon" style="background:rgba(56,189,248,.1)">&#128202;</div>
+      <div>
+        <div class="coh-section-title">1. Indicador de Cumplimiento por Programa</div>
+        <div class="coh-section-sub">Avance real de ejecución vs tiempo transcurrido de cada programa — ordenado por mayor brecha</div>
+      </div>
+    </div>
+    ${progRows}
+  </div>
+
+  <!-- 2. Brechas -->
+  <div class="coh-section">
+    <div class="coh-section-head">
+      <div class="coh-section-icon" style="background:rgba(245,158,11,.1)">&#128269;</div>
+      <div>
+        <div class="coh-section-title">2. Identificación de Brechas</div>
+        <div class="coh-section-sub">Programas con desfase entre ejecución declarada y cronograma planificado</div>
+      </div>
+    </div>
+    ${brechasHtml}
+  </div>
+
+  <!-- 3. Impacto en la continuidad -->
+  <div class="coh-section">
+    <div class="coh-section-head">
+      <div class="coh-section-icon" style="background:rgba(239,68,68,.08)">&#9888;</div>
+      <div>
+        <div class="coh-section-title">3. Impacto en la Continuidad Académica</div>
+        <div class="coh-section-sub">Evaluación del efecto de los desfases sobre la calidad del programa</div>
+      </div>
+    </div>
+    <div class="decl-text">
+      ${enRiesgo.length===0 ? `
+      <p style="color:#34d399;font-weight:600">&#10003; Sin impacto significativo en la continuidad académica.</p>
+      <p>Todos los programas mantienen una ejecución alineada con el cronograma planificado.
+      El margen de variación observado (≤10 puntos porcentuales) se encuentra dentro de los
+      parámetros aceptables según los estándares de gestión académica de postgrado.</p>
+      ` : `
+      <p><strong>Riesgo de cumplimiento de horas mínimas:</strong> Los ${enRiesgo.length} programa(s)
+      con rezago superior a 20 puntos porcentuales enfrentan riesgo de no completar las horas
+      académicas comprometidas si el ritmo de ejecución no se regulariza en las próximas 2–3 semanas.</p>
+      <p><strong>Impacto en la calidad académica:</strong> Los desfases acumulados pueden generar
+      compresión de contenidos en las sesiones restantes, reducción del tiempo para evaluaciones
+      y retroalimentación, y potencial insatisfacción estudiantil reflejada en encuestas de
+      término de módulo.</p>
+      <p><strong>Impacto administrativo:</strong> La no ejecución de horas declaradas en el período
+      correspondiente genera ajustes en la liquidación de honorarios, reprocesos en el área de
+      finanzas y posibles contingencias contractuales con los docentes afectados.</p>
+      `}
+    </div>
+  </div>
+
+  <!-- 4. Mitigación -->
+  <div class="coh-section">
+    <div class="coh-section-head">
+      <div class="coh-section-icon" style="background:rgba(16,185,129,.1)">&#9881;</div>
+      <div>
+        <div class="coh-section-title">4. Propuesta de Mitigación</div>
+        <div class="coh-section-sub">Acciones ejecutivas para regularizar las diferencias y asegurar la continuidad</div>
+      </div>
+    </div>
+    <div class="coh-mit-item">
+      <div class="coh-mit-num" style="background:rgba(56,189,248,.12);color:var(--blue)">1</div>
+      <div class="coh-mit-text">
+        <div class="coh-mit-title">Revisión inmediata del calendario con coordinadoras</div>
+        <div class="coh-mit-desc">Convocar reunión semanal de seguimiento con las coordinadoras de los programas rezagados para mapear las causas específicas del desfase, identificar sesiones recuperables dentro del período vigente y establecer fechas de recuperación formales en el sistema.</div>
+      </div>
+    </div>
+    <div class="coh-mit-item">
+      <div class="coh-mit-num" style="background:rgba(16,185,129,.12);color:#34d399">2</div>
+      <div class="coh-mit-text">
+        <div class="coh-mit-title">Plan de recuperación documentado</div>
+        <div class="coh-mit-desc">Elaborar un Plan de Recuperación Académica formal para cada programa en riesgo, detallando las sesiones pendientes, docentes responsables, fechas propuestas y modalidad (presencial, online o híbrida). Este plan debe ser firmado por el director del programa y comunicado a los estudiantes dentro de los 5 días hábiles siguientes.</div>
+      </div>
+    </div>
+    <div class="coh-mit-item">
+      <div class="coh-mit-num" style="background:rgba(245,158,11,.12);color:var(--orange)">3</div>
+      <div class="coh-mit-text">
+        <div class="coh-mit-title">Actualización del calendario en el sistema</div>
+        <div class="coh-mit-desc">Registrar las fechas de recuperación en el Dashboard de Postgrado para mantener la trazabilidad del calendario oficial, garantizar que los indicadores de coherencia se actualicen en tiempo real y que el área de finanzas cuente con información precisa para la declaración de honorarios del período.</div>
+      </div>
+    </div>
+    <div class="coh-mit-item">
+      <div class="coh-mit-num" style="background:rgba(83,74,183,.12);color:#AFA9EC">4</div>
+      <div class="coh-mit-text">
+        <div class="coh-mit-title">Alerta temprana para períodos futuros</div>
+        <div class="coh-mit-desc">Implementar revisión quincenal de este análisis de coherencia durante los primeros dos meses de cada programa. Si el índice cae por debajo de 75%, activar protocolo de contingencia automático que notifique a la dirección académica y al área de finanzas antes de que el desfase sea irrecuperable dentro del período.</div>
+      </div>
+    </div>
+    <div class="coh-mit-item">
+      <div class="coh-mit-num" style="background:rgba(29,158,117,.12);color:#5DCAA5">5</div>
+      <div class="coh-mit-text">
+        <div class="coh-mit-title">Informe ejecutivo mensual</div>
+        <div class="coh-mit-desc">Generar y distribuir mensualmente este análisis de coherencia a la Dirección de Postgrado, acompañado de un semáforo de estado por programa (verde/amarillo/rojo) y las acciones tomadas. Este reporte se convierte en el insumo principal para la reunión de gestión académica mensual y para el cierre financiero del período.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer ejecutivo -->
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+    <button class="btn btn-g btn-sm" onclick="cohDescargar()">
+      &#128202; Exportar análisis
+    </button>
+  </div>`;
+}
+
+function cohDescargar(){
+  var d=today().toLocaleDateString('es-CL').split('/').join('-');
+  DL.excel(cohExport(),'Analisis_Coherencia_'+d+'.xlsx');
+}
+
+function cohExport(){
+  const df=getDF(), hoy=today();
+  const pm={};
+  df.forEach(r=>{
+    const p=r['PROGRAMA']; if(!p) return;
+    if(!pm[p]) pm[p]={abrev:r['NOMBRE ABREVIADO']||p,total:0,ejec:0,hrsT:0,hrsE:0,ini:null,fin:null};
+    pm[p].total++;
+    const d=r['DIAS/FECHAS'];
+    if(d){
+      if(!pm[p].ini||d<pm[p].ini) pm[p].ini=d;
+      if(!pm[p].fin||d>pm[p].fin) pm[p].fin=d;
+      if(d<=hoy){pm[p].ejec++;pm[p].hrsE+=parseFloat(r['HORAS'])||0;}
+    }
+    pm[p].hrsT+=parseFloat(r['HORAS'])||0;
+  });
+  return Object.entries(pm).map(([prog,d])=>{
+    const durP=d.ini&&d.fin?Math.max(1,(d.fin-d.ini)/86400000):1;
+    const transP=d.ini?Math.min(durP,Math.max(0,(hoy-d.ini)/86400000)):0;
+    const tPct=Math.round(transP/durP*100);
+    const ePct=d.total>0?Math.round(d.ejec/d.total*100):0;
+    const gap=tPct-ePct;
+    const estado=gap>20?'Rezagado':gap<-10?'Adelantado':'En línea';
+    return {
+      'Programa':prog,'Abreviado':d.abrev,
+      'Sesiones planificadas':d.total,'Sesiones ejecutadas':d.ejec,
+      '% Ejecución':ePct,'% Tiempo transcurrido':tPct,
+      'Brecha (pts)':gap,'Estado':estado,
+      'Horas totales':Math.round(d.hrsT),'Horas ejecutadas':Math.round(d.hrsE),
+      'Corte':hoy.toLocaleDateString('es-CL'),
+    };
+  }).sort((a,b)=>Math.abs(b['Brecha (pts)'])-Math.abs(a['Brecha (pts)']));
+}
+
+
+/* ══════════════════════════════════════════════════════
+   DECLARADO VS OBLIGACIÓN
+══════════════════════════════════════════════════════ */
+let _dvoData = [];  // filas del Excel cargado
+
+function renderDeclarado(){
+  $('page').innerHTML = `
+  <div class="pg-title">Declarado vs. Obligación Real</div>
+  <div style="font-size:11px;color:var(--t3);margin-bottom:16px">
+    Carga el reporte de declaraciones para comparar contra la planificación académica
+  </div>
+
+  <!-- DROP ZONE -->
+  <label class="dvo-drop" id="dvoDrop" for="dvoFile" style="cursor:pointer;display:block">
+    <input type="file" id="dvoFile" accept=".xlsx,.xls,.csv" onchange="dvoCargar(this)" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+    <div class="dvo-drop-ico" id="dvoIco">&#128229;</div>
+    <div class="dvo-drop-txt" id="dvoTxt">Arrastra el archivo Declarado o haz clic</div>
+    <div class="dvo-drop-sub" id="dvoSub">Excel exportado del sistema · Reporte_DeclaracionRealizada</div>
+    <button type="button" onclick="document.getElementById('dvoFile').click()" 
+      style="margin-top:10px;background:rgba(56,189,248,.1);border:1px solid var(--blue);color:#38bdf8;
+      border-radius:var(--r2);padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer;
+      font-family:inherit">
+      Seleccionar archivo
+    </button>
+  </label>
+
+  <!-- Contenido dinámico -->
+  <div id="dvoContent"></div>`;
+
+  // Wire drag & drop
+  const drop = $('dvoDrop');
+  if(drop){
+    drop.addEventListener('dragover', e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', e=>{ drop.classList.remove('over'); });
+    drop.addEventListener('drop', e=>{
+      e.preventDefault(); e.stopPropagation(); drop.classList.remove('over');
+      const f = e.dataTransfer.files[0]; if(f) dvoCargarFile(f);
+    });
+    // Prevent label default for drag events
+    drop.addEventListener('dragenter', e=>{ e.preventDefault(); drop.classList.add('over'); });
+  }
+  // Si ya hay datos cargados, mostrar inmediatamente
+  if(_dvoData.length) dvoRender();
+}
+
+function dvoCargar(input){
+  const f = input.files[0]; if(!f) return;
+  dvoCargarFile(f);
+}
+
+function dvoCargarFile(file){
+  if(typeof XLSX === 'undefined'){ showToast('XLSX no disponible','err'); return; }
+  const drop = $('dvoDrop');
+  const ico  = $('dvoIco');
+  const txt  = $('dvoTxt');
+  const sub  = $('dvoSub');
+  if(ico) ico.textContent = '⏳';
+  if(txt) txt.textContent = 'Procesando...';
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const wb  = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {defval:''});
+      _dvoData  = dvoNormalize(raw);
+
+      if(drop){ drop.classList.remove('over'); drop.classList.add('loaded'); }
+      if(ico)  ico.textContent = '✓';
+      if(txt)  txt.textContent = file.name + ' cargado correctamente';
+      if(sub)  sub.textContent = _dvoData.length + ' registros · ' + new Set(_dvoData.map(r=>r.profesor)).size + ' docentes · ' + new Set(_dvoData.map(r=>r.cc)).size + ' centros de costo';
+
+      showToast(_dvoData.length + ' registros cargados','ok');
+      dvoRender();
+    } catch(err){
+      showToast('Error leyendo el archivo: '+err.message,'err');
+      if(ico) ico.textContent = '⚠';
+      if(txt) txt.textContent = 'Error al cargar el archivo';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function dvoNormalize(rows){
+  return rows.filter(r=>r['Profesor']||r['Horas']).map(function(r){
+    // Parsear monto (viene como "3961088,94" con coma decimal)
+    var montoRaw = String(r['movimiento_monto']||'0');
+    var monto = parseFloat(montoRaw.replace(/\./g,'').replace(',','.')) || 0;
+    return {
+      id:       r['actividad_id']||'',
+      codigo:   String(r['ActividadCodigo']||'').trim(),
+      nombre:   String(r['ActividadNombre']||'').trim(),
+      programa: String(r['Programa']||'').trim(),
+      cc:       String(r['programa_centrocosto']||'').trim(),
+      sede:     String(r['sede']||'').trim(),
+      profesor: String(r['Profesor']||'').trim(),
+      tipoProf: String(r['TipoProfesor']||'').trim(),
+      tipoAct:  String(r['TipoActividad']||'').trim(),
+      horas:    parseFloat(r['Horas']||0)||0,
+      hrsLV:    parseFloat(r['movimiento_horas_lv']||0)||0,
+      hrsSd:    parseFloat(r['movimiento_horas_sd']||0)||0,
+      mes:      String(r['Mes']||r['movimiento_mes']||'').trim(),
+      mesNum:   parseInt(r['movimiento_mes']||0)||0,
+      mesIni:   String(r['MesInicio']||'').trim(),
+      mesFin:   String(r['MesTermino']||'').trim(),
+      fechaIni: r['FechaInicio'] instanceof Date ? r['FechaInicio'] : null,
+      fechaFin: r['FechaTermino'] instanceof Date ? r['FechaTermino'] : null,
+      precioHr: parseFloat(r['movimiento_precio_hora']||0)||0,
+      monto:    monto,
+      honorario:String(r['es_honorario']||'').trim(),
+      esExt:    String(r['EsExtension']||'').trim(),
+    };
+  });
+}
+
+function dvoRender(){
+  const data = _dvoData;
+  if(!data.length) return;
+  const dfPlan = getDF();
+  const hoy    = today();
+
+  // ── Métricas globales ──────────────────────────────────────────
+  const totalHrsDec = data.reduce((s,r)=>s+r.horas,0);
+  const totalMonto  = data.reduce((s,r)=>s+r.monto,0);
+  const nDocentes   = new Set(data.map(r=>r.profesor)).size;
+  const nProgs      = new Set(data.map(r=>r.programa)).size;
+  const nCC         = new Set(data.map(r=>r.cc)).size;
+  const hrsPlan     = dfPlan.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy)
+                             .reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0);
+  const pctCump     = hrsPlan>0 ? Math.min(999,Math.round(totalHrsDec/hrsPlan*100)) : 0;
+
+  // ── Agrupaciones ──────────────────────────────────────────────
+  const porTipo = {};
+  data.forEach(r=>{
+    const t=r.tipoAct||'Otro';
+    if(!porTipo[t]) porTipo[t]={hrs:0,monto:0,n:0};
+    porTipo[t].hrs+=r.horas; porTipo[t].monto+=r.monto; porTipo[t].n++;
+  });
+  const porProg = {};
+  data.forEach(r=>{
+    const k=r.cc+'|'+r.programa;
+    if(!porProg[k]) porProg[k]={cc:r.cc,prog:r.programa,hrs:0,monto:0,n:0,docs:new Set()};
+    porProg[k].hrs+=r.horas; porProg[k].monto+=r.monto; porProg[k].n++;
+    porProg[k].docs.add(r.profesor);
+  });
+  const progList = Object.values(porProg).sort((a,b)=>b.hrs-a.hrs);
+  const MES_ORD  = {'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
+                    'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12};
+  const porMes   = {};
+  data.forEach(r=>{
+    const m=r.mes||'Sin mes';
+    if(!porMes[m]) porMes[m]={hrs:0,monto:0,n:0};
+    porMes[m].hrs+=r.horas; porMes[m].monto+=r.monto; porMes[m].n++;
+  });
+  const mesList  = Object.entries(porMes).sort((a,b)=>(MES_ORD[a[0]]||99)-(MES_ORD[b[0]]||99));
+  const maxHrsMes= Math.max(...mesList.map(([,d])=>d.hrs),1);
+  const porDoc   = {};
+  data.forEach(r=>{
+    if(!porDoc[r.profesor]) porDoc[r.profesor]={hrs:0,monto:0,n:0,tipo:r.tipoProf};
+    porDoc[r.profesor].hrs+=r.horas; porDoc[r.profesor].monto+=r.monto; porDoc[r.profesor].n++;
+  });
+  const docList  = Object.entries(porDoc).sort((a,b)=>b[1].hrs-a[1].hrs).slice(0,12);
+  const maxHrsDoc= Math.max(...docList.map(([,d])=>d.hrs),1);
+  const maxHrsProg=Math.max(...progList.map(d=>d.hrs),1);
+
+  // ── Helper format ─────────────────────────────────────────────
+  function dvoFmtM(n){
+    if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
+    if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
+    if(n>=1e3) return '$'+(n/1e3).toFixed(0)+'K';
+    return '$'+Math.round(n).toLocaleString('es-CL');
+  }
+  function dvoPctColor(p){ return p>=90?'#34d399':p>=70?'#38bdf8':p>=50?'var(--orange)':'#ef4444'; }
+  function tipoBg(t){
+    if(t.includes('Regular'))  return 'background:rgba(56,189,248,.14);color:#38bdf8';
+    if(t.includes('Administ')) return 'background:rgba(245,158,11,.14);color:var(--orange)';
+    if(t.includes('rmino'))    return 'background:rgba(16,185,129,.14);color:#34d399';
+    return 'background:rgba(100,116,139,.14);color:var(--t4)';
+  }
+
+  // ── Sparkline SVG (mini área) ─────────────────────────────────
+  function spark(vals, color, w, h){
+    if(!vals.length) return '';
+    const mx=Math.max(...vals)||1, mn=Math.min(...vals);
+    const xs=vals.map((_,i)=>i/(vals.length-1||1)*w);
+    const ys=vals.map(v=>h-(v-mn)/(mx-mn||1)*h*0.85-2);
+    const pts=xs.map((x,i)=>x+','+ys[i]).join(' ');
+    const area=`${xs[0]},${h} `+xs.map((x,i)=>x+','+ys[i]).join(' ')+` ${xs[xs.length-1]},${h}`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block">
+      <defs><linearGradient id="sg${color.replace(/[^a-z]/gi,'')}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <polygon points="${area}" fill="url(#sg${color.replace(/[^a-z]/gi,'')})" />
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+  }
+
+  // Sparkline values: horas por mes
+  const sparkVals = mesList.map(([,d])=>d.hrs);
+
+  // ── Area chart SVG para panel principal ───────────────────────
+  function areaChart(entries, color, w, h){
+    if(!entries.length) return `<svg width="${w}" height="${h}"></svg>`;
+    const mx=Math.max(...entries.map(e=>e[1].hrs))||1;
+    const pad=10;
+    const xs=entries.map((_,i)=>pad + i/(entries.length-1||1)*(w-pad*2));
+    const ys=entries.map(([,d])=>h-10-(d.hrs/mx)*(h-24));
+    const linePts=xs.map((x,i)=>x+','+ys[i]).join(' ');
+    const areaPts=`${xs[0]},${h} `+xs.map((x,i)=>x+','+ys[i]).join(' ')+` ${xs[xs.length-1]},${h}`;
+    const barW=Math.max(6, (w-pad*2)/entries.length*0.6);
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <defs>
+        <linearGradient id="areaG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      ${entries.map(([mes,d],i)=>{
+        const bh=Math.max(2,(d.hrs/mx)*(h-24));
+        return `<rect x="${(xs[i]-barW/2).toFixed(1)}" y="${(h-10-bh).toFixed(1)}" width="${barW}" height="${bh.toFixed(1)}" fill="${color}" opacity="0.18" rx="2"/>`;
+      }).join('')}
+      <polygon points="${areaPts}" fill="url(#areaG)"/>
+      <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${xs.map((x,i)=>`<circle cx="${x}" cy="${ys[i]}" r="3" fill="${color}"/>
+        <text x="${x}" y="${h-1}" text-anchor="middle" font-size="8" fill="var(--t4)">${esc(abbr(entries[i][0],4))}</text>
+        <text x="${x}" y="${(ys[i]-7).toFixed(0)}" text-anchor="middle" font-size="8" fill="var(--t2)" font-weight="700">${Math.round(entries[i][1].hrs)}h</text>`).join('')}
+    </svg>`;
+  }
+
+  // ── Donut SVG ─────────────────────────────────────────────────
+  function donut(slices, cx, cy, r, stroke){
+    let cum=0;
+    const total=slices.reduce((s,d)=>s+d.val,0)||1;
+    const COLORS=['#38bdf8','#34d399','var(--orange)','#AFA9EC','#ef4444','#5DCAA5'];
+    return slices.map((s,i)=>{
+      const pct=s.val/total, ang=pct*2*Math.PI;
+      const x1=cx+r*Math.sin(cum*2*Math.PI);
+      const y1=cy-r*Math.cos(cum*2*Math.PI);
+      cum+=pct;
+      const x2=cx+r*Math.sin(cum*2*Math.PI);
+      const y2=cy-r*Math.cos(cum*2*Math.PI);
+      const large=pct>0.5?1:0;
+      const col=COLORS[i%COLORS.length];
+      return `<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${col}" opacity="0.85"/>`;
+    }).join('');
+  }
+
+  // Preparar slices para donut
+  const tipoEntries = Object.entries(porTipo).sort((a,b)=>b[1].hrs-a[1].hrs);
+  const DCOLORS=['#38bdf8','#34d399','var(--orange)','#AFA9EC','#ef4444','#5DCAA5'];
+  const donutSlices = tipoEntries.map((e,i)=>({val:e[1].hrs, lbl:e[0], color:DCOLORS[i%DCOLORS.length]}));
+
+  // ── Render HTML ───────────────────────────────────────────────
+  $('dvoContent').innerHTML = `
+
+  <!-- ═══ KPI ROW ═══ -->
+  <div class="dvo-kpi-row">
+    <div class="dvo-kpi-card">
+      <div class="dvo-kpi-label">Cumplimiento <span class="dvo-kpi-label-arrow">›</span></div>
+      <div class="dvo-kpi-value" style="color:${dvoPctColor(pctCump)}">${pctCump}%</div>
+      <div class="dvo-kpi-meta">
+        <span class="dvo-kpi-badge ${pctCump>=90?'up':pctCump>=60?'ne':'dn'}">${pctCump>=90?'▲ Meta alcanzada':pctCump>=60?'● En rango':'▼ Revisar'}</span>
+        <span style="color:var(--t4);font-size:9px">${Math.round(totalHrsDec)}h de ${Math.round(hrsPlan)}h</span>
+      </div>
+      <div class="dvo-kpi-spark">${spark(sparkVals,'#38bdf8',80,36)}</div>
+    </div>
+    <div class="dvo-kpi-card">
+      <div class="dvo-kpi-label">Horas declaradas <span class="dvo-kpi-label-arrow">›</span></div>
+      <div class="dvo-kpi-value" style="color:#38bdf8">${Math.round(totalHrsDec).toLocaleString('es-CL')}</div>
+      <div class="dvo-kpi-meta">
+        <span class="dvo-kpi-badge up">▲ ${data.length} registros</span>
+        <span style="color:var(--t4);font-size:9px">${nCC} CC</span>
+      </div>
+      <div class="dvo-kpi-spark">${spark(sparkVals,'#38bdf8',80,36)}</div>
+    </div>
+    <div class="dvo-kpi-card">
+      <div class="dvo-kpi-label">Monto total <span class="dvo-kpi-label-arrow">›</span></div>
+      <div class="dvo-kpi-value" style="color:#34d399;font-size:22px">${dvoFmtM(totalMonto)}</div>
+      <div class="dvo-kpi-meta">
+        <span class="dvo-kpi-badge up">▲ ${nProgs} programas</span>
+        <span style="color:var(--t4);font-size:9px">período</span>
+      </div>
+      <div class="dvo-kpi-spark">${spark(mesList.map(([,d])=>d.monto),'#34d399',80,36)}</div>
+    </div>
+    <div class="dvo-kpi-card">
+      <div class="dvo-kpi-label">Docentes <span class="dvo-kpi-label-arrow">›</span></div>
+      <div class="dvo-kpi-value" style="color:var(--blue)">${nDocentes}</div>
+      <div class="dvo-kpi-meta">
+        <span class="dvo-kpi-badge ne">● ${nCC} centros costo</span>
+      </div>
+      <div class="dvo-kpi-spark">${spark(docList.map(([,d])=>d.hrs),'#AFA9EC',80,36)}</div>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN GRID: Área izq + Donut der ═══ -->
+  <div class="dvo-main-grid">
+    <!-- Panel área: evolución mensual -->
+    <div class="dvo-panel">
+      <div class="dvo-panel-title">
+        Evolución mensual de horas declaradas
+        <span class="dvo-panel-tag">${mesList.length} mes${mesList.length!==1?'es':''}</span>
+      </div>
+      <div class="dvo-panel-sub">Horas efectivas declaradas por período</div>
+      <div class="dvo-canvas-wrap">
+        ${areaChart(mesList,'#38bdf8',560,160)}
+      </div>
+    </div>
+
+    <!-- Panel donut: por tipo actividad -->
+    <div class="dvo-panel">
+      <div class="dvo-panel-title">Distribución por tipo</div>
+      <div class="dvo-panel-sub">Composición del total declarado</div>
+      <div class="dvo-donut-wrap">
+        <svg width="130" height="130" viewBox="0 0 130 130" style="flex-shrink:0">
+          ${donut(donutSlices,65,65,50,8)}
+          <circle cx="65" cy="65" r="30" fill="var(--bg2)"/>
+          <text x="65" y="62" text-anchor="middle" font-size="14" font-weight="800" fill="var(--t1)">${Math.round(totalHrsDec/1000)}K</text>
+          <text x="65" y="75" text-anchor="middle" font-size="8" fill="var(--t4)">horas</text>
+        </svg>
+        <div class="dvo-donut-legend">
+          ${donutSlices.map((s,i)=>`
+          <div class="dvo-donut-leg-item">
+            <div class="dvo-donut-leg-left">
+              <div class="dvo-donut-dot" style="background:${s.color}"></div>
+              <span title="${esc(s.lbl)}">${esc(abbr(s.lbl,18))}</span>
+            </div>
+            <span class="dvo-donut-pct">${Math.round(s.val/totalHrsDec*100)}%</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ BOTTOM GRID: Top docentes + Top programas ═══ -->
+  <div class="dvo-bottom-grid">
+    <!-- Top docentes -->
+    <div class="dvo-panel">
+      <div class="dvo-panel-title">Top docentes por horas <span class="dvo-panel-tag">Top ${docList.length}</span></div>
+      <div class="dvo-panel-sub">Horas declaradas por docente en el período</div>
+      <div class="dvo-hbar-list">
+        ${docList.map(([prof,d],i)=>`
+        <div class="dvo-hbar-item">
+          <div class="dvo-hbar-top">
+            <span class="dvo-hbar-name" title="${esc(prof)}">${i+1}. ${esc(abbr(prof,22))}</span>
+            <div class="dvo-hbar-right">
+              <span class="dvo-hbar-val">${Math.round(d.hrs)}h</span>
+              <span class="dvo-hbar-pct">${dvoFmtM(d.monto)}</span>
+            </div>
+          </div>
+          <div class="dvo-hbar-track">
+            <div class="dvo-hbar-fill" style="width:${Math.round(d.hrs/maxHrsDoc*100)}%;background:${d.tipo==='REGULAR'?'#38bdf8':'var(--orange)'}"></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Top programas / CC -->
+    <div class="dvo-panel">
+      <div class="dvo-panel-title">Horas por programa / CC <span class="dvo-panel-tag">${progList.length} programas</span></div>
+      <div class="dvo-panel-sub">Centro de costo y total de horas declaradas</div>
+      <div class="dvo-hbar-list">
+        ${progList.slice(0,12).map((p,i)=>`
+        <div class="dvo-hbar-item">
+          <div class="dvo-hbar-top">
+            <span class="dvo-hbar-name" title="${esc(p.prog)}">${i+1}. CC ${esc(p.cc)}</span>
+            <div class="dvo-hbar-right">
+              <span class="dvo-hbar-val">${Math.round(p.hrs)}h</span>
+              <span class="dvo-hbar-pct">${p.docs.size} doc</span>
+            </div>
+          </div>
+          <div class="dvo-hbar-track">
+            <div class="dvo-hbar-fill" style="width:${Math.round(p.hrs/maxHrsProg*100)}%;background:rgba(83,74,183,.8)"></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TABLA TRANSACCIONES (estilo Aether) ═══ -->
+  <div class="dvo-panel" style="margin-bottom:14px">
+    <div class="dvo-panel-title">
+      Detalle de declaraciones
+      <span class="dvo-panel-tag">${data.length} registros</span>
+    </div>
+    <div class="dvo-panel-sub">Últimos registros del reporte de declaraciones cargado</div>
+    <div style="overflow-x:auto">
+      <table class="dvo-tx-table">
+        <thead><tr>
+          <th>Tipo</th><th>Actividad</th><th>Docente</th>
+          <th>CC</th><th style="text-align:right">Horas</th>
+          <th style="text-align:right">Monto</th><th>Mes</th>
+        </tr></thead>
+        <tbody>
+          ${data.slice(0,20).map(r=>`
+          <tr>
+            <td><span class="dvo-tx-tipo" style="${tipoBg(r.tipoAct)}">${esc(abbr(r.tipoAct,14))}</span></td>
+            <td style="font-weight:600;color:var(--t1);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.nombre)}">${esc(abbr(r.nombre,22))}</td>
+            <td style="color:var(--t3);white-space:nowrap" title="${esc(r.profesor)}">${esc(abbr(r.profesor,20))}</td>
+            <td style="font-family:monospace;font-size:9px;color:var(--t4)">${esc(r.cc)}</td>
+            <td style="text-align:right;font-weight:700;color:#38bdf8">${r.horas}h</td>
+            <td style="text-align:right;color:#34d399;font-weight:600">${dvoFmtM(r.monto)}</td>
+            <td style="color:var(--t4);font-size:10px">${esc(r.mes)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Visualizaciones avanzadas -->
+  <div id="dvoViz"></div>
+
+  <!-- Botones -->
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+    <button class="btn btn-g btn-sm" onclick="dvoExcel()">📊 Exportar Excel</button>
+    <button class="btn btn-g btn-sm" onclick="_dvoData=[];renderDeclarado();showToast('Datos limpiados','info')">🗑 Limpiar</button>
+  </div>`;
+
+  setTimeout(function(){ dvoRenderViz(data, porProg, porTipo, hrsPlan, totalHrsDec); }, 80);
+}
+
+function dvoRenderViz(data, porProg, porTipo, hrsPlan, totalHrsDec){
+  const el = $('dvoViz'); if(!el) return;
+  const hoy=today(), progList=Object.values(porProg).sort((a,b)=>b.hrs-a.hrs);
+
+  // Horas planificadas por CC
+  const dfPlan=getDF(), planCC={};
+  dfPlan.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).forEach(r=>{
+    const cc=String(r['CC']||'').trim(); if(!cc) return;
+    planCC[cc]=(planCC[cc]||0)+(parseFloat(r['HORAS'])||0);
+  });
+
+  function dvoFmtM3(n){
+    if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
+    if(n>=1e3) return '$'+(n/1e3).toFixed(0)+'K';
+    return '$'+Math.round(n);
+  }
+
+  // ── RADAR ─────────────────────────────────────────────────────
+  const radarProgs=progList.slice(0,5);
+  const AXES=['Cumplimiento\nHoras','Eficiencia\nPresup.','Cobertura\nDocentes','Diversidad\nActiv.','Regularidad'];
+  const N=AXES.length, CX=200, CY=195, R=140;
+  const maxHrsAll=Math.max(...progList.map(p=>p.hrs),1);
+  const maxDocs=Math.max(...progList.map(p=>p.docs.size),1);
+  const RCOLORS=['#38bdf8','#34d399','#EF9F27','#AFA9EC','#F09595'];
+  function rpt(val,ai,radius){ const ang=(Math.PI*2/N)*ai-Math.PI/2; const r2=radius*val/100; return {x:CX+r2*Math.cos(ang),y:CY+r2*Math.sin(ang)}; }
+  function rscore(p){
+    const planH=planCC[p.cc]||0;
+    const cump=planH>0?Math.min(100,Math.round(p.hrs/planH*100)):50;
+    const efic=Math.round((1-Math.abs(p.monto/Math.max(...progList.map(x=>x.monto),1)-p.hrs/maxHrsAll))*100);
+    const cob=Math.round(p.docs.size/maxDocs*100);
+    const div=Math.min(100,new Set(data.filter(r=>r.cc===p.cc).map(r=>r.tipoAct)).size*20);
+    const reg=Math.min(100,new Set(data.filter(r=>r.cc===p.cc).map(r=>r.mes)).size*25);
+    return [cump,Math.max(0,efic),cob,div,reg];
+  }
+  let rsvg=`<svg width="400" height="400" viewBox="0 0 400 400" style="overflow:visible">`;
+  [20,40,60,80,100].forEach(v=>{
+    const pts=Array.from({length:N},(_,i)=>rpt(v,i,R));
+    rsvg+=`<polygon points="${pts.map(p=>p.x+','+p.y).join(' ')}" fill="none" stroke="var(--border2)" stroke-width="0.8"/>`;
+  });
+  Array.from({length:N},(_,i)=>{
+    const pt=rpt(100,i,R), lpt=rpt(122,i,R);
+    rsvg+=`<line x1="${CX}" y1="${CY}" x2="${pt.x.toFixed(1)}" y2="${pt.y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`;
+    const lines=AXES[i].split('\n');
+    rsvg+=`<text x="${lpt.x.toFixed(1)}" y="${lpt.y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="var(--t3)">`;
+    lines.forEach((l,li)=>{ rsvg+=`<tspan x="${lpt.x.toFixed(1)}" dy="${li===0?0:12}">${l}</tspan>`; });
+    rsvg+=`</text>`;
+  });
+  radarProgs.forEach((p,pi)=>{
+    const scores=rscore(p), pts=scores.map((s,i)=>rpt(s,i,R));
+    const col=RCOLORS[pi%RCOLORS.length];
+    rsvg+=`<polygon points="${pts.map(pt=>pt.x.toFixed(1)+','+pt.y.toFixed(1)).join(' ')}" fill="${col}" fill-opacity="0.13" stroke="${col}" stroke-width="2"/>`;
+    pts.forEach(pt=>{ rsvg+=`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4" fill="${col}"/>`; });
+  });
+  rsvg+=`</svg>`;
+
+  // ── WATERFALL ─────────────────────────────────────────────────
+  const wfItems=[{lbl:'Planificado\nejecutado',val:hrsPlan,type:'base'},
+    ...Object.entries(porTipo).sort((a,b)=>b[1].hrs-a[1].hrs)
+      .map(([t,d])=>({lbl:abbr(t,12),val:d.hrs,type:'add'}))];
+  const wfDiff=totalHrsDec-hrsPlan;
+  wfItems.push({lbl:wfDiff>=0?'Excedente':'Déficit',val:Math.abs(wfDiff),type:wfDiff>=0?'pos':'neg'});
+  const WW=560,WH=200,PAD=48,BAR=40,GAP=10;
+  const wfMax=Math.max(...wfItems.map(i=>i.val),hrsPlan,totalHrsDec)*1.18;
+  const wfScale=(WH-30)/wfMax;
+  let wfSvg=`<svg class="wf-svg" width="${PAD+wfItems.length*(BAR+GAP)+40}" height="${WH+55}" viewBox="0 0 ${PAD+wfItems.length*(BAR+GAP)+40} ${WH+55}">`;
+  wfSvg+=`<line x1="${PAD}" y1="${WH}" x2="${PAD+wfItems.length*(BAR+GAP)}" y2="${WH}" stroke="var(--border)" stroke-width="1"/>`;
+  let running=0;
+  wfItems.forEach((item,i)=>{
+    const x=PAD+i*(BAR+GAP);
+    const color=item.type==='base'?'#38bdf8':item.type==='add'?'rgba(83,74,183,.85)':item.type==='pos'?'#34d399':'#ef4444';
+    const h=Math.max(4,item.val*wfScale);
+    const base=item.type==='base'?0:running;
+    const y=WH-(base+(item.type==='neg'?0:item.val))*wfScale;
+    if(item.type!=='base'&&i>0){
+      const prevX=PAD+(i-1)*(BAR+GAP)+BAR;
+      const prevY=WH-running*wfScale;
+      wfSvg+=`<line x1="${prevX}" y1="${prevY.toFixed(1)}" x2="${x+BAR}" y2="${prevY.toFixed(1)}" stroke="var(--border2)" stroke-width="1" stroke-dasharray="3 2"/>`;
+    }
+    wfSvg+=`<rect x="${x}" y="${y.toFixed(1)}" width="${BAR}" height="${h.toFixed(1)}" fill="${color}" rx="3"/>`;
+    wfSvg+=`<text x="${x+BAR/2}" y="${(y-6).toFixed(0)}" text-anchor="middle" font-size="8" font-weight="700" fill="var(--t2)">${Math.round(item.val)}h</text>`;
+    const lblLines=item.lbl.split('\n');
+    const lblY=WH+14;
+    wfSvg+=`<text x="${x+BAR/2}" y="${lblY}" text-anchor="middle" font-size="8" fill="var(--t3)">`;
+    lblLines.forEach((l,li)=>{ wfSvg+=`<tspan x="${x+BAR/2}" dy="${li===0?0:10}">${l}</tspan>`; });
+    wfSvg+=`</text>`;
+    if(item.type==='add') running+=item.val;
+  });
+  wfSvg+=`</svg>`;
+
+  // ── TREEMAP ───────────────────────────────────────────────────
+  const TM_W=680,TM_H=300;
+  function tmSq(items,x,y,w,h){
+    if(!items.length) return [];
+    const result=[]; let rem=[...items],rx=x,ry=y,rw=w,rh=h;
+    while(rem.length){
+      const row=[]; let rowSum=0,best=Infinity,i=0;
+      while(i<rem.length){
+        row.push(rem[i]); rowSum+=rem[i].val;
+        const side=Math.min(rw,rh);
+        const worst=Math.max(...row.map(it=>Math.max(side*side*it.val/rowSum/rowSum,rowSum/side/side/it.val)));
+        if(worst<best||row.length===1){best=worst;i++;}
+        else{row.pop();rowSum-=rem[i-1].val;break;}
+      }
+      rem=rem.slice(row.length);
+      const vert=rw>=rh; let pos=vert?rx:ry;
+      const dim=vert?rw:rh,side=Math.min(rw,rh);
+      row.forEach(it=>{
+        const frac=it.val/rowSum;
+        result.push({...it,x:vert?pos:rx,y:vert?ry:pos,w:vert?frac*dim:side,h:vert?side:frac*dim});
+        pos+=frac*dim;
+      });
+      if(vert){rx+=dim;rw-=dim;}else{ry+=dim;rh-=dim;}
+      if(rw<1||rh<1) break;
+    }
+    return result;
+  }
+  const tmData=progList.map(p=>{
+    const planH=planCC[p.cc]||0;
+    const cump=planH>0?Math.min(200,Math.round(p.hrs/planH*100)):50;
+    return {cc:p.cc,prog:p.prog,val:p.hrs,monto:p.monto,docs:p.docs.size,cump,planH};
+  });
+  const totalTmHrs=tmData.reduce((s,d)=>s+d.val,0)||1;
+  const tmNorm=tmData.map(d=>({...d,val:d.val/totalTmHrs*TM_W*TM_H}));
+  const cells=tmSq(tmNorm,0,0,TM_W,TM_H);
+  function cumpBg(p){ return p>=90?'#0F6E56':p>=70?'#185FA5':p>=50?'#854F0B':'#A32D2D'; }
+  function cumpFg(p){ return p>=90?'#5DCAA5':p>=70?'#85B7EB':p>=50?'#EF9F27':'#F09595'; }
+  let tmHtml=`<div class="tm-wrap" style="height:${TM_H}px"><div class="tm-tooltip" id="tmTooltip2"></div>`;
+  cells.forEach(cell=>{
+    if(cell.w<4||cell.h<4) return;
+    const hrs=Math.round(cell.val*totalTmHrs/TM_W/TM_H);
+    tmHtml+=`<div class="tm-cell" style="left:${cell.x.toFixed(1)}px;top:${cell.y.toFixed(1)}px;width:${cell.w.toFixed(1)}px;height:${cell.h.toFixed(1)}px;background:${cumpBg(cell.cump)}"
+      onmouseenter="tmTip2(event,'${esc(cell.cc)}','${esc(abbr(cell.prog,40))}','${hrs}','${cell.cump}','${cell.docs}')"
+      onmouseleave="tmHide2()">
+      <div class="tm-label" style="height:${cell.h.toFixed(0)}px;overflow:hidden">
+        ${cell.w>60&&cell.h>28?`<div class="tm-lbl-cc" style="color:${cumpFg(cell.cump)}">${esc(cell.cc)}</div>`:''}
+        ${cell.h>46?`<div class="tm-lbl-hrs" style="color:#fff;font-size:${cell.w>80?14:10}px">${hrs}h</div>`:''}
+        ${cell.h>66?`<div class="tm-lbl-pct">${cell.cump}% cump.</div>`:''}
+      </div></div>`;
+  });
+  tmHtml+=`</div>`;
+
+  el.innerHTML=`
+  <div class="dvo-bottom-grid">
+    <div class="viz-section" style="margin:0">
+      <div class="viz-title"><div class="viz-ico" style="background:rgba(56,189,248,.1)">🕸</div>Radar — Desempeño multidimensional</div>
+      <div class="viz-sub">Top 5 programas · 5 dimensiones simultáneas</div>
+      <div class="radar-wrap">
+        ${rsvg}
+        <div class="radar-legend">${radarProgs.map((p,pi)=>`
+          <div class="radar-leg-item">
+            <div class="radar-leg-dot" style="background:${RCOLORS[pi]}"></div>
+            <span title="${esc(p.prog)}">${esc(p.cc)} — ${esc(abbr(p.prog,20))}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="viz-section" style="margin:0">
+      <div class="viz-title"><div class="viz-ico" style="background:rgba(16,185,129,.1)">📊</div>Cascada — Conciliación de horas</div>
+      <div class="viz-sub">Planificado → tipos de actividad → total declarado</div>
+      <div class="wf-wrap">${wfSvg}</div>
+      <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;font-size:9px">
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#38bdf8"></div>Base</div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(83,74,183,.8)"></div>Actividad</div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#34d399"></div>Excedente</div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#ef4444"></div>Déficit</div>
+      </div>
+    </div>
+  </div>
+  <div class="viz-section" style="margin-top:14px">
+    <div class="viz-title"><div class="viz-ico" style="background:rgba(245,158,11,.1)">🗺</div>Treemap — Peso de cada Centro de Costo</div>
+    <div class="viz-sub">Tamaño = horas declaradas · Color = nivel de cumplimiento · Hover para detalle</div>
+    ${tmHtml}
+    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+      ${[['≥90%','#0F6E56','Alto'],['70–89%','#185FA5','En línea'],['50–69%','#854F0B','Bajo'],['<50%','#A32D2D','Riesgo']].map(([rng,col,lbl])=>`
+      <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t2)">
+        <div style="width:10px;height:10px;border-radius:3px;background:${col};flex-shrink:0"></div>
+        <strong>${rng}</strong> ${lbl}
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function dvoExcel(){
+  if(!_dvoData.length){ showToast('Sin datos','warn'); return; }
+  const rows=_dvoData.map(r=>({
+    'CC':r.cc,'Programa':r.programa,'Docente':r.profesor,'Tipo Prof.':r.tipoProf,
+    'Tipo Actividad':r.tipoAct,'Actividad':r.nombre,'Mes':r.mes,
+    'Horas':r.horas,'Horas L-V':r.hrsLV,'Horas S-D':r.hrsSd,
+    'Precio Hora':Math.round(r.precioHr),'Monto':Math.round(r.monto),
+    'Honorario':r.honorario,'Sede':r.sede,
+  }));
+  var d=today().toLocaleDateString('es-CL').split('/').join('-');
+  DL.excel(rows,'Declarado_Analisis_'+d+'.xlsx');
+  showToast(rows.length+' registros exportados','ok');
+}
+
+function tmTip2(e,cc,prog,hrs,cump,docs){
+  const t=$('tmTooltip2'); if(!t) return;
+  t.style.display='block'; t.style.left=(e.clientX+12)+'px'; t.style.top=(e.clientY-10)+'px';
+  t.innerHTML='<div style="font-weight:800;color:var(--blue);margin-bottom:4px">CC '+esc(cc)+'</div>'
+    +'<div style="color:var(--t2);margin-bottom:6px;font-size:9px">'+esc(prog)+'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:3px">'
+    +'<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--t4)">Horas</span><strong>'+hrs+'h</strong></div>'
+    +'<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--t4)">Cumplimiento</span><strong style="color:'+(cump>=90?'#34d399':cump>=70?'#38bdf8':cump>=50?'var(--orange)':'#ef4444')+'">'+cump+'%</strong></div>'
+    +'<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--t4)">Docentes</span><strong>'+docs+'</strong></div>'
+    +'</div>';
+}
+function tmHide2(){ const t=$('tmTooltip2'); if(t) t.style.display='none'; }
+
+
 function renderCalendario() {
   const df=getDF();
   const now=new Date();
@@ -2905,31 +5208,24 @@ function renderCalendario() {
 
   $('page').innerHTML=`
   <div class="page-title">Calendario Académico</div>
-  <div class="frow">
-    <div class="fg"><span class="flabel">Año</span>
-      <select class="fsel" id="calY" onchange="updCal()">
-        <option value="">Todos</option>${years.map(y=>`<option value="${y}"${y===cy?' selected':''}>${y}</option>`).join('')}
-      </select>
-    </div>
-    <div class="fg"><span class="flabel">Mes</span>
-      <select class="fsel" id="calM" onchange="updCal()">
-        ${MLIST.map((m,i)=>`<option value="${i}"${i===now.getMonth()+1?' selected':''}>${m}</option>`).join('')}
-      </select>
-    </div>
-    ${mkDF('calC','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCalCascade()')}
-    ${mkDF('calP','Programa',   uniq(df.map(r=>r['PROGRAMA'])),'updCal()')}
+  <div class="frow" style="flex-wrap:wrap;gap:6px;margin-bottom:8px" id="calFiltros2"></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+    <button class="btn btn-ghost btn-sm" onclick="calPrevMes()">&#8249; Anterior</button>
+    <span id="calLabel" style="font-size:13px;font-weight:700;color:var(--t1);min-width:140px;text-align:center"></span>
+    <button class="btn btn-ghost btn-sm" onclick="calNextMes()">Siguiente &#8250;</button>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="calHoy()">Hoy</button>
   </div>
-  <div id="calGrid"></div>
-  <div style="border-top:1px solid var(--border);margin:16px 0"></div>
-  <div class="page-subtitle" id="calTitle">Agenda</div>
-  <div id="calDetail"></div>
-  <div class="btn-row">
-    <button class="btn btn-ghost btn-sm" onclick="DL.ics(_calDf,'calendario.ics')">📅 iCal</button>
-    <button class="btn btn-ghost btn-sm" onclick="DL.excel(_calDf,'agenda.xlsx')">📊 Excel</button>
-  </div>`;
+  <div id="calGrid"></div>`;
+
+  var cf2=document.getElementById('calFiltros2');
+  if(cf2) cf2.innerHTML=
+    mkDF('calC','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCalCascade()')+
+    mkDF('calP','Programa',    uniq(df.map(r=>r['PROGRAMA'])),'updCal()');
+
+  // Inicializar estado del calendario
+  if(!window._calState) window._calState={year:now.getFullYear(),month:now.getMonth()};
   updCal();
 }
-
 function updCalCascade() {
   const df=getDF();
   const sc=getDF_sel('calC');
@@ -3104,7 +5400,7 @@ function renderReservas() {
     <div class="fg"><span class="flabel">Mes</span>
       <select class="fsel" id="resM" onchange="updRes2()">${MLIST.map((m,i)=>`<option value="${i+1}"${i===now.getMonth()?' selected':''}>${m}</option>`).join('')}</select>
     </div>
-    ${mkDF('resSa','Sala',salas,'updRes2()')}
+    
   </div>
   <div id="resGrid"></div>
   <div style="border-top:1px solid var(--border);margin:14px 0"></div>
@@ -4485,6 +6781,222 @@ function enhanceMultiSelects(container){
 // Override refreshView to enhance selects after render
 const _origRefreshView = null; // will be set below
 
+
+function renderAuditoria(){
+  var pg=$('page'); if(!pg) return;
+  var df = APP.df; // datos del calendario cargado
+
+  // ── Calcular análisis en tiempo real ─────────────────────────────
+  // 1. Sin sala
+  var sinSala = df.filter(function(s){
+    var sala = String(s['SALA']||'').trim();
+    return !sala || sala==='' || sala.toLowerCase()==='none' || sala.toLowerCase()==='nan';
+  });
+
+  // 2. Solapamientos sala+fecha (distintos programas)
+  var sfMap = {};
+  df.forEach(function(s){
+    var sala = String(s['SALA']||'').trim().toUpperCase();
+    var fecha = s['DIAS/FECHAS'] ? fmtDate(s['DIAS/FECHAS']) : '';
+    if(!sala || !fecha) return;
+    var k = fecha+'||'+sala;
+    if(!sfMap[k]) sfMap[k]={fecha:fecha, sala:sala, progs:new Set()};
+    sfMap[k].progs.add(s['PROGRAMA']||'');
+  });
+  var solaps = Object.values(sfMap).filter(function(x){return x.progs.size>1;}).map(function(x){
+    return {fecha:x.fecha, sala:x.sala, programas:[...x.progs]};
+  });
+
+  // 3. Contratos: >2 sesiones por profesor en MISMO asignatura+programa
+  var conteoMap = {};
+  df.forEach(function(s){
+    var prof = String(s['PROFESOR']||'').trim();
+    var asig = String(s['ASIGNATURA']||'').trim();
+    var prog = String(s['PROGRAMA']||'').trim();
+    if(!prof || !asig || !prog) return;
+    var k = prof+'|||'+prog+'|||'+asig;
+    conteoMap[k] = (conteoMap[k]||0)+1;
+  });
+  var contratos = [];
+  Object.entries(conteoMap).forEach(function(e){
+    if(e[1]>2){
+      var parts = e[0].split('|||');
+      contratos.push({profesor:parts[0], programa:parts[1], asignatura:parts[2], sesiones:e[1]});
+    }
+  });
+  contratos.sort(function(a,b){return b.sesiones-a.sesiones;});
+
+  var st = {
+    total_sesiones:       df.length,
+    total_sin_sala:       sinSala.length,
+    total_solapamientos:  solaps.length,
+    total_contratos:      contratos.length,
+    total_topes:          0,
+    total_feriados:       0,
+  };
+
+  // Guardar en _AUDIT para que las sub-funciones los usen
+  _AUDIT.sinSala_calc    = sinSala;
+  _AUDIT.solaps_calc     = solaps;
+  _AUDIT.contratos_calc  = contratos;
+  _AUDIT.stats_calc      = st;
+
+  if(!df.length){
+    pg.innerHTML='<div class="pg-title">Auditoría Académica</div>'
+      +'<div class="banner b-info" style="margin-top:16px">Carga el archivo académico (sidebar izquierdo) para ver el análisis de auditoría.</div>';
+    return;
+  }
+
+  // KPIs
+  var kpis=[
+    {lbl:'Contratos a emitir', val:st.total_contratos,    color:'#38bdf8', ico:'📄', sub:'>2 ses. mismo curso'},
+    {lbl:'Sesiones sin sala',  val:st.total_sin_sala,     color:'#ef4444', ico:'🏫', sub:'de '+st.total_sesiones+' totales'},
+    {lbl:'Solapamientos sala', val:st.total_solapamientos,color:'var(--orange)', ico:'⚠️', sub:'misma sala, distintos progs'},
+    {lbl:'Total sesiones',     val:st.total_sesiones,     color:'var(--green)', ico:'📊', sub:new Set(df.map(function(r){return r['PROGRAMA'];})).size+' programas'},
+  ];
+
+  var kpiHtml='<div class="aud-kpi-row">';
+  kpis.forEach(function(k){
+    kpiHtml+='<div class="aud-kpi">'
+      +'<div class="aud-kpi-ico">'+k.ico+'</div>'
+      +'<div class="aud-kpi-lbl">'+k.lbl+'</div>'
+      +'<div class="aud-kpi-val" style="color:'+k.color+'">'+fmt(k.val)+'</div>'
+      +'<div class="aud-kpi-sub">'+k.sub+'</div>'
+      +'</div>';
+  });
+  kpiHtml+='</div>';
+
+  pg.innerHTML='<div class="pg-title">Auditoría Académica</div>'
+    +'<div style="font-size:11px;color:var(--t3);margin-bottom:16px">Análisis calculado desde el calendario cargado · '+st.total_sesiones+' sesiones · '+new Set(df.map(function(r){return r['PROGRAMA'];})).size+' programas</div>'
+    +kpiHtml
+    +'<div class="aud-tabs">'
+    +'<button class="aud-tab active" onclick="audTab(0)">📄 Contratos ('+st.total_contratos+')</button>'
+    +'<button class="aud-tab" onclick="audTab(1)">🏫 Sin Sala ('+st.total_sin_sala+')</button>'
+    +'<button class="aud-tab" onclick="audTab(2)">⚠️ Solapamientos ('+st.total_solapamientos+')</button>'
+    +'</div>'
+    +'<div id="audBody"></div>';
+
+  audTab(0);
+}
+
+
+function audTab(idx){
+  var tabs=document.querySelectorAll('.aud-tab');
+  tabs.forEach(function(t,i){ t.classList.toggle('active', i===idx); });
+  var el=document.getElementById('audBody'); if(!el) return;
+  if(idx===0) _audContratos(el);
+  else if(idx===1) _audSinSala(el);
+  else _audTopes(el);
+}
+
+
+function _audContratos(el){
+  var data=_AUDIT.contratos_calc||[];
+  if(!data.length){ el.innerHTML='<div class="aud-empty">Sin contratos a emitir con los datos cargados.</div>'; return; }
+  var maxSes=data.reduce(function(m,c){return Math.max(m,c.sesiones);},1);
+  var html='<div class="aud-panel">'
+    +'<div class="aud-panel-title">Declaración de Contratos<span style="font-size:9px;color:var(--t4)">'+data.length+' contratos</span></div>'
+    +'<div class="aud-panel-sub">Regla estricta: <strong>más de 2 sesiones del mismo docente en la misma asignatura y programa</strong>. Sesiones de cursos distintos no se acumulan.</div>'
+    +'<input class="aud-search" placeholder="Buscar docente o asignatura..." oninput="_audFilter(this,\'audContratosTable\')">'
+    +'<div style="overflow-x:auto"><table class="aud-table" id="audContratosTable">'
+    +'<thead><tr><th>Docente</th><th>Asignatura</th><th>Programa</th><th style="text-align:center">Sesiones</th><th style="text-align:center">Acción</th></tr></thead><tbody>';
+  data.forEach(function(c){
+    var pct=Math.round(c.sesiones/maxSes*100);
+    html+='<tr>'
+      +'<td style="font-weight:600;color:var(--t1);white-space:nowrap">'+esc(c.profesor||'Sin nombre')+'</td>'
+      +'<td>'+esc(abbr(c.asignatura,38))+'</td>'
+      +'<td style="color:var(--t4);font-size:10px">'+esc(abbr(c.programa,42))+'</td>'
+      +'<td style="text-align:center">'
+        +'<div style="font-weight:800;color:#38bdf8">'+c.sesiones+'</div>'
+        +'<div class="aud-prog-bar" style="width:60px;margin:3px auto 0"><div class="aud-prog-fill" style="width:'+pct+'%;background:#38bdf8"></div></div>'
+      +'</td>'
+      +'<td style="text-align:center"><span class="aud-badge aud-badge-blue">📄 EMITIR CONTRATO</span></td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function _audTopes(el){
+  var data=_AUDIT.solaps_calc||[];
+  if(!data.length){ el.innerHTML='<div class="aud-empty">✓ Sin solapamientos de sala detectados.</div>'; return; }
+  var html='<div class="aud-panel">'
+    +'<div class="aud-panel-title">Solapamientos de Sala <span style="font-size:9px;color:var(--t4)">'+data.length+' conflictos</span></div>'
+    +'<div class="aud-panel-sub">Misma sala asignada a distintos programas en la misma fecha.</div>'
+    +'<div style="overflow-x:auto"><table class="aud-table">'
+    +'<thead><tr><th>Fecha</th><th>Sala</th><th>Programas en conflicto</th></tr></thead><tbody>';
+  data.forEach(function(t){
+    html+='<tr>'
+      +'<td style="white-space:nowrap;font-weight:600">'+esc(t.fecha)+'</td>'
+      +'<td><span class="aud-badge aud-badge-amber">'+esc(t.sala)+'</span></td>'
+      +'<td style="font-size:10px;color:var(--t2)">'+t.programas.map(function(p){return esc(abbr(p,40));}).join(' &nbsp;/&nbsp; ')+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function _audSinSala(el){
+  var df=_AUDIT.sinSala_calc||[];
+  if(!df.length){ el.innerHTML='<div class="aud-empty">✓ Todas las sesiones tienen sala asignada.</div>'; return; }
+  // Agrupar por programa
+  var byProg={};
+  df.forEach(function(s){
+    var p=String(s['PROGRAMA']||'Sin programa').trim();
+    var coord=String(s['COORDINADORA RESPONSABLE']||'').trim();
+    if(!byProg[p]) byProg[p]={n:0,coord:coord};
+    byProg[p].n++;
+  });
+  var entries=Object.entries(byProg).sort(function(a,b){return b[1].n-a[1].n;});
+  var maxN=entries[0]?entries[0][1].n:1;
+  var html='<div class="aud-panel">'
+    +'<div class="aud-panel-title">Sesiones sin Sala Asignada <span style="font-size:9px;color:var(--t4)">'+df.length+' sesiones · '+entries.length+' programas</span></div>'
+    +'<div class="aud-panel-sub">Requieren sala antes de su fecha de ejecución.</div>'
+    +'<input class="aud-search" placeholder="Buscar programa..." oninput="_audFilter(this,\'audSinSalaTable\')">'
+    +'<div style="overflow-x:auto"><table class="aud-table" id="audSinSalaTable">'
+    +'<thead><tr><th>Programa</th><th>Coordinadora</th><th style="text-align:right">Sin sala</th><th>Proporción</th></tr></thead><tbody>';
+  entries.forEach(function(e){
+    var prog=e[0], d=e[1];
+    var pct=Math.round(d.n/maxN*100);
+    html+='<tr>'
+      +'<td style="font-weight:600;color:var(--t1)">'+esc(abbr(prog,48))+'</td>'
+      +'<td style="color:var(--t4);font-size:10px">'+esc(d.coord||'—')+'</td>'
+      +'<td style="text-align:right"><strong style="color:#ef4444">'+d.n+'</strong></td>'
+      +'<td style="min-width:120px"><div class="aud-prog-bar"><div class="aud-prog-fill" style="width:'+pct+'%;background:#ef4444"></div></div></td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function _audFeriados(el){
+  var data=_AUDIT.feriados;
+  if(!data.length){ el.innerHTML='<div class="aud-empty">Sin sesiones en feriados detectadas. ✓</div>'; return; }
+  var html='<div class="aud-panel">'
+    +'<div class="aud-panel-title">Sesiones en Días Feriados <span style="font-size:9px;color:var(--t4)">'+data.length+' sesiones</span></div>'
+    +'<div class="aud-panel-sub">Sesiones programadas en días marcados como feriado en la propuesta académica.</div>'
+    +'<div style="overflow-x:auto"><table class="aud-table">'
+    +'<thead><tr><th>Fecha</th><th>Asignatura</th><th>Programa</th></tr></thead><tbody>';
+  data.forEach(function(f){
+    html+='<tr>'
+      +'<td style="white-space:nowrap;font-weight:600">'+esc(f.fecha)+'</td>'
+      +'<td>'+esc(abbr(f.asig,40))+'</td>'
+      +'<td style="color:var(--t4);font-size:10px">'+esc(abbr(f.prog,45))+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function _audFilter(input, tableId){
+  var q=input.value.toLowerCase();
+  var rows=document.getElementById(tableId);
+  if(!rows) return;
+  Array.from(rows.querySelectorAll('tbody tr')).forEach(function(tr){
+    tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+
 function init(){
   wireUpload('fiMain','main');
   wireUpload('fiRes','res');
@@ -4585,4 +7097,3 @@ document.addEventListener('DOMContentLoaded', init);
 
 </body>
 </html>
-
