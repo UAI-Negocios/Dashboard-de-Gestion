@@ -942,7 +942,7 @@ const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
   programas:    ['resumen','calidad','declaracion','coherencia','declarado'],
   calendarios:  ['calendario','reservas'],
-  planificador: ['plancursos','malla'],
+  planificador: ['plancursos','malla','planreporte'],
   admin:        ['gestion','turnos','validaciones','auditoria'],
   ayuda:        ['manual','faqs'],
 };
@@ -967,6 +967,7 @@ const TAB_LABELS = {
   auditoria:    'Auditoría',
   plancursos:   'Planificador General',
   malla:        'Malla Curricular',
+  planreporte:   'Reporte Planificaciones',
   manual:       'Manual',
   faqs:         'FAQs',
 };
@@ -1797,7 +1798,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -1820,6 +1821,7 @@ function refreshView() {
     auditoria:    renderAuditoria,
     plancursos:   renderPlanificador,
     malla:        renderMalla,
+  planreporte:   renderPlanReporte,
     manual:       renderManual,
     faqs:         renderFAQs,
   };
@@ -4231,6 +4233,560 @@ function buildProgDetail(rows){
 /* ══════════════════════════════════════════════════════
    ANÁLISIS DE COHERENCIA — Ejecución vs Planificación
 ══════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PROGRAMAS → DECLARADO VS. OBLIGACIÓN
+   Tab 1: Declaraciones cargadas (Excel dinámico)
+   Tab 2: Pendientes de declarar (cruce plan 2026 vs declarado)
+   Tab 3: Comparador por docente
+═══════════════════════════════════════════════════════════════ */
+
+// ── Plan 2026 vs Declarado (precalculado) ─────────────────────
+const _DH = [{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"10694182","docente":"PÁEZ, AMALIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"10694182","docente":"PÁEZ, AMALIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"10694182","docente":"PÁEZ, AMALIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"10721301","docente":"CONTRERAS, PAOLA CECILIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"10721301","docente":"CONTRERAS, PAOLA CECILIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"10721301","docente":"CONTRERAS, PAOLA CECILIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"10911347","docente":"VIVES, LUIS ALIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"10911347","docente":"VIVES, LUIS ALIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"10911347","docente":"VIVES, LUIS ALIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"11472054","docente":"ALONSO, LEONARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"11472054","docente":"ALONSO, LEONARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"11472054","docente":"ALONSO, LEONARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"11639847","docente":"MASSON, PAOLA MARIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"11639847","docente":"MASSON, PAOLA MARIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"11639847","docente":"MASSON, PAOLA MARIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"12466722","docente":"THODES, MARÍA JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"12466722","docente":"THODES, MARÍA JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"12466722","docente":"THODES, MARÍA JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"13713243","docente":"NALLI, LISSETTE ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"13713243","docente":"NALLI, LISSETTE ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"13713243","docente":"NALLI, LISSETTE ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"15312775","docente":"SALAZAR, CRISTIAN ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"15312775","docente":"SALAZAR, CRISTIAN ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"15312775","docente":"SALAZAR, CRISTIAN ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"LAB101","asig":"LABORATORIOS","rut":"8028910","docente":"FUENZALIDA, PABLO ANDRÉS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE440","asig":"COACHING EJECUTIVO","rut":"8028910","docente":"FUENZALIDA, PABLO ANDRÉS","hrsPlan":0.0,"hrsDecl":14.0,"diff":-14.0,"cumplPct":1400.0,"declarado":true,"monto":1260000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE795","asig":"LABORATORIO DE CIERRE","rut":"8028910","docente":"FUENZALIDA, PABLO ANDRÉS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"LAB101","asig":"LABORATORIOS","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE440","asig":"COACHING EJECUTIVO","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":0.0,"hrsDecl":6.0,"diff":-6.0,"cumplPct":600.0,"declarado":true,"monto":840000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE795","asig":"LABORATORIO DE CIERRE","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"10331530","docente":"CELIS, ALEJANDRO EDUARDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER765","asig":"COMPLIANCE Y DERECHO","rut":"12247648","docente":"GAJARDO, CARLOS EDUARDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DPR441","asig":"GESTIÓN DE RIESGOS CORPORATIVOS Y SISTEMA DE CONTROL INTERNO","rut":"12810916","docente":"DÍAZ, MIGUEL ANGEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"12866387","docente":"MUÑOZ, ANA MARÍA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"13433119","docente":"DEL VILLAR, LUCAS IGNACIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER764","asig":"COMPLIANCE Y LIBRE COMPETENCIA","rut":"15377147","docente":"BORQUEZ, FRANCISCO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"15635996","docente":"ECHEVERRÍA, PEDRO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DIS819","asig":"SOSTENIBILIDAD Y GOBIERNO CORPORATIVO","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"MGT414","asig":"INTRODUCCIÓN","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":4.0,"hrsDecl":0.0,"diff":4.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER750","asig":"FRAUDE CORPORATIVO: PREVENCIÓN, DETECCIÓN E INVESTIGACIÓN","rut":"17329454","docente":"ZAMORA, REBECA CONCEPCIÓN","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"PSO106","asig":"Taller de Integración","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":4.0,"hrsDecl":0.0,"diff":4.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"8229895","docente":"PUMARINO, AUGUSTO ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN513","asig":"PERSPECTIVA APRENDIZAJE Y CRECIMIENTO BSC","rut":"12484626","docente":"CORONADO, FREDDY CHRISTIAN","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT393","asig":"MAPAS ESTRATÉGICOS Y BSC","rut":"12484626","docente":"CORONADO, FREDDY CHRISTIAN","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT761","asig":"INTRODUCCIÓN AL CONTROL DE GESTIÓN","rut":"12484626","docente":"CORONADO, FREDDY CHRISTIAN","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT483","asig":"ESTRATEGIA COMPETITIVA","rut":"12684239","docente":"INZUNZA, ALEJANDRO RODRIGO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"PLE451","asig":"TALLER DE COMUNICACIÓN EFECTIVA","rut":"14244218","docente":"MORGADO, MARÍA SOLEDAD","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN512","asig":"PERSPECTIVA CLIENTES BSC","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MKT429","asig":"BUSINESS INTELLIGENCE","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN515","asig":"TALLER DE ANÁLISIS FINANCIERO:INTERPRETANDO LA CREACIÓN DE VALOR","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN848","asig":"TOOLKIT FINANCIERO: CUÁLES, CUÁNDO Y POR QUÉ?","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT758","asig":"PROCESOS DE NEGOCIOS Y DRIVERS DE VALOR","rut":"27994566","docente":"VAN DE, JÖEL JORIS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF BL2026_2026/1","cc":"8969","sigla":"FIN102","asig":"TALLER DE HERRAMIENTAS ANALÍTICAS PARA FINANZAS","rut":"11599752","docente":"ZULETA, JAVIER FERNANDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF BL2026_2026/1","cc":"8969","sigla":"PLE436","asig":"TALLER DE INTEGRACIÓN","rut":"13074292","docente":"GORMAZ, NAISA CORINA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN404","asig":"ADMINISTRACIÓN DE INSTRUMENTO DE INTERMEDIACIÓN FINANCIERA","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN406","asig":"VALUACIÓN Y ANÁLISIS DE TÍTULOS DE RENTA FIJA","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN408","asig":"VALUACIÓN FORWARDS FUTUROS Y SWAPS","rut":"10588239","docente":"SANTIBÁÑEZ, FRANCISCO ANDRÉS JULIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN102","asig":"TALLER DE HERRAMIENTAS ANALÍTICAS PARA FINANZAS","rut":"11599752","docente":"ZULETA, JAVIER FERNANDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"PLE436","asig":"TALLER DE INTEGRACIÓN","rut":"13074292","docente":"GORMAZ, NAISA CORINA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"ECO437","asig":"ANÁLISIS MACROECONÓMICO","rut":"16018265","docente":"BERGER, FELIPE IGNACIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN405","asig":"VALUACIÓN Y ANÁLISIS ACCIONARIO","rut":"24432281","docente":"PÉREZ, JOAQUÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN400","asig":"CONTABILIDAD FINANCIERA Y ANÁLISIS DE ESTADOS FINANCIEROS","rut":"6970793","docente":"NIÑO, JORGE ENRIQUE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN402","asig":"FINANZAS CORPORATIVAS","rut":"7129878","docente":"CASTILLO, AUGUSTO OCTAVIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN531","asig":"VALUACIÓN DE OPCIONES","rut":"8769661","docente":"ESCOBAR, CARLOS JORGE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN565","asig":"GESTIÓN FINANCIERA DE LAS NECESIDADES OPERATIVAS DE FONDOS","rut":"8850854","docente":"ZURITA, SALVADOR","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE408","asig":"GESTIÓN DEL DESEMPEÑO Y COMPENSACIONES","rut":"10335414","docente":"DE LA CARRERA, MARÍA CONSTANZA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE404","asig":"TRABAJO Y GESTIÓN EN LA ERA DIGITAL","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE406","asig":"ATRACCIÓN, INTEGRACIÓN Y DESARROLLO DE PERSONAS","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE408","asig":"GESTIÓN DEL DESEMPEÑO Y COMPENSACIONES","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE406","asig":"ATRACCIÓN, INTEGRACIÓN Y DESARROLLO DE PERSONAS","rut":"10709486","docente":"LARA, RODRIGO FERNANDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"11493276","docente":"POLIZZI, PATRICIO ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE203","asig":"TALLER DE COMPETENCIAS LABORALES","rut":"11530619","docente":"BARROS, EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE406","asig":"ATRACCIÓN, INTEGRACIÓN Y DESARROLLO DE PERSONAS","rut":"11530619","docente":"BARROS, EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE408","asig":"GESTIÓN DEL DESEMPEÑO Y COMPENSACIONES","rut":"11530619","docente":"BARROS, EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"11628393","docente":"UNANUE, WENCESLAO MARIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE404","asig":"TRABAJO Y GESTIÓN EN LA ERA DIGITAL","rut":"12467176","docente":"VALDIVIESO, FELIPE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE205","asig":"TALLER COMPETENCIAS PARA DIRIGIR EQUIPOS DE TRABAJO","rut":"13077977","docente":"MADRID, HÉCTOR PABLO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"MGT406","asig":"TALLER DE HABILIDADES EN CONSULTORÍA","rut":"6926362","docente":"FUENZALIDA, RODRIGO JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE799","asig":"TALLER DE GESTIÓN DE SÍ MISMO","rut":"6926362","docente":"FUENZALIDA, RODRIGO JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE404","asig":"TRABAJO Y GESTIÓN EN LA ERA DIGITAL","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE546","asig":"TALLER DE ON BOARDING E INTEGRACIÓN","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"9529160","docente":"LIZAMA, LUIS GUILLERMO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"PLE324","asig":"TALLER OPTIMIZACIÓN PERFIL RRSS DE NEGOCIOS","rut":"12721185","docente":"CASTRO, PATRICIO JOSÉ","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"PLE412","asig":"LIDERAZGO DE EQUIPOS COMERCIALES DE ALTO DESEMPEÑO","rut":"13074292","docente":"GORMAZ, NAISA CORINA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"MGT417","asig":"TALLER DE HABILIDADES EFECTIVAS DE VENTA","rut":"15357467","docente":"CÁRDENAS, PÍA","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"MGT485","asig":"TALLER DE INNOVACIÓN","rut":"15640637","docente":"MUSIC, DANICA","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"TICS449","asig":"E-COMMERCE","rut":"15819247","docente":"ESPINOZA, JAIME ANDRES","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"PLE401","asig":"DIRECCIÓN DE PERSONAS","rut":"10371345","docente":"QUEZADA, ARIEL OSVALDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"DER422","asig":"DERECHO Y NEGOCIOS","rut":"12265463","docente":"LEÓN, RODRIGO AVELINO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"DER422","asig":"DERECHO Y NEGOCIOS","rut":"13233011","docente":"HUMPHREYS, PATRICK ALEXANDER","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"DER422","asig":"DERECHO Y NEGOCIOS","rut":"13432721","docente":"GUIDI, CATERINA MARÍA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"PLE428","asig":"COMUNICACIÓN EFECTIVA PARA LA GESTIÓN","rut":"14244218","docente":"MORGADO, MARÍA SOLEDAD","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MKT400","asig":"GESTIÓN DE MARKETING","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT030","asig":"EMPRESA Y SOCIEDAD: VISIÓN ESTRATÉGICA","rut":"24615144","docente":"CASARÍN, ARIEL ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"FIN401","asig":"INFORMACIÓN CONTABLE FINANCIERA PARA LA TOMA DE DECISIONES","rut":"6970793","docente":"NIÑO, JORGE ENRIQUE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"FIN535","asig":"ANÁLISIS FINANCIERO PARA LA GESTIÓN","rut":"6970793","docente":"NIÑO, JORGE ENRIQUE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT402","asig":"PROYECTO INTEGRADOR I","rut":"7274041","docente":"CÁNEPA, PABLO LUIS","hrsPlan":150.0,"hrsDecl":0.0,"diff":150.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"7274041","docente":"CÁNEPA, PABLO LUIS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT031","asig":"BOOTCAMP","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT401","asig":"EVALUACIÓN DE PROYECTOS","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT402","asig":"PROYECTO INTEGRADOR I","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":150.0,"hrsDecl":0.0,"diff":150.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"9793726","docente":"ANICH, NICOLÁS ENRIQUE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM00668","asig":"SUSTAINABILITY","rut":"10929862","docente":"VERCELLI, DANIEL","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM901","asig":"EXPERIENCE","rut":"12237455","docente":"LÓPEZ, CLAUDIO ALBERTO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM581","asig":"BEHAVIOUR","rut":"13633842","docente":"RIESLE, TATIANA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"DTS100","asig":"MINING","rut":"13830778","docente":"FRITIS, NICOLAS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MGT128","asig":"STRATEGY","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM400","asig":"INSIGHTS","rut":"15030833","docente":"ARAYA, LUIS ANDRÉS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"FIN300","asig":"VALUE","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MGT435","asig":"ALINEAMIENTO ESTRATÉGICO","rut":"6374433","docente":"SINN, MARÍA FRANCISCA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DLC 2026_2026/1","cc":"8994","sigla":"PLE510","asig":"COACHING INDIVIDUAL I","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":8.0,"hrsDecl":25.0,"diff":-17.0,"cumplPct":312.5,"declarado":true,"monto":4929082.740999999,"docProg":"NO","cerrada":"NO","mesIni":"Enero","mesFin":"Diciembre"},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MACH223","asig":"PROYECTO FINAL","rut":"12721185","docente":"CASTRO, PATRICIO JOSÉ","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00925","asig":"PAID MEDIA","rut":"17105356","docente":"BARRIOS, NICOLÁS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MACH223","asig":"PROYECTO FINAL","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00927","asig":"INTELIGENCIA ARTIFICIAL PARA EL MARKETING","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00928","asig":"ANALÍTICA DIGITAL","rut":"17346191","docente":"ROJAS, CAROLINA ALEJANDRA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT896","asig":"E-COMMERCE","rut":"17457221","docente":"Sanhueza, Luciano Fernando","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00926","asig":"SOCIAL MEDIA","rut":"17754052","docente":"RUETE, MARTIN PABLO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT896","asig":"E-COMMERCE","rut":"17815615","docente":"SILVA, SEBASTIÁN","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00924","asig":"MARKETING Y OPTIMIZACIÓN EN BUSCADORES: SEO Y SEM","rut":"26827822","docente":"RENDÓN, ORIAN","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"10715194","docente":"ESCANDÓN, FELIPE ANDRÉS","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"12025098","docente":"HERMOSILLA, MARÍA PAZ","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"12684239","docente":"INZUNZA, ALEJANDRO RODRIGO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"15320784","docente":"MUSA, MIGUEL ÁNGEL","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"17248137","docente":"ARACENA, CLAUDIO FELIPE","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI103","asig":"EJECUCIÓN Y ALINEAMIENTO DE PROYECTOS CON INTELIGENCIA ARTIFICIAL","rut":"20181578","docente":"HAPPEY, BEJAMIN MATHEW","hrsPlan":240.0,"hrsDecl":0.0,"diff":240.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"22091655","docente":"VERA, TOMÁS","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI103","asig":"EJECUCIÓN Y ALINEAMIENTO DE PROYECTOS CON INTELIGENCIA ARTIFICIAL","rut":"7909615","docente":"JAPKE, MARCO ANTONIO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS001","asig":"ENTENDIENDO LOS NEGOCIOS Y SU ENTORNO GLOBAL","rut":"0","docente":"ALVAREZ, MARIA GABRIELA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS009","asig":"IMPULSANDO LA INNOVACIÓN Y EFICIENCIA DEL GASTO","rut":"0","docente":"CARRAL, MARIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"13054130","docente":"CUADRA, REINALDO CARLOS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS001","asig":"ENTENDIENDO LOS NEGOCIOS Y SU ENTORNO GLOBAL","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS003","asig":"BASES FINANCIERAS PARA COMPRADORES","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS006","asig":"IMPLEMENTANDO LA TRANSFORMACIÓN","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS007","asig":"TRABAJO FINAL CATEGORY PLAN","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS008","asig":"GENERANDO VENTAJAS COMPETITIVAS SOSTENIBLES","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS009","asig":"IMPULSANDO LA INNOVACIÓN Y EFICIENCIA DEL GASTO","rut":"23359931","docente":"KOBERG, ESTEBAN FRANCISCO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS003","asig":"BASES FINANCIERAS PARA COMPRADORES","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS008","asig":"GENERANDO VENTAJAS COMPETITIVAS SOSTENIBLES","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"23982958","docente":"RODRÍGUEZ, DIEGO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS006","asig":"IMPLEMENTANDO LA TRANSFORMACIÓN","rut":"24942932","docente":"RIBBI, CLELIA ALIDA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS001","asig":"ENTENDIENDO LOS NEGOCIOS Y SU ENTORNO GLOBAL","rut":"7013908","docente":"MAGENDZO, IGNACIO IGAL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS009","asig":"IMPULSANDO LA INNOVACIÓN Y EFICIENCIA DEL GASTO","rut":"9097240","docente":"TRASLAVIÑA, JAVIER ALBERTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER767","asig":"BASE JURÍDICA","rut":"10346527","docente":"SOTO, EDMUNDO EDGARDO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER852","asig":"IMPUESTO A LAS VENTAS Y SERVICIOS - IVA","rut":"10346527","docente":"SOTO, EDMUNDO EDGARDO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER853","asig":"FISCALIZACIONES Y ACTUACIONES DEL SII","rut":"10346527","docente":"SOTO, EDMUNDO EDGARDO","hrsPlan":8.0,"hrsDecl":0.0,"diff":8.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER766","asig":"RENTAS DE TRABAJO","rut":"10545922","docente":"PEÑALOZA, MAURICIO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER761","asig":"ASPECTOS TRIBUTARIOS DE LA REORGANIZACIÓN EMPRESARIAL Y FISCALIZACIONES Y ACTUACIONES DEL SII","rut":"11837206","docente":"DELCORTO, CHRISTIAN RICARDO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER757","asig":"IMPUESTO A LA RENTA DE LAS EMPRESAS","rut":"16142068","docente":"GONZÁLEZ, LUIS ALBERTO","hrsPlan":40.0,"hrsDecl":0.0,"diff":40.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"ACCT429","asig":"BASE CONTABLE","rut":"16662054","docente":"MARTÍNEZ, NICOLÁS ANTONIO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"PLE436","asig":"TALLER DE INTEGRACIÓN","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER852","asig":"IMPUESTO A LAS VENTAS Y SERVICIOS - IVA","rut":"8749139","docente":"ALTAMIRANO, JULIA MARGARITA","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER757","asig":"IMPUESTO A LA RENTA DE LAS EMPRESAS","rut":"9383128","docente":"CORNEJO, JUAN IGNACIO","hrsPlan":40.0,"hrsDecl":0.0,"diff":40.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER762","asig":"TRIBUTACIÓN INTERNACIONAL Y PRECIOS DE TRANSFERENCIA","rut":"9383128","docente":"CORNEJO, JUAN IGNACIO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN849","asig":"FINANZAS CONDUCTUALES","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"10667679","docente":"BUSTAMANTE, GONZALO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"MGT479","asig":"ESTRUCTURA SOCIETARIA Y GOBIERNO CORPORATIVO","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN443","asig":"ADMINISTRACIÓN DE RIESGO FINANCIERO","rut":"12517400","docente":"ABARCA, ANA MARÍA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12722417","docente":"JOBET, JUAN CARLOS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"FIN456","asig":"ADMINISTRACIÓN DE CARTERAS DE INVERSIÓN","rut":"12852834","docente":"CASTAÑEDA, PABLO","hrsPlan":90.0,"hrsDecl":4.0,"diff":86.0,"cumplPct":4.4,"declarado":true,"monto":1047052.68,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Mayo"},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"FIN788","asig":"MERCADOS DE CAPITALES","rut":"12884051","docente":"MURÚA, PEDRO ANTONIO","hrsPlan":60.0,"hrsDecl":14.0,"diff":46.0,"cumplPct":23.3,"declarado":true,"monto":1260000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN847","asig":"CONTABILIDAD DE COBERTURA","rut":"13623679","docente":"CONCHA, CHRISTIAN EDUARDO","hrsPlan":60.0,"hrsDecl":4.0,"diff":56.0,"cumplPct":6.7,"declarado":true,"monto":380000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF  BL2025_2026/2","cc":"6047","sigla":"FIN901","asig":"MONEDAS DIGITALES","rut":"15320784","docente":"MUSA, MIGUEL ÁNGEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"15637190","docente":"TORRES, JUAN PABLO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"15959910","docente":"VALENZUELA, GABRIEL ANTONIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN464","asig":"FUSIONES Y ADQUISICIONES","rut":"24432281","docente":"PÉREZ, JOAQUÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"24615144","docente":"CASARÍN, ARIEL ANDRÉS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"7018223","docente":"COWAN, KEVIN NOEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN859","asig":"NEGOCIACIÓN FINANCIERA","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN900","asig":"INVERSIONES EN ACTIVOS ALTERNATIVOS","rut":"8351880","docente":"MANZUR, RODRIGO LEONARDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"DER424","asig":"TRIBUTACIÓN Y EMPRESA","rut":"9500084","docente":"RENCORET, ERNESTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN849","asig":"FINANZAS CONDUCTUALES","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"10667679","docente":"BUSTAMANTE, GONZALO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"12086166","docente":"TORRES, JUAN PABLO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"MGT479","asig":"ESTRUCTURA SOCIETARIA Y GOBIERNO CORPORATIVO","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN443","asig":"ADMINISTRACIÓN DE RIESGO FINANCIERO","rut":"12517400","docente":"ABARCA, ANA MARÍA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12722417","docente":"JOBET, JUAN CARLOS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN456","asig":"ADMINISTRACIÓN DE CARTERAS DE INVERSIÓN","rut":"12852834","docente":"CASTAÑEDA, PABLO","hrsPlan":90.0,"hrsDecl":4.0,"diff":86.0,"cumplPct":4.4,"declarado":true,"monto":1047052.68,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Mayo"},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN788","asig":"MERCADOS DE CAPITALES","rut":"12884051","docente":"MURÚA, PEDRO ANTONIO","hrsPlan":60.0,"hrsDecl":14.0,"diff":46.0,"cumplPct":23.3,"declarado":true,"monto":1260000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN847","asig":"CONTABILIDAD DE COBERTURA","rut":"13623679","docente":"CONCHA, CHRISTIAN EDUARDO","hrsPlan":60.0,"hrsDecl":4.0,"diff":56.0,"cumplPct":6.7,"declarado":true,"monto":380000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"15959910","docente":"VALENZUELA, GABRIEL ANTONIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN901","asig":"MONEDAS DIGITALES","rut":"16155314","docente":"PEREIRA, CRISTÓBAL ROBERTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN464","asig":"FUSIONES Y ADQUISICIONES","rut":"24432281","docente":"PÉREZ, JOAQUÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"24615144","docente":"CASARÍN, ARIEL ANDRÉS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"7018223","docente":"COWAN, KEVIN NOEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN859","asig":"NEGOCIACIÓN FINANCIERA","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN900","asig":"INVERSIONES EN ACTIVOS ALTERNATIVOS","rut":"8351880","docente":"MANZUR, RODRIGO LEONARDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"DER424","asig":"TRIBUTACIÓN Y EMPRESA","rut":"9500084","docente":"RENCORET, ERNESTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"MGT475","asig":"ESTRATEGIA Y GESTIÓN DE EMPRESA","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE435","asig":"DIAGNÓSTICO Y ADMINISTRACIÓN DEL CAMBIO","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE467","asig":"LIDERAZGO","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE469","asig":"FUNDAMENTOS DEL COMPORTAMIENTO: PERSONA Y ORGANIZACIÓN","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE473","asig":"TRABAJO DE GRADO","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE467","asig":"LIDERAZGO","rut":"13077977","docente":"MADRID, HÉCTOR PABLO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"MGT475","asig":"ESTRATEGIA Y GESTIÓN DE EMPRESA","rut":"6374433","docente":"SINN, MARÍA FRANCISCA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE435","asig":"DIAGNÓSTICO Y ADMINISTRACIÓN DEL CAMBIO","rut":"6926362","docente":"FUENZALIDA, RODRIGO JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"MGT475","asig":"ESTRATEGIA Y GESTIÓN DE EMPRESA","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE467","asig":"LIDERAZGO","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE469","asig":"FUNDAMENTOS DEL COMPORTAMIENTO: PERSONA Y ORGANIZACIÓN","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE473","asig":"TRABAJO DE GRADO","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PHIL427","asig":"ÉTICA Y RESPONSABILIDAD SOCIAL EMPRESARIAL - NEGOCIO SUSTENTABLE","rut":"0","docente":"MESEGUER, VÍCTOR","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PLE848","asig":"LIDERAZGO","rut":"13233971","docente":"BRAVO, DIEGO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT545","asig":"ANALÍTICA DE DATOS PARA LA GESTIÓN","rut":"14111335","docente":"CARVAJAL, RODOLFO ANGHELLO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT917","asig":"PROYECTO INTEGRADOR II","rut":"14503820","docente":"BULGARINI, ROBERTO EMILIO","hrsPlan":300.0,"hrsDecl":0.0,"diff":300.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PHIL427","asig":"ÉTICA Y RESPONSABILIDAD SOCIAL EMPRESARIAL - NEGOCIO SUSTENTABLE","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MKT456","asig":"DESARROLLO DE NUEVOS MERCADOS","rut":"21609510","docente":"BILANCIO, GUILLERMO HÉCTOR","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT477","asig":"TRANSFORMANDO LA ORGANIZACIÓN","rut":"23537013","docente":"MARTÍN, IGNACIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT435","asig":"ALINEAMIENTO ESTRATÉGICO","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"FIN483","asig":"CÓMO FINANCIAR EL CRECIMIENTO","rut":"7129878","docente":"CASTILLO, AUGUSTO OCTAVIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PLE432","asig":"TALLER DE NEGOCIACIÓN","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PLE437","asig":"GESTIÓN DE PERSONAS EN LA ERA DIGITAL","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT484","asig":"ESTRATEGIA Y GESTIÓN DE LA INNOVACIÓN","rut":"9097240","docente":"TRASLAVIÑA, JAVIER ALBERTO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DIS702","asig":"BUSINESS INTELLIGENCE","rut":"0","docente":"MONTEALEGRE, JOSE RAMIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT523","asig":"INNOVACIÓN EN MODELOS DE NEGOCIOS","rut":"10354877","docente":"LARENAS, ROBERTO ARNALDO","hrsPlan":0.0,"hrsDecl":12.0,"diff":-12.0,"cumplPct":1200.0,"declarado":true,"monto":1080000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MKT527","asig":"ESTRATEGIA DE LA INNOVACIÓN","rut":"10354877","docente":"LARENAS, ROBERTO ARNALDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT522","asig":"GESTIÓN DE PORTAFOLIO DE INNOVACIONES","rut":"10508609","docente":"FERES, PATRICIO ANDRÉS","hrsPlan":0.0,"hrsDecl":12.0,"diff":-12.0,"cumplPct":1200.0,"declarado":true,"monto":2524008.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DIS818","asig":"LA STARTUP DE BASE TECNOLÓGICA, DE LA TESIS A LOS MERCADOS INTERNACIONALES","rut":"10588342","docente":"MARTÍNEZ, DANIEL EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT492","asig":"TALLER DE ECOSISTEMAS DE INNOVACIÓN","rut":"10597119","docente":"JARA, FELIPE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT790","asig":"DISEÑO DE EXPERIENCIAS","rut":"11125063","docente":"MARTINEZ, BERNARDITA SOFIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"FIN536","asig":"FINANCIAMIENTO DE INNOVACIONES","rut":"11605899","docente":"DUFEU, CLAUDIO ANDRES","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT548","asig":"ECONOMÍA DE LA INNOVACIÓN: GESTIÓN Y POLÍTICAS PÚBLICAS","rut":"12059751","docente":"BRAVO, CLAUDIO CRISTIÁN","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DER425","asig":"PROTECCIÓN DE INNOVACIÓN","rut":"12265463","docente":"LEÓN, RODRIGO AVELINO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT547","asig":"GESTIÓN DE EQUIPOS INNOVADORES","rut":"13077977","docente":"MADRID, HÉCTOR PABLO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MKT529","asig":"MARKETING DE LA INNOVACIÓN","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DIS808","asig":"TALLER 4: COMUNICACIÓN DE LA INNOVACIÓN","rut":"15357467","docente":"CÁRDENAS, PÍA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MKT527","asig":"ESTRATEGIA DE LA INNOVACIÓN","rut":"22527993","docente":"VIANA, HORACIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DER425","asig":"PROTECCIÓN DE INNOVACIÓN","rut":"9606173","docente":"SÁNCHEZ, GONZALO JOSE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MIM398","asig":"GROWTH","rut":"0","docente":"BREA, ALBERTO JOSE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MKT306","asig":"METRICS","rut":"12721185","docente":"CASTRO, PATRICIO JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MKT497","asig":"BRANDING","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":0.0,"hrsDecl":20.0,"diff":-20.0,"cumplPct":2000.0,"declarado":true,"monto":5975519.227,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MKT342","asig":"ECOMMERCE","rut":"15819247","docente":"ESPINOZA, JAIME ANDRES","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MIM639","asig":"PRICING","rut":"17120646","docente":"HALAL, MUNIRA CONSTANZA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"PLE198","asig":"CONTENT","rut":"17274392","docente":"AROS, CAROLINA ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"TICS107","asig":"IA","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"MKT864","asig":"DESARROLLO DE NUEVOS MERCADOS","rut":"10570170","docente":"CASTRO, RODRIGO HERNÁN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"FIN841","asig":"FINANZAS SOSTENIBLES","rut":"10994071","docente":"RUBINSTEIN, DIANA YAEL","hrsPlan":120.0,"hrsDecl":16.0,"diff":104.0,"cumplPct":13.3,"declarado":true,"monto":1520000.0,"docProg":"SI","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"INN101","asig":"PENSAMIENTO ESTRATÉGICO E INNOVACIÓN","rut":"12059751","docente":"BRAVO, CLAUDIO CRISTIÁN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"MGT802","asig":"ANÁLISIS ESTRATÉGICO Y PLANTEAMIENTO EMPRESARIAL","rut":"14503820","docente":"BULGARINI, ROBERTO EMILIO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"PER851","asig":"ASUNTOS CORPORATIVOS Y COMUNICACIONES","rut":"16575162","docente":"FIERRO, PEDRO SEBASTIÁN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"SOS107","asig":"TALLER DE CASOS DE NEGOCIOS SOSTENIBLES","rut":"17084089","docente":"LARRAÍN, MACARENA AMPARO MARÍA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"SOS106","asig":"TALLER DE DIAGNÓSTICO SOSTENIBILIDAD EMPRESARIAL","rut":"22653578","docente":"TORA, FANNY","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"LID205","asig":"LIDERAZGO ADAPTATIVO Y OPINIÓN PÚBLICA","rut":"23537013","docente":"MARTÍN, IGNACIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"SOS200","asig":"PROYECTO APLICADO DE GRADO CAPSTONE","rut":"9097240","docente":"TRASLAVIÑA, JAVIER ALBERTO","hrsPlan":420.0,"hrsDecl":0.0,"diff":420.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"SOS102","asig":"GOBERNANZA DE LA SOSTENIBILIDAD","rut":"10994071","docente":"RUBINSTEIN, DIANA YAEL","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"ECO408","asig":"EVALUACIÓN SOCIO-AMBIENTAL DE PROYECTOS","rut":"12628823","docente":"PAGE, BENJAMÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"SOS103","asig":"NEGOCIOS SOSTENIBLES","rut":"15779865","docente":"EGAÑA, PABLO ANDRÉS","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"ECO407","asig":"ECONOMÍA PARA LA SOSTENIBILIDAD","rut":"16628144","docente":"VILLAGRA, MIJAIL ROLANDO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"SOS101","asig":"TRANSICIÓN A LA SOSTENIBILIDAD","rut":"9904943","docente":"OPAZO, JOSÉ LUIS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM303","asig":"ESTRATEGIAS PARA LA GESTIÓN DE CADENAS DE SUMINISTRO GLOBALES","rut":"10330785","docente":"GARCÍA, PABLO ANTONIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM206","asig":"SOSTENIBILIDAD EN OPERACIONES Y CADENAS DE SUMINISTRO","rut":"13451074","docente":"MARTINEZ CARO, LUCIA","hrsPlan":0.0,"hrsDecl":10.0,"diff":-10.0,"cumplPct":1000.0,"declarado":true,"monto":800000.0,"docProg":"SI","cerrada":"NO","mesIni":"Marzo","mesFin":"Mayo"},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM207","asig":"MODELADO Y SIMULACIÓN DE PROCESOS DE TOMA DE DECISIÓN EN CADENAS DE SUMINISTRO","rut":"13451074","docente":"MARTINEZ CARO, LUCIA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM207","asig":"MODELADO Y SIMULACIÓN DE PROCESOS DE TOMA DE DECISIÓN EN CADENAS DE SUMINISTRO","rut":"13729772","docente":"HERNANDEZ, JORGE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM304","asig":"VIAJE INTERNACIONAL MSCM","rut":"13729772","docente":"HERNANDEZ, JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM402","asig":"CAPSTONE","rut":"13729772","docente":"HERNANDEZ, JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM206","asig":"SOSTENIBILIDAD EN OPERACIONES Y CADENAS DE SUMINISTRO","rut":"17084089","docente":"LARRAÍN, MACARENA AMPARO MARÍA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM401","asig":"LIDERAZGO E INNOVACIÓN","rut":"23537013","docente":"MARTÍN, IGNACIO","hrsPlan":0.0,"hrsDecl":20.0,"diff":-20.0,"cumplPct":2000.0,"declarado":true,"monto":5612383.621,"docProg":"SI","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM301","asig":"ESTRATEGIAS DE DIGITALIZACIÓN PARA CADENAS DE SUMINISTRO","rut":"9288913","docente":"VARAS, SAMUEL EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM302","asig":"COMUNICACIÓN EFECTIVA Y RESOLUCIÓN DE CONFLICTOS","rut":"9909733","docente":"SAGREDO, FRANCISCO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""}];
+
+// ── Estado módulo ─────────────────────────────────────────────
+var _dvo = [];          // declaraciones cargadas desde Excel
+var _dvoTab  = 'decl'; // 'decl' | 'pend' | 'comp'
+var _dvoPag  = 1;
+const _PP = 40;
+
+// Filtros tab Declaraciones
+var _dfCC='', _dfMes='', _dfTipo='', _dfBus='';
+// Filtros tab Pendientes
+var _dpCC='', _dpPer='', _dpSolo=false;
+
+function renderDeclarado(){
+  var pg=$('page'); if(!pg) return;
+
+  pg.innerHTML =
+    '<div class="pg-title">Declarado vs. Obligación</div>'+
+
+    // ── 3 tabs ────────────────────────────────────────────────
+    '<div style="display:flex;gap:0;margin-bottom:18px;border-bottom:2px solid var(--border)">'+
+      '<button id="dvBT1" onclick="_dvSetTab(\'decl\')" '+
+        'style="padding:8px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;'+
+        'border-bottom:2px solid var(--blue);margin-bottom:-2px;color:var(--blue)">'+
+        '📋 Declaraciones</button>'+
+      '<button id="dvBT2" onclick="_dvSetTab(\'pend\')" '+
+        'style="padding:8px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;'+
+        'border-bottom:2px solid transparent;color:var(--t3)">'+
+        '⚠️ Pendientes de Declarar</button>'+
+      '<button id="dvBT3" onclick="_dvSetTab(\'comp\')" '+
+        'style="padding:8px 20px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;'+
+        'border-bottom:2px solid transparent;color:var(--t3)">'+
+        '⚖️ Comparador Docente</button>'+
+    '</div>'+
+
+    // ── KPIs ─────────────────────────────────────────────────
+    '<div id="dvKpi" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px"></div>'+
+
+    // ── Contenido dinámico ────────────────────────────────────
+    '<div id="dvBody"></div>';
+
+  _dvKpi(); _dvSetTab('decl');
+}
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+function _dvSetTab(t){
+  _dvoTab=t; _dvoPag=1;
+  ['decl','pend','comp'].forEach(function(n,i){
+    var b=document.getElementById('dvBT'+(i+1)); if(!b) return;
+    var on=t===n;
+    b.style.borderBottomColor=on?'var(--blue)':'transparent';
+    b.style.color=on?'var(--blue)':'var(--t3)';
+  });
+  _dvKpi();
+  if(t==='decl') _dvTabDecl();
+  else if(t==='pend') _dvTabPend();
+  else _dvTabComp();
+}
+
+/* ── KPIs globales (combinan ambas fuentes) ───────────────── */
+function _dvKpi(){
+  var el=document.getElementById('dvKpi'); if(!el) return;
+  var hrsObl=0,hrsDec=0,sinDecl=0,montoT=0;
+  _DH.forEach(function(r){ hrsObl+=r.hrsPlan; hrsDec+=r.hrsDecl; if(!r.declarado&&r.hrsPlan>0) sinDecl++; });
+  _dvo.forEach(function(r){ montoT+=r.monto; });
+  var cum=hrsObl>0?hrsDec/hrsObl*100:0;
+  var kpis=[
+    {ico:'📋',lbl:'Declaraciones cargadas',val:_dvo.length,          color:'var(--blue)',  sub:'registros del Excel'},
+    {ico:'📚',lbl:'Cursos plan 2026',       val:_DH.length,          color:'var(--t2)',   sub:'con docente asignado'},
+    {ico:'⚠️',lbl:'Pendientes declarar',    val:sinDecl,             color:'var(--red)',  sub:'sin declaración'},
+    {ico:'✅',lbl:'Hrs declaradas / plan',  val:hrsDec.toFixed(0)+'/'+hrsObl.toFixed(0), color:cum>=80?'var(--green)':cum>=50?'var(--orange)':'var(--red)', sub:cum.toFixed(1)+'% cumplimiento'},
+    {ico:'💰',lbl:'Monto declarado',        val:montoT>0?'$'+Math.round(montoT/1e6).toLocaleString('es-CL')+'M':'—', color:'var(--purple,#7c3aed)',sub:'total período'},
+  ];
+  el.innerHTML=kpis.map(function(k){
+    return '<div class="aud-kpi" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px">'+
+      '<div style="font-size:20px;margin-bottom:4px">'+k.ico+'</div>'+
+      '<div class="aud-kpi-lbl">'+k.lbl+'</div>'+
+      '<div class="aud-kpi-val" style="color:'+k.color+'">'+k.val+'</div>'+
+      '<div class="aud-kpi-sub">'+k.sub+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TAB 1 — DECLARACIONES (carga dinámica de Excel)
+══════════════════════════════════════════════════════════════ */
+function _dvTabDecl(){
+  var el=document.getElementById('dvBody'); if(!el) return;
+
+  // Upload zone si no hay datos
+  var upz=_dvo.length?'':
+    '<div id="dvoUpZone" style="border:2px dashed var(--border);border-radius:10px;padding:20px;'+
+      'text-align:center;margin-bottom:14px;transition:border-color .2s"'+
+      ' ondragover="event.preventDefault();this.style.borderColor=\'var(--blue)\'"'+
+      ' ondragleave="this.style.borderColor=\'var(--border)\'"'+
+      ' ondrop="dvoHandleDrop(event)">'+
+      '<div style="font-size:24px;margin-bottom:6px">📂</div>'+
+      '<div style="font-weight:600;color:var(--t1);margin-bottom:4px">Arrastra el reporte de declaraciones aquí</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Reporte_DeclaracionRealizada_XX.xlsx</div>'+
+      '<label style="cursor:pointer">'+
+        '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="dvoCargar(this.files[0])">'+
+        '<span class="btn btn-p btn-sm">Seleccionar archivo</span>'+
+      '</label>'+
+    '</div>';
+
+  var status='<div id="dvoSt" style="font-size:11px;color:var(--t3);margin-bottom:12px">'+
+    (_dvo.length?
+      '✅ '+_dvo.length+' declaraciones cargadas &nbsp;·&nbsp; '+
+      '<a href="#" onclick="dvoReset();return false" style="color:var(--blue)">cambiar archivo</a>':
+      'Carga el Excel para ver todas las declaraciones.')+
+  '</div>';
+
+  if(!_dvo.length){ el.innerHTML=upz+status; return; }
+
+  // Filtros
+  var ccs  =[...new Set(_dvo.map(function(r){return r.cc;}))].sort(function(a,b){return Number(a)-Number(b);});
+  var meses=[...new Set(_dvo.map(function(r){return r.mesIni;}))].filter(Boolean).sort();
+  var tipos=[...new Set(_dvo.map(function(r){return r.tipoAct;}))].sort();
+
+  var filHtml='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:flex-end">'+
+    _mkSel('dfSelCC','Centro de Costo',
+      ccs.map(function(cc){return {v:cc,l:'CC '+cc+' — '+(_dvo.find(function(r){return r.cc===cc;})||{}).programa.replace(/^\d+\s*/,'').substring(0,30)};}),
+      _dfCC,'_dfCC=this.value;_dvoPag=1;_dvTabDecl()')+
+    _mkSel('dfSelMes','Mes Inicio',meses.map(function(m){return{v:m,l:m};}),_dfMes,'_dfMes=this.value;_dvoPag=1;_dvTabDecl()')+
+    _mkSel('dfSelTipo','Tipo Actividad',tipos.map(function(t){return{v:t,l:t};}),_dfTipo,'_dfTipo=this.value;_dvoPag=1;_dvTabDecl()')+
+    '<div style="display:flex;flex-direction:column;gap:3px">'+
+      '<span style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase">Buscar</span>'+
+      '<input id="dfBusInput" type="text" value="'+esc(_dfBus)+'" placeholder="Docente, sigla…" '+
+        'oninput="_dfBus=this.value;_dvoPag=1;_dvTabDecl()" '+
+        'style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 10px;font-size:12px;width:190px"></div>'+
+    '<button onclick="_dfCC=\'\';_dfMes=\'\';_dfTipo=\'\';_dfBus=\'\';_dvoPag=1;_dvTabDecl()" class="btn btn-ghost btn-sm" style="align-self:flex-end">✕ Limpiar</button>'+
+    '<button onclick="_dvExportDecl()" class="btn btn-ghost btn-sm" style="align-self:flex-end">📊 Exportar</button>'+
+  '</div>';
+
+  var d=_dvFiltDecl();
+  var tp=Math.max(1,Math.ceil(d.length/_PP));
+  if(_dvoPag>tp) _dvoPag=tp;
+  var st=(_dvoPag-1)*_PP, sl=d.slice(st,st+_PP);
+
+  var h=filHtml+status+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">'+
+      'Mostrando <strong>'+(st+1)+'–'+Math.min(st+_PP,d.length)+'</strong> de <strong>'+d.length+'</strong> declaraciones</div>'+
+    '<div style="overflow-x:auto"><table class="dt" style="font-size:11px"><thead><tr>'+
+      '<th>CC</th><th style="min-width:180px">Programa</th><th>Sigla</th>'+
+      '<th style="min-width:200px">Asignatura</th><th style="min-width:170px">Docente</th>'+
+      '<th>RUT</th><th>Tipo Prof.</th><th>Tipo Actividad</th>'+
+      '<th style="text-align:right">Hrs Obl.</th>'+
+      '<th style="text-align:right">Hrs LV</th><th style="text-align:right">Hrs SD</th>'+
+      '<th style="text-align:right;color:var(--blue)">Total Decl.</th>'+
+      '<th style="text-align:right">Diferencia</th><th style="text-align:center">Cumpl.</th>'+
+      '<th style="text-align:right">$/hr</th><th style="text-align:right">Monto</th>'+
+      '<th>Mes Ini.</th><th>Mes Fin.</th><th>Fecha Mov.</th><th>Sede</th>'+
+    '</tr></thead><tbody>';
+
+  sl.forEach(function(r){
+    var ok=r.diff<=0,warn=r.diff>0&&r.diff<=5;
+    var dc=ok?'var(--green)':warn?'var(--orange)':'var(--red)';
+    var pbg=r.cumpl>=100?'var(--green-l)':r.cumpl>=80?'var(--amber-l)':'var(--red-l)';
+    var pfg=r.cumpl>=100?'var(--green-d)':r.cumpl>=80?'var(--amber-d)':'var(--red-d)';
+    var mo=r.monto>0?'$'+Math.round(r.monto).toLocaleString('es-CL'):'—';
+    var ph=r.phora>0?'$'+Math.round(r.phora).toLocaleString('es-CL'):'—';
+    h+='<tr>'+
+      '<td><strong>'+esc(r.cc)+'</strong></td>'+
+      '<td style="font-size:10px;color:var(--t3)" title="'+esc(r.programa)+'">'+esc(abbr(r.programa,34))+'</td>'+
+      '<td><span class="aud-badge aud-badge-blue" style="font-size:10px">'+esc(r.actCod)+'</span></td>'+
+      '<td style="font-size:10px" title="'+esc(r.actNom)+'">'+esc(abbr(r.actNom,42))+'</td>'+
+      '<td style="font-weight:500;font-size:11px;white-space:nowrap">'+esc(abbr(r.profesor,25))+'</td>'+
+      '<td style="font-size:10px;color:var(--t4)">'+esc(r.rut)+'</td>'+
+      '<td style="font-size:10px;color:var(--t3)">'+esc(r.tipoProf)+'</td>'+
+      '<td style="font-size:10px;color:var(--t3)">'+esc(abbr(r.tipoAct,22))+'</td>'+
+      '<td style="text-align:right;font-weight:600">'+r.hrObl.toLocaleString('es-CL',{maximumFractionDigits:1})+'</td>'+
+      '<td style="text-align:right;color:var(--blue)">'+r.hrLV.toLocaleString('es-CL',{maximumFractionDigits:1})+'</td>'+
+      '<td style="text-align:right;color:var(--blue)">'+r.hrSD.toLocaleString('es-CL',{maximumFractionDigits:1})+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:var(--blue)">'+r.hrDec.toLocaleString('es-CL',{maximumFractionDigits:1})+'</td>'+
+      '<td style="text-align:right;font-weight:800;color:'+dc+'">'+
+        (ok?'✓':'−'+Math.abs(r.diff).toLocaleString('es-CL',{maximumFractionDigits:1}))+'</td>'+
+      '<td style="text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+pbg+';color:'+pfg+'">'+r.cumpl.toFixed(0)+'%</span></td>'+
+      '<td style="text-align:right;font-size:10px">'+ph+'</td>'+
+      '<td style="text-align:right;font-size:10px">'+mo+'</td>'+
+      '<td style="color:var(--t3);font-size:10px">'+esc(r.mesIni)+'</td>'+
+      '<td style="color:var(--t3);font-size:10px">'+esc(r.mesFin)+'</td>'+
+      '<td style="color:var(--t4);font-size:10px;white-space:nowrap">'+esc(r.fechaMov)+'</td>'+
+      '<td style="font-size:10px;color:var(--t4)">'+esc(r.sede)+'</td>'+
+    '</tr>';
+  });
+  h+='</tbody></table></div>'+_dvPag(tp);
+  el.innerHTML=h;
+}
+
+function _dvFiltDecl(){
+  return _dvo.filter(function(r){
+    if(_dfCC   && r.cc!==_dfCC)        return false;
+    if(_dfMes  && r.mesIni!==_dfMes)   return false;
+    if(_dfTipo && r.tipoAct!==_dfTipo) return false;
+    if(_dfBus){var q=_dfBus.toLowerCase();
+      if(!(r.profesor.toLowerCase().includes(q)||r.actCod.toLowerCase().includes(q)||
+           r.actNom.toLowerCase().includes(q)||r.programa.toLowerCase().includes(q))) return false;}
+    return true;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TAB 2 — PENDIENTES DE DECLARAR (cruce plan 2026 vs declarado)
+══════════════════════════════════════════════════════════════ */
+function _dvTabPend(){
+  var el=document.getElementById('dvBody'); if(!el) return;
+
+  var periodos=[...new Set(_DH.map(function(r){return r.periodo;}))].sort();
+  var ccs=[...new Set(_DH.filter(function(r){return r.cc&&r.cc!=='—';}).map(function(r){return r.cc;}))].sort(function(a,b){return Number(a)-Number(b);});
+
+  var filHtml='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:flex-end">'+
+    _mkSel('dpSelCC','Centro de Costo',
+      ccs.map(function(cc){return{v:cc,l:'CC '+cc};}),
+      _dpCC,'_dpCC=this.value;_dvoPag=1;_dvTabPend()')+
+    _mkSel('dpSelPer','Período',
+      periodos.map(function(p){return{v:p,l:p.replace(/\t/g,'').trim()};}),
+      _dpPer,'_dpPer=this.value;_dvoPag=1;_dvTabPend()')+
+    '<div style="display:flex;flex-direction:column;gap:3px">'+
+      '<span style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase">Ver solo</span>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">'+
+        '<input type="checkbox" '+(_dpSolo?'checked':'')+' onchange="_dpSolo=this.checked;_dvoPag=1;_dvTabPend()">'+
+        'Sin declarar</label>'+
+    '</div>'+
+    '<button onclick="_dpCC=\'\';_dpPer=\'\';_dpSolo=false;_dvoPag=1;_dvTabPend()" class="btn btn-ghost btn-sm" style="align-self:flex-end">✕ Limpiar</button>'+
+    '<button onclick="_dvExportPend()" class="btn btn-ghost btn-sm" style="align-self:flex-end">📊 Exportar</button>'+
+  '</div>';
+
+  var d=_DH.filter(function(r){
+    if(_dpCC  && r.cc!==_dpCC)                     return false;
+    if(_dpPer && r.periodo.trim()!==_dpPer.trim())  return false;
+    if(_dpSolo && r.declarado)                      return false;
+    return true;
+  });
+
+  var tp=Math.max(1,Math.ceil(d.length/_PP));
+  if(_dvoPag>tp) _dvoPag=tp;
+  var st=(_dvoPag-1)*_PP, sl=d.slice(st,st+_PP);
+
+  var sinN=d.filter(function(r){return !r.declarado&&r.hrsPlan>0;}).length;
+  var sinZ=d.filter(function(r){return !r.declarado&&r.hrsPlan===0;}).length;
+  var conN=d.filter(function(r){return r.declarado;}).length;
+
+  var h=filHtml+
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<span style="font-size:11px;color:var(--red)">⚠️ <strong>'+sinN+'</strong> cursos con horas sin declarar</span>'+
+      '<span style="font-size:11px;color:var(--t3)">⭕ <strong>'+sinZ+'</strong> cursos sin horas ni declaración</span>'+
+      '<span style="font-size:11px;color:var(--green)">✅ <strong>'+conN+'</strong> cursos con declaración</span>'+
+      '<span style="font-size:11px;color:var(--t3)">Total: <strong>'+d.length+'</strong> registros</span>'+
+    '</div>'+
+    '<div style="overflow-x:auto"><table class="dt" style="font-size:11px"><thead><tr>'+
+      '<th style="text-align:center">Estado</th>'+
+      '<th style="min-width:200px">Período</th>'+
+      '<th>CC</th>'+
+      '<th>Sigla</th>'+
+      '<th style="min-width:220px">Asignatura</th>'+
+      '<th style="min-width:180px">Docente</th>'+
+      '<th>RUT</th>'+
+      '<th style="text-align:right">Hrs Plan</th>'+
+      '<th style="text-align:right">Hrs Decl.</th>'+
+      '<th style="text-align:right">Diferencia</th>'+
+      '<th style="text-align:center">Cumpl.</th>'+
+      '<th style="text-align:right">Monto</th>'+
+      '<th style="text-align:center">Doc. Prog.</th>'+
+      '<th style="text-align:center">Cerrada</th>'+
+    '</tr></thead><tbody>';
+
+  sl.forEach(function(r){
+    var sinHrs=r.hrsPlan===0&&!r.declarado;
+    var sinDecl=!r.declarado&&r.hrsPlan>0;
+    var conDecl=r.declarado;
+    var estadoBg=conDecl?'var(--green-l)':sinHrs?'rgba(148,163,184,.12)':'var(--red-l)';
+    var estadoFg=conDecl?'var(--green-d)':sinHrs?'var(--t3)':'var(--red-d)';
+    var estadoTxt=conDecl?'✅ Declarado':sinHrs?'⭕ Sin hrs':'⚠️ Pendiente';
+    var mo=r.monto>0?'$'+Math.round(r.monto).toLocaleString('es-CL'):'—';
+    var diff=r.diff;
+    var dc=diff<=0?'var(--green)':diff<=10?'var(--orange)':'var(--red)';
+    var pbg=r.cumplPct>=100?'var(--green-l)':r.cumplPct>=80?'var(--amber-l)':'var(--red-l)';
+    var pfg=r.cumplPct>=100?'var(--green-d)':r.cumplPct>=80?'var(--amber-d)':'var(--red-d)';
+
+    h+='<tr style="background:'+(sinDecl?'rgba(220,38,38,.03)':sinHrs?'':'')+'">'+
+      '<td style="text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+estadoBg+';color:'+estadoFg+';white-space:nowrap">'+estadoTxt+'</span></td>'+
+      '<td style="font-size:10px;color:var(--t3);white-space:nowrap">'+esc(r.periodo.replace(/\t/g,'').trim())+'</td>'+
+      '<td style="font-size:11px"><strong>'+esc(r.cc)+'</strong></td>'+
+      '<td><span class="aud-badge aud-badge-blue" style="font-size:10px">'+esc(r.sigla)+'</span></td>'+
+      '<td style="font-size:10px" title="'+esc(r.asig)+'">'+esc(abbr(r.asig,48))+'</td>'+
+      '<td style="font-weight:500;font-size:11px;white-space:nowrap">'+esc(abbr(r.docente,26))+'</td>'+
+      '<td style="font-size:10px;color:var(--t4)">'+esc(r.rut)+'</td>'+
+      '<td style="text-align:right;font-weight:600">'+
+        (r.hrsPlan>0?r.hrsPlan.toLocaleString('es-CL',{maximumFractionDigits:1}):'—')+'</td>'+
+      '<td style="text-align:right;color:var(--blue);font-weight:600">'+
+        (r.hrsDecl>0?r.hrsDecl.toLocaleString('es-CL',{maximumFractionDigits:1}):'—')+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:'+dc+'">'+
+        (r.hrsPlan===0?'—':diff<=0?'✓':('−'+Math.abs(diff).toLocaleString('es-CL',{maximumFractionDigits:1})))+'</td>'+
+      '<td style="text-align:center">'+
+        (r.hrsPlan>0?'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+pbg+';color:'+pfg+'">'+r.cumplPct.toFixed(0)+'%</span>':'—')+'</td>'+
+      '<td style="text-align:right;font-size:10px">'+mo+'</td>'+
+      '<td style="text-align:center"><span style="font-size:11px;font-weight:700;color:'+(r.docProg==='SI'?'var(--green)':'var(--red)')+'">'+
+        (r.docProg==='SI'?'✓':'✗')+'</span></td>'+
+      '<td style="text-align:center"><span style="font-size:11px;font-weight:700;color:'+(r.cerrada==='SI'?'var(--blue)':'var(--t3)')+'">'+
+        (r.cerrada==='SI'?'✓':'○')+'</span></td>'+
+    '</tr>';
+  });
+  h+='</tbody></table></div>'+_dvPag(tp);
+  el.innerHTML=h;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TAB 3 — COMPARADOR POR DOCENTE (desde declaraciones cargadas)
+══════════════════════════════════════════════════════════════ */
+function _dvTabComp(){
+  var el=document.getElementById('dvBody'); if(!el) return;
+  if(!_dvo.length){
+    el.innerHTML=
+      '<div style="text-align:center;padding:40px;color:var(--t3)">'+
+        '<div style="font-size:32px;margin-bottom:8px">📂</div>'+
+        '<div style="font-weight:600;margin-bottom:6px">Carga el archivo de declaraciones</div>'+
+        '<div style="font-size:11px">Ve a la tab "Declaraciones" y sube el Excel para ver el comparador</div>'+
+      '</div>';
+    return;
+  }
+
+  var dm={};
+  _dvo.forEach(function(r){
+    if(!dm[r.profesor]) dm[r.profesor]={prof:r.profesor,tipo:r.tipoProf,hrO:0,hrD:0,hrLV:0,hrSD:0,monto:0,cursos:{}};
+    var e=dm[r.profesor];
+    e.hrO+=r.hrObl; e.hrD+=r.hrDec; e.hrLV+=r.hrLV; e.hrSD+=r.hrSD; e.monto+=r.monto;
+    var ck=r.actCod+'|||'+r.actNom;
+    if(!e.cursos[ck]) e.cursos[ck]={cod:r.actCod,nom:r.actNom,cc:r.cc,prog:r.programa,
+      tipo:r.tipoAct,hrO:0,hrD:0,hrLV:0,hrSD:0,monto:0,phora:r.phora,mesIni:r.mesIni,mesFin:r.mesFin};
+    var ce=e.cursos[ck];
+    ce.hrO+=r.hrObl; ce.hrD+=r.hrDec; ce.hrLV+=r.hrLV; ce.hrSD+=r.hrSD; ce.monto+=r.monto;
+  });
+
+  var docs=Object.values(dm).sort(function(a,b){ return (b.hrO-b.hrD)-(a.hrO-a.hrD); });
+  var h='<div style="font-size:11px;color:var(--t3);margin-bottom:10px">'+
+    docs.length+' docentes ordenados por mayor brecha · clic para expandir</div>';
+
+  docs.forEach(function(dm2,idx){
+    var diff=Math.round((dm2.hrO-dm2.hrD)*100)/100;
+    var cum=dm2.hrO>0?dm2.hrD/dm2.hrO*100:100;
+    var okC=cum>=100?'var(--green)':cum>=80?'var(--orange)':'var(--red)';
+    var bgH=cum>=100?'rgba(22,163,74,.07)':cum>=80?'rgba(251,191,36,.08)':'rgba(220,38,38,.06)';
+    var cursos=Object.values(dm2.cursos).sort(function(a,b){return(b.hrO-b.hrD)-(a.hrO-a.hrD);});
+    var mo=dm2.monto>0?'$'+Math.round(dm2.monto).toLocaleString('es-CL'):'—';
+    var cid='dvC'+idx;
+
+    h+='<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden">'+
+    '<div onclick="_dvTgl(\''+cid+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;background:'+bgH+';user-select:none">'+
+      '<span id="'+cid+'A" style="font-size:11px;color:var(--t3);transition:transform .2s;display:inline-block">▶</span>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:700;font-size:13px">'+esc(dm2.prof)+'</div>'+
+        '<div style="font-size:10px;color:var(--t3)">'+esc(dm2.tipo)+' · '+cursos.length+' asig. · LV:'+dm2.hrLV.toFixed(1)+'h SD:'+dm2.hrSD.toFixed(1)+'h</div>'+
+      '</div>'+
+      '<div style="flex:2;max-width:250px;min-width:100px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:2px">'+
+          '<span>'+dm2.hrD.toFixed(1)+' decl.</span><span>'+dm2.hrO.toFixed(1)+' obl.</span></div>'+
+        '<div style="height:7px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;overflow:hidden">'+
+          '<div style="width:'+Math.min(cum,100).toFixed(1)+'%;height:100%;background:'+okC+'"></div></div>'+
+      '</div>'+
+      '<div style="text-align:center;min-width:52px">'+
+        '<div style="font-size:16px;font-weight:800;color:'+okC+'">'+cum.toFixed(0)+'%</div>'+
+        '<div style="font-size:9px;color:var(--t4)">cumpl.</div></div>'+
+      '<div style="text-align:right;min-width:68px">'+
+        '<div style="font-size:12px;font-weight:800;color:'+(diff>0?'var(--red)':'var(--green)')+'">'+
+          (diff>0?'−'+diff.toFixed(1)+'h':'✓ OK')+'</div>'+
+        '<div style="font-size:9px;color:var(--t4)">'+(diff>0?'brecha':'al día')+'</div></div>'+
+      '<div style="text-align:right;min-width:80px;font-size:11px;color:var(--t3)">'+mo+'</div>'+
+    '</div>'+
+    '<div id="'+cid+'" style="display:none"><div style="overflow-x:auto">'+
+    '<table class="dt" style="font-size:11px"><thead><tr>'+
+      '<th>CC</th><th>Sigla</th><th style="min-width:200px">Asignatura</th>'+
+      '<th style="text-align:right">Hrs Obl.</th>'+
+      '<th style="text-align:right">Hrs LV</th><th style="text-align:right">Hrs SD</th>'+
+      '<th style="text-align:right;color:var(--blue)">Total Decl.</th>'+
+      '<th style="text-align:right">Diferencia</th><th style="text-align:center">Cumpl.</th>'+
+      '<th style="text-align:right">$/hr</th><th style="text-align:right">Monto</th>'+
+      '<th>Tipo</th><th>Mes Ini.</th><th>Mes Fin.</th>'+
+    '</tr></thead><tbody>'+
+    cursos.map(function(ce){
+      var cd=Math.round((ce.hrO-ce.hrD)*100)/100;
+      var cc2=ce.hrO>0?ce.hrD/ce.hrO*100:100;
+      var cbg=cc2>=100?'var(--green-l)':cc2>=80?'var(--amber-l)':'var(--red-l)';
+      var cfg=cc2>=100?'var(--green-d)':cc2>=80?'var(--amber-d)':'var(--red-d)';
+      return '<tr>'+
+        '<td><strong>'+esc(ce.cc)+'</strong></td>'+
+        '<td><span class="aud-badge aud-badge-blue" style="font-size:10px">'+esc(ce.cod)+'</span></td>'+
+        '<td title="'+esc(ce.nom)+'">'+esc(abbr(ce.nom,50))+'</td>'+
+        '<td style="text-align:right;font-weight:600">'+ce.hrO.toFixed(1)+'</td>'+
+        '<td style="text-align:right;color:var(--blue)">'+ce.hrLV.toFixed(1)+'</td>'+
+        '<td style="text-align:right;color:var(--blue)">'+ce.hrSD.toFixed(1)+'</td>'+
+        '<td style="text-align:right;font-weight:800;color:var(--blue)">'+ce.hrD.toFixed(1)+'</td>'+
+        '<td style="text-align:right;font-weight:800;color:'+(cd<=0?'var(--green)':cd<=5?'var(--orange)':'var(--red)')+'">'+
+          (cd<=0?'✓':'−'+Math.abs(cd).toFixed(1))+'</td>'+
+        '<td style="text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+cbg+';color:'+cfg+'">'+cc2.toFixed(0)+'%</span></td>'+
+        '<td style="text-align:right;font-size:10px;color:var(--t3)">'+(ce.phora>0?'$'+Math.round(ce.phora).toLocaleString('es-CL'):'—')+'</td>'+
+        '<td style="text-align:right;font-size:10px">'+(ce.monto>0?'$'+Math.round(ce.monto).toLocaleString('es-CL'):'—')+'</td>'+
+        '<td style="font-size:10px;color:var(--t3)">'+esc(abbr(ce.tipo,20))+'</td>'+
+        '<td style="font-size:10px;color:var(--t3)">'+esc(ce.mesIni)+'</td>'+
+        '<td style="font-size:10px;color:var(--t3)">'+esc(ce.mesFin)+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div></div></div>';
+  });
+  el.innerHTML=h;
+}
+
+/* ── Helpers compartidos ──────────────────────────────────── */
+function _mkSel(id,lbl,opts,cur,fn){
+  return '<div style="display:flex;flex-direction:column;gap:3px">'+
+    '<span style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase">'+lbl+'</span>'+
+    '<select id="'+id+'" onchange="'+fn+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;max-width:260px">'+
+      '<option value="">Todos</option>'+
+      opts.map(function(o){return '<option value="'+esc(o.v)+'"'+(cur===o.v?' selected':'')+'>'+esc(o.l)+'</option>';}).join('')+
+    '</select></div>';
+}
+
+function _dvPag(tp){
+  if(tp<=1) return '';
+  var h='<div style="display:flex;justify-content:center;gap:6px;padding:14px;flex-wrap:wrap">';
+  h+='<button '+(_dvoPag===1?'disabled':'')+' onclick="_dvoPag--;_dvoView2()" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--t2)">← Ant.</button>';
+  var sp=Math.max(1,_dvoPag-3),ep=Math.min(tp,sp+6); if(ep-sp<6)sp=Math.max(1,ep-6);
+  for(var p=sp;p<=ep;p++){
+    h+='<button onclick="_dvoPag='+p+';_dvoView2()" style="font-size:11px;padding:5px 10px;border:1px solid '+(p===_dvoPag?'var(--blue)':'var(--border)')+
+      ';background:'+(p===_dvoPag?'var(--blue)':'var(--surface)')+
+      ';color:'+(p===_dvoPag?'#fff':'var(--t2)')+';border-radius:6px;cursor:pointer">'+p+'</button>';
+  }
+  h+='<button '+(_dvoPag===tp?'disabled':'')+' onclick="_dvoPag++;_dvoView2()" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--t2)">Sig. →</button>';
+  return h+'</div>';
+}
+
+function _dvoView2(){ _dvSetTab(_dvoTab); }
+
+function _dvTgl(id){
+  var el=document.getElementById(id),ar=document.getElementById(id+'A');
+  if(!el) return;
+  var op=el.style.display!=='none';
+  el.style.display=op?'none':'block';
+  if(ar)ar.style.transform=op?'':'rotate(90deg)';
+}
+
+/* ── Upload / carga dinámica ────────────────────────────── */
+function dvoHandleDrop(e){
+  e.preventDefault();
+  var uz=document.getElementById('dvoUpZone');
+  if(uz)uz.style.borderColor='var(--border)';
+  var f=e.dataTransfer.files[0]; if(f)dvoCargar(f);
+}
+
+function dvoReset(){
+  _dvo=[]; _dfCC=''; _dfMes=''; _dfTipo=''; _dfBus=''; _dvoPag=1;
+  renderDeclarado();
+}
+
+function dvoCargar(file){
+  if(!file) return;
+  var st=document.getElementById('dvoSt');
+  if(st)st.textContent='⏳ Cargando '+file.name+'…';
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    try{
+      var wb=XLSX.read(ev.target.result,{type:'array'});
+      var sh=wb.SheetNames[0];
+      var raw=XLSX.utils.sheet_to_json(wb.Sheets[sh],{defval:''});
+      _dvo=raw.map(function(r){
+        var hrLV=parseFloat(r['movimiento_horas_lv'])||0;
+        var hrSD=parseFloat(r['movimiento_horas_sd'])||0;
+        var hrObl=parseFloat(r['Horas'])||0;
+        var hrDec=Math.round((hrLV+hrSD)*100)/100;
+        var diff=Math.round((hrObl-hrDec)*100)/100;
+        var mnto=parseFloat(String(r['movimiento_monto']||'0').replace(',','.'))||0;
+        return{
+          movId:r['movimiento_id']||'',
+          actCod:String(r['ActividadCodigo']||'').trim(),
+          actNom:String(r['ActividadNombre']||'').trim(),
+          programa:String(r['Programa']||'').trim(),
+          cc:String(r['programa_centrocosto']||'').trim(),
+          seccion:String(r['seccion']||'').trim(),
+          sede:String(r['sede']||'').trim(),
+          rut:String(r['NumeroDocumento']||'').trim(),
+          profesor:String(r['Profesor']||'').trim(),
+          tipoProf:String(r['TipoProfesor']||'').trim(),
+          tipoAct:String(r['TipoActividad']||'').trim(),
+          mesIni:String(r['MesInicio']||'').trim(),
+          mesFin:String(r['MesTermino']||'').trim(),
+          mesMov:String(r['Mes']||'').trim(),
+          fechaIni:String(r['FechaInicio']||'').split('T')[0].split(' ')[0],
+          fechaFin:String(r['FechaTermino']||'').split('T')[0].split(' ')[0],
+          fechaMov:String(r['movimiento_fecha']||'').split('T')[0].split(' ')[0],
+          hrObl:hrObl,hrLV:hrLV,hrSD:hrSD,hrDec:hrDec,
+          diff:diff,cumpl:hrObl>0?Math.round(hrDec/hrObl*10000)/100:100,
+          phora:parseFloat(r['movimiento_precio_hora'])||0,
+          monto:mnto,
+          esExt:String(r['EsExtension']||'').trim(),
+        };
+      });
+      _dfCC='';_dfMes='';_dfTipo='';_dfBus='';_dvoPag=1;
+      _dvKpi(); _dvSetTab('decl');
+    }catch(err){
+      var st2=document.getElementById('dvoSt');
+      if(st2)st2.textContent='❌ Error: '+err.message;
+    }
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* ── Exportar ───────────────────────────────────────────── */
+function _dvExportDecl(){
+  var d=_dvFiltDecl(); if(!d.length) return;
+  try{
+    var ws=XLSX.utils.json_to_sheet(d.map(function(r){return{
+      'CC':r.cc,'Programa':r.programa,'Sigla':r.actCod,'Asignatura':r.actNom,
+      'Docente':r.profesor,'RUT':r.rut,'Tipo Profesor':r.tipoProf,'Tipo Actividad':r.tipoAct,
+      'Mes Inicio':r.mesIni,'Mes Término':r.mesFin,
+      'Hrs Obligación':r.hrObl,'Hrs Decl. LV':r.hrLV,'Hrs Decl. SD':r.hrSD,
+      'Hrs Declaradas':r.hrDec,'Diferencia':r.diff,'Cumplimiento %':r.cumpl,
+      '$/hora':r.phora,'Monto':r.monto,'Sede':r.sede,'Fecha Mov.':r.fechaMov,
+    };}));
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Declaraciones');
+    XLSX.writeFile(wb,'Declaraciones_Filtrado.xlsx');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function _dvExportPend(){
+  var d=_DH.filter(function(r){
+    if(_dpCC&&r.cc!==_dpCC)return false;
+    if(_dpPer&&r.periodo.trim()!==_dpPer.trim())return false;
+    if(_dpSolo&&r.declarado)return false;
+    return true;
+  });
+  if(!d.length) return;
+  try{
+    var ws=XLSX.utils.json_to_sheet(d.map(function(r){return{
+      'Período':r.periodo.replace(/\t/g,'').trim(),'CC':r.cc,'Sigla':r.sigla,'Asignatura':r.asig,
+      'Docente':r.docente,'RUT':r.rut,'Hrs Plan':r.hrsPlan,'Hrs Declaradas':r.hrsDecl,
+      'Diferencia':r.diff,'Cumplimiento %':r.cumplPct,'Declarado':r.declarado?'Sí':'No',
+      'Monto':r.monto,'Doc. Programa':r.docProg,'Sección Cerrada':r.cerrada,
+      'Mes Inicio':r.mesIni,'Mes Término':r.mesFin,
+    };}));
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pendientes');
+    XLSX.writeFile(wb,'Pendientes_Declarar.xlsx');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+
 function renderCoherencia(){
   const df  = getDF();
   const hoy = today();
@@ -4571,633 +5127,20 @@ function cohExport(){
 /* ══════════════════════════════════════════════════════
    DECLARADO VS OBLIGACIÓN
 ══════════════════════════════════════════════════════ */
-let _dvoData = [];  // filas del Excel cargado
 
-function renderDeclarado(){
-  $('page').innerHTML = `
-  <div class="pg-title">Declarado vs. Obligación Real</div>
-  <div style="font-size:11px;color:var(--t3);margin-bottom:16px">
-    Carga el reporte de declaraciones para comparar contra la planificación académica
-  </div>
 
-  <!-- DROP ZONE -->
-  <label class="dvo-drop" id="dvoDrop" for="dvoFile" style="cursor:pointer;display:block">
-    <input type="file" id="dvoFile" accept=".xlsx,.xls,.csv" onchange="dvoCargar(this)" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
-    <div class="dvo-drop-ico" id="dvoIco">&#128229;</div>
-    <div class="dvo-drop-txt" id="dvoTxt">Arrastra el archivo Declarado o haz clic</div>
-    <div class="dvo-drop-sub" id="dvoSub">Excel exportado del sistema · Reporte_DeclaracionRealizada</div>
-    <button type="button" onclick="document.getElementById('dvoFile').click()" 
-      style="margin-top:10px;background:rgba(56,189,248,.1);border:1px solid var(--blue);color:#38bdf8;
-      border-radius:var(--r2);padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer;
-      font-family:inherit">
-      Seleccionar archivo
-    </button>
-  </label>
+/* ═══════════════════════════════════════════════════════════════
+   PROGRAMAS → DECLARADO VS. OBLIGACIÓN
+   Tabla completa de declaraciones + comparador horas por docente
+═══════════════════════════════════════════════════════════════ */
 
-  <!-- Contenido dinámico -->
-  <div id="dvoContent"></div>`;
-
-  // Wire drag & drop
-  const drop = $('dvoDrop');
-  if(drop){
-    drop.addEventListener('dragover', e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); });
-    drop.addEventListener('dragleave', e=>{ drop.classList.remove('over'); });
-    drop.addEventListener('drop', e=>{
-      e.preventDefault(); e.stopPropagation(); drop.classList.remove('over');
-      const f = e.dataTransfer.files[0]; if(f) dvoCargarFile(f);
-    });
-    // Prevent label default for drag events
-    drop.addEventListener('dragenter', e=>{ e.preventDefault(); drop.classList.add('over'); });
-  }
-  // Si ya hay datos cargados, mostrar inmediatamente
-  if(_dvoData.length) dvoRender();
-}
-
-function dvoCargar(input){
-  const f = input.files[0]; if(!f) return;
-  dvoCargarFile(f);
-}
-
-function dvoCargarFile(file){
-  if(typeof XLSX === 'undefined'){ showToast('XLSX no disponible','err'); return; }
-  const drop = $('dvoDrop');
-  const ico  = $('dvoIco');
-  const txt  = $('dvoTxt');
-  const sub  = $('dvoSub');
-  if(ico) ico.textContent = '⏳';
-  if(txt) txt.textContent = 'Procesando...';
-
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try {
-      const wb  = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
-      const ws  = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, {defval:''});
-      _dvoData  = dvoNormalize(raw);
-
-      if(drop){ drop.classList.remove('over'); drop.classList.add('loaded'); }
-      if(ico)  ico.textContent = '✓';
-      if(txt)  txt.textContent = file.name + ' cargado correctamente';
-      if(sub)  sub.textContent = _dvoData.length + ' registros · ' + new Set(_dvoData.map(r=>r.profesor)).size + ' docentes · ' + new Set(_dvoData.map(r=>r.cc)).size + ' centros de costo';
-
-      showToast(_dvoData.length + ' registros cargados','ok');
-      dvoRender();
-    } catch(err){
-      showToast('Error leyendo el archivo: '+err.message,'err');
-      if(ico) ico.textContent = '⚠';
-      if(txt) txt.textContent = 'Error al cargar el archivo';
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function dvoNormalize(rows){
-  return rows.filter(r=>r['Profesor']||r['Horas']).map(function(r){
-    // Parsear monto (viene como "3961088,94" con coma decimal)
-    var montoRaw = String(r['movimiento_monto']||'0');
-    var monto = parseFloat(montoRaw.replace(/\./g,'').replace(',','.')) || 0;
-    return {
-      id:       r['actividad_id']||'',
-      codigo:   String(r['ActividadCodigo']||'').trim(),
-      nombre:   String(r['ActividadNombre']||'').trim(),
-      programa: String(r['Programa']||'').trim(),
-      cc:       String(r['programa_centrocosto']||'').trim(),
-      sede:     String(r['sede']||'').trim(),
-      profesor: String(r['Profesor']||'').trim(),
-      tipoProf: String(r['TipoProfesor']||'').trim(),
-      tipoAct:  String(r['TipoActividad']||'').trim(),
-      horas:    parseFloat(r['Horas']||0)||0,
-      hrsLV:    parseFloat(r['movimiento_horas_lv']||0)||0,
-      hrsSd:    parseFloat(r['movimiento_horas_sd']||0)||0,
-      mes:      String(r['Mes']||r['movimiento_mes']||'').trim(),
-      mesNum:   parseInt(r['movimiento_mes']||0)||0,
-      mesIni:   String(r['MesInicio']||'').trim(),
-      mesFin:   String(r['MesTermino']||'').trim(),
-      fechaIni: r['FechaInicio'] instanceof Date ? r['FechaInicio'] : null,
-      fechaFin: r['FechaTermino'] instanceof Date ? r['FechaTermino'] : null,
-      precioHr: parseFloat(r['movimiento_precio_hora']||0)||0,
-      monto:    monto,
-      honorario:String(r['es_honorario']||'').trim(),
-      esExt:    String(r['EsExtension']||'').trim(),
-    };
-  });
-}
-
-function dvoRender(){
-  const data = _dvoData;
-  if(!data.length) return;
-  const dfPlan = getDF();
-  const hoy    = today();
-
-  // ── Métricas globales ──────────────────────────────────────────
-  const totalHrsDec = data.reduce((s,r)=>s+r.horas,0);
-  const totalMonto  = data.reduce((s,r)=>s+r.monto,0);
-  const nDocentes   = new Set(data.map(r=>r.profesor)).size;
-  const nProgs      = new Set(data.map(r=>r.programa)).size;
-  const nCC         = new Set(data.map(r=>r.cc)).size;
-  const hrsPlan     = dfPlan.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy)
-                             .reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0);
-  const pctCump     = hrsPlan>0 ? Math.min(999,Math.round(totalHrsDec/hrsPlan*100)) : 0;
-
-  // ── Agrupaciones ──────────────────────────────────────────────
-  const porTipo = {};
-  data.forEach(r=>{
-    const t=r.tipoAct||'Otro';
-    if(!porTipo[t]) porTipo[t]={hrs:0,monto:0,n:0};
-    porTipo[t].hrs+=r.horas; porTipo[t].monto+=r.monto; porTipo[t].n++;
-  });
-  const porProg = {};
-  data.forEach(r=>{
-    const k=r.cc+'|'+r.programa;
-    if(!porProg[k]) porProg[k]={cc:r.cc,prog:r.programa,hrs:0,monto:0,n:0,docs:new Set()};
-    porProg[k].hrs+=r.horas; porProg[k].monto+=r.monto; porProg[k].n++;
-    porProg[k].docs.add(r.profesor);
-  });
-  const progList = Object.values(porProg).sort((a,b)=>b.hrs-a.hrs);
-  const MES_ORD  = {'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
-                    'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12};
-  const porMes   = {};
-  data.forEach(r=>{
-    const m=r.mes||'Sin mes';
-    if(!porMes[m]) porMes[m]={hrs:0,monto:0,n:0};
-    porMes[m].hrs+=r.horas; porMes[m].monto+=r.monto; porMes[m].n++;
-  });
-  const mesList  = Object.entries(porMes).sort((a,b)=>(MES_ORD[a[0]]||99)-(MES_ORD[b[0]]||99));
-  const maxHrsMes= Math.max(...mesList.map(([,d])=>d.hrs),1);
-  const porDoc   = {};
-  data.forEach(r=>{
-    if(!porDoc[r.profesor]) porDoc[r.profesor]={hrs:0,monto:0,n:0,tipo:r.tipoProf};
-    porDoc[r.profesor].hrs+=r.horas; porDoc[r.profesor].monto+=r.monto; porDoc[r.profesor].n++;
-  });
-  const docList  = Object.entries(porDoc).sort((a,b)=>b[1].hrs-a[1].hrs).slice(0,12);
-  const maxHrsDoc= Math.max(...docList.map(([,d])=>d.hrs),1);
-  const maxHrsProg=Math.max(...progList.map(d=>d.hrs),1);
-
-  // ── Helper format ─────────────────────────────────────────────
-  function dvoFmtM(n){
-    if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
-    if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
-    if(n>=1e3) return '$'+(n/1e3).toFixed(0)+'K';
-    return '$'+Math.round(n).toLocaleString('es-CL');
-  }
-  function dvoPctColor(p){ return p>=90?'#34d399':p>=70?'#38bdf8':p>=50?'var(--orange)':'#ef4444'; }
-  function tipoBg(t){
-    if(t.includes('Regular'))  return 'background:rgba(56,189,248,.14);color:#38bdf8';
-    if(t.includes('Administ')) return 'background:rgba(245,158,11,.14);color:var(--orange)';
-    if(t.includes('rmino'))    return 'background:rgba(16,185,129,.14);color:#34d399';
-    return 'background:rgba(100,116,139,.14);color:var(--t4)';
-  }
-
-  // ── Sparkline SVG (mini área) ─────────────────────────────────
-  function spark(vals, color, w, h){
-    if(!vals.length) return '';
-    const mx=Math.max(...vals)||1, mn=Math.min(...vals);
-    const xs=vals.map((_,i)=>i/(vals.length-1||1)*w);
-    const ys=vals.map(v=>h-(v-mn)/(mx-mn||1)*h*0.85-2);
-    const pts=xs.map((x,i)=>x+','+ys[i]).join(' ');
-    const area=`${xs[0]},${h} `+xs.map((x,i)=>x+','+ys[i]).join(' ')+` ${xs[xs.length-1]},${h}`;
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block">
-      <defs><linearGradient id="sg${color.replace(/[^a-z]/gi,'')}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-      </linearGradient></defs>
-      <polygon points="${area}" fill="url(#sg${color.replace(/[^a-z]/gi,'')})" />
-      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-    </svg>`;
-  }
-
-  // Sparkline values: horas por mes
-  const sparkVals = mesList.map(([,d])=>d.hrs);
-
-  // ── Area chart SVG para panel principal ───────────────────────
-  function areaChart(entries, color, w, h){
-    if(!entries.length) return `<svg width="${w}" height="${h}"></svg>`;
-    const mx=Math.max(...entries.map(e=>e[1].hrs))||1;
-    const pad=10;
-    const xs=entries.map((_,i)=>pad + i/(entries.length-1||1)*(w-pad*2));
-    const ys=entries.map(([,d])=>h-10-(d.hrs/mx)*(h-24));
-    const linePts=xs.map((x,i)=>x+','+ys[i]).join(' ');
-    const areaPts=`${xs[0]},${h} `+xs.map((x,i)=>x+','+ys[i]).join(' ')+` ${xs[xs.length-1]},${h}`;
-    const barW=Math.max(6, (w-pad*2)/entries.length*0.6);
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-      <defs>
-        <linearGradient id="areaG" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
-        </linearGradient>
-      </defs>
-      ${entries.map(([mes,d],i)=>{
-        const bh=Math.max(2,(d.hrs/mx)*(h-24));
-        return `<rect x="${(xs[i]-barW/2).toFixed(1)}" y="${(h-10-bh).toFixed(1)}" width="${barW}" height="${bh.toFixed(1)}" fill="${color}" opacity="0.18" rx="2"/>`;
-      }).join('')}
-      <polygon points="${areaPts}" fill="url(#areaG)"/>
-      <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      ${xs.map((x,i)=>`<circle cx="${x}" cy="${ys[i]}" r="3" fill="${color}"/>
-        <text x="${x}" y="${h-1}" text-anchor="middle" font-size="8" fill="var(--t4)">${esc(abbr(entries[i][0],4))}</text>
-        <text x="${x}" y="${(ys[i]-7).toFixed(0)}" text-anchor="middle" font-size="8" fill="var(--t2)" font-weight="700">${Math.round(entries[i][1].hrs)}h</text>`).join('')}
-    </svg>`;
-  }
-
-  // ── Donut SVG ─────────────────────────────────────────────────
-  function donut(slices, cx, cy, r, stroke){
-    let cum=0;
-    const total=slices.reduce((s,d)=>s+d.val,0)||1;
-    const COLORS=['#38bdf8','#34d399','var(--orange)','#AFA9EC','#ef4444','#5DCAA5'];
-    return slices.map((s,i)=>{
-      const pct=s.val/total, ang=pct*2*Math.PI;
-      const x1=cx+r*Math.sin(cum*2*Math.PI);
-      const y1=cy-r*Math.cos(cum*2*Math.PI);
-      cum+=pct;
-      const x2=cx+r*Math.sin(cum*2*Math.PI);
-      const y2=cy-r*Math.cos(cum*2*Math.PI);
-      const large=pct>0.5?1:0;
-      const col=COLORS[i%COLORS.length];
-      return `<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${col}" opacity="0.85"/>`;
-    }).join('');
-  }
-
-  // Preparar slices para donut
-  const tipoEntries = Object.entries(porTipo).sort((a,b)=>b[1].hrs-a[1].hrs);
-  const DCOLORS=['#38bdf8','#34d399','var(--orange)','#AFA9EC','#ef4444','#5DCAA5'];
-  const donutSlices = tipoEntries.map((e,i)=>({val:e[1].hrs, lbl:e[0], color:DCOLORS[i%DCOLORS.length]}));
-
-  // ── Render HTML ───────────────────────────────────────────────
-  $('dvoContent').innerHTML = `
-
-  <!-- ═══ KPI ROW ═══ -->
-  <div class="dvo-kpi-row">
-    <div class="dvo-kpi-card">
-      <div class="dvo-kpi-label">Cumplimiento <span class="dvo-kpi-label-arrow">›</span></div>
-      <div class="dvo-kpi-value" style="color:${dvoPctColor(pctCump)}">${pctCump}%</div>
-      <div class="dvo-kpi-meta">
-        <span class="dvo-kpi-badge ${pctCump>=90?'up':pctCump>=60?'ne':'dn'}">${pctCump>=90?'▲ Meta alcanzada':pctCump>=60?'● En rango':'▼ Revisar'}</span>
-        <span style="color:var(--t4);font-size:9px">${Math.round(totalHrsDec)}h de ${Math.round(hrsPlan)}h</span>
-      </div>
-      <div class="dvo-kpi-spark">${spark(sparkVals,'#38bdf8',80,36)}</div>
-    </div>
-    <div class="dvo-kpi-card">
-      <div class="dvo-kpi-label">Horas declaradas <span class="dvo-kpi-label-arrow">›</span></div>
-      <div class="dvo-kpi-value" style="color:#38bdf8">${Math.round(totalHrsDec).toLocaleString('es-CL')}</div>
-      <div class="dvo-kpi-meta">
-        <span class="dvo-kpi-badge up">▲ ${data.length} registros</span>
-        <span style="color:var(--t4);font-size:9px">${nCC} CC</span>
-      </div>
-      <div class="dvo-kpi-spark">${spark(sparkVals,'#38bdf8',80,36)}</div>
-    </div>
-    <div class="dvo-kpi-card">
-      <div class="dvo-kpi-label">Monto total <span class="dvo-kpi-label-arrow">›</span></div>
-      <div class="dvo-kpi-value" style="color:#34d399;font-size:22px">${dvoFmtM(totalMonto)}</div>
-      <div class="dvo-kpi-meta">
-        <span class="dvo-kpi-badge up">▲ ${nProgs} programas</span>
-        <span style="color:var(--t4);font-size:9px">período</span>
-      </div>
-      <div class="dvo-kpi-spark">${spark(mesList.map(([,d])=>d.monto),'#34d399',80,36)}</div>
-    </div>
-    <div class="dvo-kpi-card">
-      <div class="dvo-kpi-label">Docentes <span class="dvo-kpi-label-arrow">›</span></div>
-      <div class="dvo-kpi-value" style="color:var(--blue)">${nDocentes}</div>
-      <div class="dvo-kpi-meta">
-        <span class="dvo-kpi-badge ne">● ${nCC} centros costo</span>
-      </div>
-      <div class="dvo-kpi-spark">${spark(docList.map(([,d])=>d.hrs),'#AFA9EC',80,36)}</div>
-    </div>
-  </div>
-
-  <!-- ═══ MAIN GRID: Área izq + Donut der ═══ -->
-  <div class="dvo-main-grid">
-    <!-- Panel área: evolución mensual -->
-    <div class="dvo-panel">
-      <div class="dvo-panel-title">
-        Evolución mensual de horas declaradas
-        <span class="dvo-panel-tag">${mesList.length} mes${mesList.length!==1?'es':''}</span>
-      </div>
-      <div class="dvo-panel-sub">Horas efectivas declaradas por período</div>
-      <div class="dvo-canvas-wrap">
-        ${areaChart(mesList,'#38bdf8',560,160)}
-      </div>
-    </div>
-
-    <!-- Panel donut: por tipo actividad -->
-    <div class="dvo-panel">
-      <div class="dvo-panel-title">Distribución por tipo</div>
-      <div class="dvo-panel-sub">Composición del total declarado</div>
-      <div class="dvo-donut-wrap">
-        <svg width="130" height="130" viewBox="0 0 130 130" style="flex-shrink:0">
-          ${donut(donutSlices,65,65,50,8)}
-          <circle cx="65" cy="65" r="30" fill="var(--bg2)"/>
-          <text x="65" y="62" text-anchor="middle" font-size="14" font-weight="800" fill="var(--t1)">${Math.round(totalHrsDec/1000)}K</text>
-          <text x="65" y="75" text-anchor="middle" font-size="8" fill="var(--t4)">horas</text>
-        </svg>
-        <div class="dvo-donut-legend">
-          ${donutSlices.map((s,i)=>`
-          <div class="dvo-donut-leg-item">
-            <div class="dvo-donut-leg-left">
-              <div class="dvo-donut-dot" style="background:${s.color}"></div>
-              <span title="${esc(s.lbl)}">${esc(abbr(s.lbl,18))}</span>
-            </div>
-            <span class="dvo-donut-pct">${Math.round(s.val/totalHrsDec*100)}%</span>
-          </div>`).join('')}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ BOTTOM GRID: Top docentes + Top programas ═══ -->
-  <div class="dvo-bottom-grid">
-    <!-- Top docentes -->
-    <div class="dvo-panel">
-      <div class="dvo-panel-title">Top docentes por horas <span class="dvo-panel-tag">Top ${docList.length}</span></div>
-      <div class="dvo-panel-sub">Horas declaradas por docente en el período</div>
-      <div class="dvo-hbar-list">
-        ${docList.map(([prof,d],i)=>`
-        <div class="dvo-hbar-item">
-          <div class="dvo-hbar-top">
-            <span class="dvo-hbar-name" title="${esc(prof)}">${i+1}. ${esc(abbr(prof,22))}</span>
-            <div class="dvo-hbar-right">
-              <span class="dvo-hbar-val">${Math.round(d.hrs)}h</span>
-              <span class="dvo-hbar-pct">${dvoFmtM(d.monto)}</span>
-            </div>
-          </div>
-          <div class="dvo-hbar-track">
-            <div class="dvo-hbar-fill" style="width:${Math.round(d.hrs/maxHrsDoc*100)}%;background:${d.tipo==='REGULAR'?'#38bdf8':'var(--orange)'}"></div>
-          </div>
-        </div>`).join('')}
-      </div>
-    </div>
-
-    <!-- Top programas / CC -->
-    <div class="dvo-panel">
-      <div class="dvo-panel-title">Horas por programa / CC <span class="dvo-panel-tag">${progList.length} programas</span></div>
-      <div class="dvo-panel-sub">Centro de costo y total de horas declaradas</div>
-      <div class="dvo-hbar-list">
-        ${progList.slice(0,12).map((p,i)=>`
-        <div class="dvo-hbar-item">
-          <div class="dvo-hbar-top">
-            <span class="dvo-hbar-name" title="${esc(p.prog)}">${i+1}. CC ${esc(p.cc)}</span>
-            <div class="dvo-hbar-right">
-              <span class="dvo-hbar-val">${Math.round(p.hrs)}h</span>
-              <span class="dvo-hbar-pct">${p.docs.size} doc</span>
-            </div>
-          </div>
-          <div class="dvo-hbar-track">
-            <div class="dvo-hbar-fill" style="width:${Math.round(p.hrs/maxHrsProg*100)}%;background:rgba(83,74,183,.8)"></div>
-          </div>
-        </div>`).join('')}
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ TABLA TRANSACCIONES (estilo Aether) ═══ -->
-  <div class="dvo-panel" style="margin-bottom:14px">
-    <div class="dvo-panel-title">
-      Detalle de declaraciones
-      <span class="dvo-panel-tag">${data.length} registros</span>
-    </div>
-    <div class="dvo-panel-sub">Últimos registros del reporte de declaraciones cargado</div>
-    <div style="overflow-x:auto">
-      <table class="dvo-tx-table">
-        <thead><tr>
-          <th>Tipo</th><th>Actividad</th><th>Docente</th>
-          <th>CC</th><th style="text-align:right">Horas</th>
-          <th style="text-align:right">Monto</th><th>Mes</th>
-        </tr></thead>
-        <tbody>
-          ${data.slice(0,20).map(r=>`
-          <tr>
-            <td><span class="dvo-tx-tipo" style="${tipoBg(r.tipoAct)}">${esc(abbr(r.tipoAct,14))}</span></td>
-            <td style="font-weight:600;color:var(--t1);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.nombre)}">${esc(abbr(r.nombre,22))}</td>
-            <td style="color:var(--t3);white-space:nowrap" title="${esc(r.profesor)}">${esc(abbr(r.profesor,20))}</td>
-            <td style="font-family:monospace;font-size:9px;color:var(--t4)">${esc(r.cc)}</td>
-            <td style="text-align:right;font-weight:700;color:#38bdf8">${r.horas}h</td>
-            <td style="text-align:right;color:#34d399;font-weight:600">${dvoFmtM(r.monto)}</td>
-            <td style="color:var(--t4);font-size:10px">${esc(r.mes)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Visualizaciones avanzadas -->
-  <div id="dvoViz"></div>
-
-  <!-- Botones -->
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-    <button class="btn btn-g btn-sm" onclick="dvoExcel()">📊 Exportar Excel</button>
-    <button class="btn btn-g btn-sm" onclick="_dvoData=[];renderDeclarado();showToast('Datos limpiados','info')">🗑 Limpiar</button>
-  </div>`;
-
-  setTimeout(function(){ dvoRenderViz(data, porProg, porTipo, hrsPlan, totalHrsDec); }, 80);
-}
-
-function dvoRenderViz(data, porProg, porTipo, hrsPlan, totalHrsDec){
-  const el = $('dvoViz'); if(!el) return;
-  const hoy=today(), progList=Object.values(porProg).sort((a,b)=>b.hrs-a.hrs);
-
-  // Horas planificadas por CC
-  const dfPlan=getDF(), planCC={};
-  dfPlan.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).forEach(r=>{
-    const cc=String(r['CC']||'').trim(); if(!cc) return;
-    planCC[cc]=(planCC[cc]||0)+(parseFloat(r['HORAS'])||0);
-  });
-
-  function dvoFmtM3(n){
-    if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
-    if(n>=1e3) return '$'+(n/1e3).toFixed(0)+'K';
-    return '$'+Math.round(n);
-  }
-
-  // ── RADAR ─────────────────────────────────────────────────────
-  const radarProgs=progList.slice(0,5);
-  const AXES=['Cumplimiento\nHoras','Eficiencia\nPresup.','Cobertura\nDocentes','Diversidad\nActiv.','Regularidad'];
-  const N=AXES.length, CX=200, CY=195, R=140;
-  const maxHrsAll=Math.max(...progList.map(p=>p.hrs),1);
-  const maxDocs=Math.max(...progList.map(p=>p.docs.size),1);
-  const RCOLORS=['#38bdf8','#34d399','#EF9F27','#AFA9EC','#F09595'];
-  function rpt(val,ai,radius){ const ang=(Math.PI*2/N)*ai-Math.PI/2; const r2=radius*val/100; return {x:CX+r2*Math.cos(ang),y:CY+r2*Math.sin(ang)}; }
-  function rscore(p){
-    const planH=planCC[p.cc]||0;
-    const cump=planH>0?Math.min(100,Math.round(p.hrs/planH*100)):50;
-    const efic=Math.round((1-Math.abs(p.monto/Math.max(...progList.map(x=>x.monto),1)-p.hrs/maxHrsAll))*100);
-    const cob=Math.round(p.docs.size/maxDocs*100);
-    const div=Math.min(100,new Set(data.filter(r=>r.cc===p.cc).map(r=>r.tipoAct)).size*20);
-    const reg=Math.min(100,new Set(data.filter(r=>r.cc===p.cc).map(r=>r.mes)).size*25);
-    return [cump,Math.max(0,efic),cob,div,reg];
-  }
-  let rsvg=`<svg width="400" height="400" viewBox="0 0 400 400" style="overflow:visible">`;
-  [20,40,60,80,100].forEach(v=>{
-    const pts=Array.from({length:N},(_,i)=>rpt(v,i,R));
-    rsvg+=`<polygon points="${pts.map(p=>p.x+','+p.y).join(' ')}" fill="none" stroke="var(--border2)" stroke-width="0.8"/>`;
-  });
-  Array.from({length:N},(_,i)=>{
-    const pt=rpt(100,i,R), lpt=rpt(122,i,R);
-    rsvg+=`<line x1="${CX}" y1="${CY}" x2="${pt.x.toFixed(1)}" y2="${pt.y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`;
-    const lines=AXES[i].split('\n');
-    rsvg+=`<text x="${lpt.x.toFixed(1)}" y="${lpt.y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="var(--t3)">`;
-    lines.forEach((l,li)=>{ rsvg+=`<tspan x="${lpt.x.toFixed(1)}" dy="${li===0?0:12}">${l}</tspan>`; });
-    rsvg+=`</text>`;
-  });
-  radarProgs.forEach((p,pi)=>{
-    const scores=rscore(p), pts=scores.map((s,i)=>rpt(s,i,R));
-    const col=RCOLORS[pi%RCOLORS.length];
-    rsvg+=`<polygon points="${pts.map(pt=>pt.x.toFixed(1)+','+pt.y.toFixed(1)).join(' ')}" fill="${col}" fill-opacity="0.13" stroke="${col}" stroke-width="2"/>`;
-    pts.forEach(pt=>{ rsvg+=`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4" fill="${col}"/>`; });
-  });
-  rsvg+=`</svg>`;
-
-  // ── WATERFALL ─────────────────────────────────────────────────
-  const wfItems=[{lbl:'Planificado\nejecutado',val:hrsPlan,type:'base'},
-    ...Object.entries(porTipo).sort((a,b)=>b[1].hrs-a[1].hrs)
-      .map(([t,d])=>({lbl:abbr(t,12),val:d.hrs,type:'add'}))];
-  const wfDiff=totalHrsDec-hrsPlan;
-  wfItems.push({lbl:wfDiff>=0?'Excedente':'Déficit',val:Math.abs(wfDiff),type:wfDiff>=0?'pos':'neg'});
-  const WW=560,WH=200,PAD=48,BAR=40,GAP=10;
-  const wfMax=Math.max(...wfItems.map(i=>i.val),hrsPlan,totalHrsDec)*1.18;
-  const wfScale=(WH-30)/wfMax;
-  let wfSvg=`<svg class="wf-svg" width="${PAD+wfItems.length*(BAR+GAP)+40}" height="${WH+55}" viewBox="0 0 ${PAD+wfItems.length*(BAR+GAP)+40} ${WH+55}">`;
-  wfSvg+=`<line x1="${PAD}" y1="${WH}" x2="${PAD+wfItems.length*(BAR+GAP)}" y2="${WH}" stroke="var(--border)" stroke-width="1"/>`;
-  let running=0;
-  wfItems.forEach((item,i)=>{
-    const x=PAD+i*(BAR+GAP);
-    const color=item.type==='base'?'#38bdf8':item.type==='add'?'rgba(83,74,183,.85)':item.type==='pos'?'#34d399':'#ef4444';
-    const h=Math.max(4,item.val*wfScale);
-    const base=item.type==='base'?0:running;
-    const y=WH-(base+(item.type==='neg'?0:item.val))*wfScale;
-    if(item.type!=='base'&&i>0){
-      const prevX=PAD+(i-1)*(BAR+GAP)+BAR;
-      const prevY=WH-running*wfScale;
-      wfSvg+=`<line x1="${prevX}" y1="${prevY.toFixed(1)}" x2="${x+BAR}" y2="${prevY.toFixed(1)}" stroke="var(--border2)" stroke-width="1" stroke-dasharray="3 2"/>`;
-    }
-    wfSvg+=`<rect x="${x}" y="${y.toFixed(1)}" width="${BAR}" height="${h.toFixed(1)}" fill="${color}" rx="3"/>`;
-    wfSvg+=`<text x="${x+BAR/2}" y="${(y-6).toFixed(0)}" text-anchor="middle" font-size="8" font-weight="700" fill="var(--t2)">${Math.round(item.val)}h</text>`;
-    const lblLines=item.lbl.split('\n');
-    const lblY=WH+14;
-    wfSvg+=`<text x="${x+BAR/2}" y="${lblY}" text-anchor="middle" font-size="8" fill="var(--t3)">`;
-    lblLines.forEach((l,li)=>{ wfSvg+=`<tspan x="${x+BAR/2}" dy="${li===0?0:10}">${l}</tspan>`; });
-    wfSvg+=`</text>`;
-    if(item.type==='add') running+=item.val;
-  });
-  wfSvg+=`</svg>`;
-
-  // ── TREEMAP ───────────────────────────────────────────────────
-  const TM_W=680,TM_H=300;
-  function tmSq(items,x,y,w,h){
-    if(!items.length) return [];
-    const result=[]; let rem=[...items],rx=x,ry=y,rw=w,rh=h;
-    while(rem.length){
-      const row=[]; let rowSum=0,best=Infinity,i=0;
-      while(i<rem.length){
-        row.push(rem[i]); rowSum+=rem[i].val;
-        const side=Math.min(rw,rh);
-        const worst=Math.max(...row.map(it=>Math.max(side*side*it.val/rowSum/rowSum,rowSum/side/side/it.val)));
-        if(worst<best||row.length===1){best=worst;i++;}
-        else{row.pop();rowSum-=rem[i-1].val;break;}
-      }
-      rem=rem.slice(row.length);
-      const vert=rw>=rh; let pos=vert?rx:ry;
-      const dim=vert?rw:rh,side=Math.min(rw,rh);
-      row.forEach(it=>{
-        const frac=it.val/rowSum;
-        result.push({...it,x:vert?pos:rx,y:vert?ry:pos,w:vert?frac*dim:side,h:vert?side:frac*dim});
-        pos+=frac*dim;
-      });
-      if(vert){rx+=dim;rw-=dim;}else{ry+=dim;rh-=dim;}
-      if(rw<1||rh<1) break;
-    }
-    return result;
-  }
-  const tmData=progList.map(p=>{
-    const planH=planCC[p.cc]||0;
-    const cump=planH>0?Math.min(200,Math.round(p.hrs/planH*100)):50;
-    return {cc:p.cc,prog:p.prog,val:p.hrs,monto:p.monto,docs:p.docs.size,cump,planH};
-  });
-  const totalTmHrs=tmData.reduce((s,d)=>s+d.val,0)||1;
-  const tmNorm=tmData.map(d=>({...d,val:d.val/totalTmHrs*TM_W*TM_H}));
-  const cells=tmSq(tmNorm,0,0,TM_W,TM_H);
-  function cumpBg(p){ return p>=90?'#0F6E56':p>=70?'#185FA5':p>=50?'#854F0B':'#A32D2D'; }
-  function cumpFg(p){ return p>=90?'#5DCAA5':p>=70?'#85B7EB':p>=50?'#EF9F27':'#F09595'; }
-  let tmHtml=`<div class="tm-wrap" style="height:${TM_H}px"><div class="tm-tooltip" id="tmTooltip2"></div>`;
-  cells.forEach(cell=>{
-    if(cell.w<4||cell.h<4) return;
-    const hrs=Math.round(cell.val*totalTmHrs/TM_W/TM_H);
-    tmHtml+=`<div class="tm-cell" style="left:${cell.x.toFixed(1)}px;top:${cell.y.toFixed(1)}px;width:${cell.w.toFixed(1)}px;height:${cell.h.toFixed(1)}px;background:${cumpBg(cell.cump)}"
-      onmouseenter="tmTip2(event,'${esc(cell.cc)}','${esc(abbr(cell.prog,40))}','${hrs}','${cell.cump}','${cell.docs}')"
-      onmouseleave="tmHide2()">
-      <div class="tm-label" style="height:${cell.h.toFixed(0)}px;overflow:hidden">
-        ${cell.w>60&&cell.h>28?`<div class="tm-lbl-cc" style="color:${cumpFg(cell.cump)}">${esc(cell.cc)}</div>`:''}
-        ${cell.h>46?`<div class="tm-lbl-hrs" style="color:#fff;font-size:${cell.w>80?14:10}px">${hrs}h</div>`:''}
-        ${cell.h>66?`<div class="tm-lbl-pct">${cell.cump}% cump.</div>`:''}
-      </div></div>`;
-  });
-  tmHtml+=`</div>`;
-
-  el.innerHTML=`
-  <div class="dvo-bottom-grid">
-    <div class="viz-section" style="margin:0">
-      <div class="viz-title"><div class="viz-ico" style="background:rgba(56,189,248,.1)">🕸</div>Radar — Desempeño multidimensional</div>
-      <div class="viz-sub">Top 5 programas · 5 dimensiones simultáneas</div>
-      <div class="radar-wrap">
-        ${rsvg}
-        <div class="radar-legend">${radarProgs.map((p,pi)=>`
-          <div class="radar-leg-item">
-            <div class="radar-leg-dot" style="background:${RCOLORS[pi]}"></div>
-            <span title="${esc(p.prog)}">${esc(p.cc)} — ${esc(abbr(p.prog,20))}</span>
-          </div>`).join('')}
-        </div>
-      </div>
-    </div>
-    <div class="viz-section" style="margin:0">
-      <div class="viz-title"><div class="viz-ico" style="background:rgba(16,185,129,.1)">📊</div>Cascada — Conciliación de horas</div>
-      <div class="viz-sub">Planificado → tipos de actividad → total declarado</div>
-      <div class="wf-wrap">${wfSvg}</div>
-      <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;font-size:9px">
-        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#38bdf8"></div>Base</div>
-        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(83,74,183,.8)"></div>Actividad</div>
-        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#34d399"></div>Excedente</div>
-        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:#ef4444"></div>Déficit</div>
-      </div>
-    </div>
-  </div>
-  <div class="viz-section" style="margin-top:14px">
-    <div class="viz-title"><div class="viz-ico" style="background:rgba(245,158,11,.1)">🗺</div>Treemap — Peso de cada Centro de Costo</div>
-    <div class="viz-sub">Tamaño = horas declaradas · Color = nivel de cumplimiento · Hover para detalle</div>
-    ${tmHtml}
-    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
-      ${[['≥90%','#0F6E56','Alto'],['70–89%','#185FA5','En línea'],['50–69%','#854F0B','Bajo'],['<50%','#A32D2D','Riesgo']].map(([rng,col,lbl])=>`
-      <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t2)">
-        <div style="width:10px;height:10px;border-radius:3px;background:${col};flex-shrink:0"></div>
-        <strong>${rng}</strong> ${lbl}
-      </div>`).join('')}
-    </div>
-  </div>`;
-}
-
-function dvoExcel(){
-  if(!_dvoData.length){ showToast('Sin datos','warn'); return; }
-  const rows=_dvoData.map(r=>({
-    'CC':r.cc,'Programa':r.programa,'Docente':r.profesor,'Tipo Prof.':r.tipoProf,
-    'Tipo Actividad':r.tipoAct,'Actividad':r.nombre,'Mes':r.mes,
-    'Horas':r.horas,'Horas L-V':r.hrsLV,'Horas S-D':r.hrsSd,
-    'Precio Hora':Math.round(r.precioHr),'Monto':Math.round(r.monto),
-    'Honorario':r.honorario,'Sede':r.sede,
-  }));
-  var d=today().toLocaleDateString('es-CL').split('/').join('-');
-  DL.excel(rows,'Declarado_Analisis_'+d+'.xlsx');
-  showToast(rows.length+' registros exportados','ok');
-}
-
-function tmTip2(e,cc,prog,hrs,cump,docs){
-  const t=$('tmTooltip2'); if(!t) return;
-  t.style.display='block'; t.style.left=(e.clientX+12)+'px'; t.style.top=(e.clientY-10)+'px';
-  t.innerHTML='<div style="font-weight:800;color:var(--blue);margin-bottom:4px">CC '+esc(cc)+'</div>'
-    +'<div style="color:var(--t2);margin-bottom:6px;font-size:9px">'+esc(prog)+'</div>'
-    +'<div style="display:flex;flex-direction:column;gap:3px">'
-    +'<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--t4)">Horas</span><strong>'+hrs+'h</strong></div>'
-    +'<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--t4)">Cumplimiento</span><strong style="color:'+(cump>=90?'#34d399':cump>=70?'#38bdf8':cump>=50?'var(--orange)':'#ef4444')+'">'+cump+'%</strong></div>'
-    +'<div style="display:flex;justify-content:space-between;gap:12px"><span style="color:var(--t4)">Docentes</span><strong>'+docs+'</strong></div>'
-    +'</div>';
-}
-function tmHide2(){ const t=$('tmTooltip2'); if(t) t.style.display='none'; }
-
+var _dvoFCC   = '';   // filtro centro de costo
+var _dvoFMes  = '';   // filtro mes
+var _dvoFTipo = '';   // filtro tipo actividad
+var _dvoFBusca= '';   // búsqueda docente/asig
+var _dvoVista = 'tabla'; // 'tabla' | 'comparador'
+var _dvoPage  = 1;
+const _DVO_PER = 40;
 
 function renderCalendario() {
   const df=getDF();
@@ -6259,6 +6202,323 @@ function mallaLoad(){
   try { return JSON.parse(localStorage.getItem('malla_data')||'[]'); } catch(e){ return []; }
 }
 function mallaSave(d){ localStorage.setItem('malla_data', JSON.stringify(d)); }
+
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PLANIFICADOR → REPORTE DE PLANIFICACIONES D-M
+   Replica exactamente el dashboard standalone con DATA precalculada
+═══════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PLANIFICADOR → REPORTE DE PLANIFICACIONES
+   Carga dinámica de Excel — agrupa por período académico
+   igual que el dashboard standalone Reporte_Planficaciones_D-M
+═══════════════════════════════════════════════════════════════ */
+
+var _prData   = [];   // DATA procesada desde Excel
+var _prYears  = [];   // totales por año
+var _prYear   = 'all';
+var _prSearch = '';
+var _prPage   = 1;
+const _PR_PP  = 40;
+
+function renderPlanReporte() {
+  var pg = $('page'); if (!pg) return;
+  _prYear = 'all'; _prSearch = ''; _prPage = 1;
+
+  pg.innerHTML =
+    '<div class="pg-title">Reporte de Planificaciones — D&M</div>' +
+
+    // ── Upload zone ─────────────────────────────────────────────
+    '<div id="prUpZone" style="border:2px dashed var(--border);border-radius:10px;padding:22px;'+
+      'text-align:center;margin-bottom:16px;transition:border-color .2s;'+
+      'display:'+(_prData.length?'none':'block')+'"'+
+      ' ondragover="event.preventDefault();this.style.borderColor=\'var(--blue)\'"'+
+      ' ondragleave="this.style.borderColor=\'var(--border)\'"'+
+      ' ondrop="prHandleDrop(event)">'+
+      '<div style="font-size:28px;margin-bottom:6px">📊</div>'+
+      '<div style="font-weight:600;color:var(--t1);margin-bottom:4px">Arrastra el reporte aquí</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Reporte_Planficaciones_D-M.xlsx</div>'+
+      '<label style="cursor:pointer">'+
+        '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="prCargar(this.files[0])">'+
+        '<span class="btn btn-p btn-sm">📂 Seleccionar archivo</span>'+
+      '</label>'+
+    '</div>' +
+
+    // ── Status ──────────────────────────────────────────────────
+    '<div id="prStatus" style="font-size:11px;color:var(--t3);margin-bottom:14px">'+
+      (_prData.length ?
+        '✅ '+_prData.length+' períodos cargados &nbsp;·&nbsp; '+
+        '<a href="#" onclick="prReset();return false" style="color:var(--blue)">cambiar archivo</a>' :
+        'Carga el Excel para analizar planificaciones por período académico.')+
+    '</div>'+
+
+    // ── Contenido (oculto hasta cargar) ─────────────────────────
+    '<div id="prContenido" style="display:'+(_prData.length?'block':'none')+'">'+
+      '<div class="aud-kpi-row" id="prKpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:18px"></div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">'+
+        '<span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase">Año:</span>'+
+        '<div id="prYearBtns" style="display:flex;gap:5px;flex-wrap:wrap"></div>'+
+        '<div style="margin-left:auto">'+
+          '<input type="text" id="prBusca" placeholder="Buscar período académico…" '+
+            'oninput="_prOnSearch(this.value)" '+
+            'style="font-size:12px;padding:5px 14px;border:1px solid var(--border);border-radius:20px;background:var(--surface2);color:var(--t1);width:240px;outline:none">'+
+        '</div>'+
+      '</div>'+
+      '<div id="prSummary" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px"></div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:8px" id="prStatsRow"></div>'+
+      '<div class="tbl-wrap mh"><div style="overflow-x:auto"><table class="dt">'+
+        '<thead><tr>'+
+          '<th>Año</th><th>Período Académico</th>'+
+          '<th class="center">Total</th><th class="center">Con Horas</th><th class="center">Sin Horas</th>'+
+          '<th class="center">% Horas</th><th class="center">Doc. Sí</th><th class="center">Doc. No</th>'+
+          '<th class="center">% Doc.</th><th class="center">Créditos</th>'+
+        '</tr></thead>'+
+        '<tbody id="prTbody"></tbody>'+
+      '</table></div>'+
+      '<div id="prPag" style="display:flex;justify-content:center;gap:6px;padding:14px;flex-wrap:wrap"></div>'+
+      '</div>'+
+    '</div>';
+
+  if (_prData.length) { _prRenderKpis(); _prRenderYears(); _prRenderSummary(); _prRenderTable(); }
+}
+
+/* ── Handlers de carga ────────────────────────────────────── */
+function prHandleDrop(e) {
+  e.preventDefault();
+  var uz = document.getElementById('prUpZone');
+  if (uz) uz.style.borderColor = 'var(--border)';
+  var f = e.dataTransfer.files[0]; if (f) prCargar(f);
+}
+
+function prReset() {
+  _prData = []; _prYears = []; _prYear = 'all'; _prSearch = ''; _prPage = 1;
+  renderPlanReporte();
+}
+
+function prCargar(file) {
+  if (!file) return;
+  var st = document.getElementById('prStatus');
+  if (st) st.textContent = '⏳ Cargando ' + file.name + '…';
+  var rd = new FileReader();
+  rd.onload = function(ev) {
+    try {
+      var wb = XLSX.read(ev.target.result, {type:'array'});
+      // Buscar hoja "Data"
+      var shName = wb.SheetNames.find(function(n){ return n.toLowerCase()==='data'; }) || wb.SheetNames[0];
+      var raw = XLSX.utils.sheet_to_json(wb.Sheets[shName], {defval:''});
+
+      // Filtrar solo PROFESORES
+      var profs = raw.filter(function(r){
+        return String(r['TIPO INSTRUCTOR']||'').trim().toUpperCase() === 'PROFESOR';
+      });
+
+      // Agrupar por período + año
+      var pm = {};
+      profs.forEach(function(r) {
+        var per = String(r['PERIDO ACADEMICO']||'').trim();
+        var ano = parseInt(r['AÑO PERIODO ACAD.'])||0;
+        var key = per + '||' + ano;
+        if (!pm[key]) pm[key] = {periodo:per, año:ano, total:0, ch:0, sh:0, dsi:0, dno:0, ct:0, cp_sum:0, ht:0};
+        var hrs  = parseFloat(r['HORAS ACADÉMICAS'])||0;
+        var cred = parseFloat(r['CREDITOS'])||0;
+        var docP = String(r['DOCUMENTO PROGRAMA SECCIÓN']||'').trim().toUpperCase();
+        pm[key].total++;
+        if (hrs > 0) pm[key].ch++; else pm[key].sh++;
+        if (docP === 'SI') pm[key].dsi++; else pm[key].dno++;
+        pm[key].ct      += hrs;
+        pm[key].cp_sum  += cred;
+        pm[key].ht      += hrs;
+      });
+
+      _prData = Object.values(pm).map(function(d) {
+        return {
+          periodo: d.periodo,
+          año:     d.año,
+          total:   d.total,
+          ch:      d.ch,
+          sh:      d.sh,
+          dsi:     d.dsi,
+          dno:     d.dno,
+          ct:      Math.round(d.ct * 100) / 100,
+          cp:      d.total > 0 ? Math.round(d.cp_sum / d.total * 100) / 100 : 0,
+          ht:      Math.round(d.ht * 100) / 100,
+        };
+      });
+
+      // Totales por año
+      var ym = {};
+      _prData.forEach(function(d) {
+        if (!ym[d.año]) ym[d.año] = {year:d.año, total:0, ch:0, sh:0, dsi:0, dno:0, ct:0};
+        ym[d.año].total += d.total; ym[d.año].ch += d.ch; ym[d.año].sh += d.sh;
+        ym[d.año].dsi   += d.dsi;  ym[d.año].dno += d.dno; ym[d.año].ct += d.ct;
+      });
+      _prYears = Object.values(ym).sort(function(a,b){return a.year-b.year;});
+
+      // Reset y mostrar
+      _prYear = 'all'; _prSearch = ''; _prPage = 1;
+      var uz = document.getElementById('prUpZone');   if (uz) uz.style.display = 'none';
+      var co = document.getElementById('prContenido');if (co) co.style.display = 'block';
+      var st2 = document.getElementById('prStatus');
+      if (st2) st2.innerHTML = '✅ '+_prData.length+' períodos cargados &nbsp;·&nbsp; '+
+        '<a href="#" onclick="prReset();return false" style="color:var(--blue)">cambiar archivo</a>';
+
+      _prRenderKpis(); _prRenderYears(); _prRenderSummary(); _prRenderTable();
+
+    } catch(err) {
+      var st3 = document.getElementById('prStatus');
+      if (st3) st3.textContent = '❌ Error: ' + err.message;
+    }
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* ── Filtrado ──────────────────────────────────────────────── */
+function _prFilt() {
+  var d = _prData;
+  if (_prYear !== 'all') d = d.filter(function(r){ return r.año === parseInt(_prYear); });
+  if (_prSearch) {
+    var q = _prSearch.toLowerCase();
+    d = d.filter(function(r){ return r.periodo.toLowerCase().includes(q); });
+  }
+  return d;
+}
+
+/* ── KPIs ──────────────────────────────────────────────────── */
+function _prRenderKpis() {
+  var el = document.getElementById('prKpis'); if (!el) return;
+  var d = _prFilt();
+  var tot = d.reduce(function(s,r){return s+r.total;},0);
+  var ch  = d.reduce(function(s,r){return s+r.ch;},0);
+  var sh  = d.reduce(function(s,r){return s+r.sh;},0);
+  var dsi = d.reduce(function(s,r){return s+r.dsi;},0);
+  var dno = d.reduce(function(s,r){return s+r.dno;},0);
+  var pH  = tot ? (ch/tot*100).toFixed(1) : '0';
+  var pD  = tot ? (dsi/tot*100).toFixed(1) : '0';
+  var kpis = [
+    {lbl:'Total Secciones',  val:tot.toLocaleString('es-CL'),  det:d.length+' períodos',         color:'var(--blue)'},
+    {lbl:'Con Horas Planif.',val:ch.toLocaleString('es-CL'),   det:pH+'% del total',             color:'var(--green)'},
+    {lbl:'Sin Horas',        val:sh.toLocaleString('es-CL'),   det:(100-pH).toFixed(1)+'% pend.',color:'var(--red)'},
+    {lbl:'Doc. Ingresada',   val:dsi.toLocaleString('es-CL'),  det:pD+'% completado',            color:'#7c3aed'},
+    {lbl:'Doc. Pendiente',   val:dno.toLocaleString('es-CL'),  det:(100-pD).toFixed(1)+'% sin doc.',color:'var(--orange)'},
+  ];
+  el.innerHTML = kpis.map(function(k){
+    return '<div class="aud-kpi" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px">'+
+      '<div class="aud-kpi-lbl">'+k.lbl+'</div>'+
+      '<div class="aud-kpi-val" style="color:'+k.color+'">'+k.val+'</div>'+
+      '<div class="aud-kpi-sub">'+k.det+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+/* ── Botones año ───────────────────────────────────────────── */
+function _prRenderYears() {
+  var el = document.getElementById('prYearBtns'); if (!el) return;
+  var years = _prYears.map(function(y){return y.year;});
+  var h = _prYearBtn('all', 'Todos', _prYear==='all');
+  years.forEach(function(y){ h += _prYearBtn(String(y), String(y), _prYear===String(y)); });
+  el.innerHTML = h;
+}
+
+function _prYearBtn(val, lbl, on) {
+  return '<button onclick="_prSetYear(\''+val+'\')" style="'+
+    'background:'+(on?'var(--blue)':'var(--surface2)')+';'+
+    'color:'+(on?'#fff':'var(--t2)')+';'+
+    'border:1px solid '+(on?'var(--blue)':'var(--border)')+';'+
+    'font-size:11px;font-weight:'+(on?'600':'500')+';'+
+    'padding:4px 12px;border-radius:20px;cursor:pointer">'+lbl+'</button>';
+}
+
+function _prSetYear(v) { _prYear=v; _prPage=1; _prRender(); }
+function _prOnSearch(v){ _prSearch=v; _prPage=1; _prRender(); }
+
+function _prRender() {
+  _prRenderKpis(); _prRenderYears(); _prRenderSummary(); _prRenderTable();
+}
+
+/* ── Summary cards ─────────────────────────────────────────── */
+function _prRenderSummary() {
+  var el = document.getElementById('prSummary'); if (!el) return;
+  var d = _prFilt();
+  var tot = d.reduce(function(s,r){return s+r.total;},0);
+  var ch  = d.reduce(function(s,r){return s+r.ch;},0);
+  var sh  = d.reduce(function(s,r){return s+r.sh;},0);
+  var dsi = d.reduce(function(s,r){return s+r.dsi;},0);
+  var dno = d.reduce(function(s,r){return s+r.dno;},0);
+  var pH  = tot?ch/tot*100:0;
+  var pD  = tot?dsi/tot*100:0;
+
+  function mbar(lbl,n,pct,col) {
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:6px">'+
+      '<span style="min-width:72px;color:var(--t2)">'+lbl+'</span>'+
+      '<div style="flex:1;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'+
+        '<div style="width:'+Math.min(pct,100).toFixed(1)+'%;height:100%;background:'+col+'"></div>'+
+      '</div>'+
+      '<span style="min-width:40px;text-align:right;font-weight:600">'+n.toLocaleString('es-CL')+'</span>'+
+      '<span style="min-width:42px;color:var(--t3)">'+pct.toFixed(1)+'%</span>'+
+    '</div>';
+  }
+
+  el.innerHTML =
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px">'+
+      '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;margin-bottom:10px">Horas Académicas</div>'+
+      mbar('Con Horas', ch,  pH,   'var(--green)')+
+      mbar('Sin Horas', sh,  100-pH,'var(--red)')+
+    '</div>'+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px">'+
+      '<div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;margin-bottom:10px">Documentación Programa</div>'+
+      mbar('Ingresada', dsi, pD,   '#7c3aed')+
+      mbar('Pendiente', dno, 100-pD,'var(--orange)')+
+    '</div>';
+}
+
+/* ── Tabla paginada ────────────────────────────────────────── */
+function _prRenderTable() {
+  var d = _prFilt();
+  var tp = Math.max(1, Math.ceil(d.length / _PR_PP));
+  if (_prPage > tp) _prPage = tp;
+  var st = (_prPage-1)*_PR_PP;
+  var sl = d.slice(st, st+_PR_PP);
+
+  var sr = document.getElementById('prStatsRow');
+  if (sr) sr.innerHTML = 'Mostrando <strong>'+(st+1)+'–'+Math.min(st+_PR_PP,d.length)+'</strong> de <strong>'+d.length+'</strong> períodos';
+
+  var tb = document.getElementById('prTbody'); if (!tb) return;
+  tb.innerHTML = sl.map(function(r) {
+    var pH = r.total ? r.ch/r.total*100 : 0;
+    var pD = r.total ? r.dsi/r.total*100 : 0;
+    var pbg = function(p){ return p>=80?'var(--green-l)':p>=50?'var(--amber-l)':'var(--red-l)'; };
+    var pfg = function(p){ return p>=80?'var(--green-d)':p>=50?'var(--amber-d)':'var(--red-d)'; };
+    return '<tr>'+
+      '<td style="text-align:center"><strong>'+r.año+'</strong></td>'+
+      '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="'+esc(r.periodo)+'">'+esc(r.periodo)+'</td>'+
+      '<td style="text-align:center"><strong>'+r.total+'</strong></td>'+
+      '<td style="text-align:center"><span style="color:var(--green);font-weight:600">'+r.ch+'</span></td>'+
+      '<td style="text-align:center"><span style="color:'+(r.sh>0?'var(--red)':'var(--t4)')+';font-weight:600">'+r.sh+'</span></td>'+
+      '<td style="text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+pbg(pH)+';color:'+pfg(pH)+'">'+pH.toFixed(0)+'%</span></td>'+
+      '<td style="text-align:center"><span style="color:#7c3aed;font-weight:600">'+r.dsi+'</span></td>'+
+      '<td style="text-align:center"><span style="color:'+(r.dno>0?'var(--orange)':'var(--t4)')+';font-weight:600">'+r.dno+'</span></td>'+
+      '<td style="text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+pbg(pD)+';color:'+pfg(pD)+'">'+pD.toFixed(0)+'%</span></td>'+
+      '<td style="text-align:center;color:var(--t3)">'+r.ct.toLocaleString('es-CL',{maximumFractionDigits:1})+'</td>'+
+    '</tr>';
+  }).join('');
+
+  // Paginación
+  var pg = document.getElementById('prPag'); if (!pg) return;
+  if (tp <= 1) { pg.innerHTML=''; return; }
+  var h = '<button '+(_prPage===1?'disabled':'')+' onclick="_prPage--;_prRenderTable()" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--t2)">← Ant.</button>';
+  var sp=Math.max(1,_prPage-3), ep=Math.min(tp,sp+6); if(ep-sp<6)sp=Math.max(1,ep-6);
+  for(var p=sp;p<=ep;p++){
+    h+='<button onclick="_prPage='+p+';_prRenderTable()" style="font-size:11px;padding:5px 10px;border:1px solid '+(p===_prPage?'var(--blue)':'var(--border)')+
+      ';background:'+(p===_prPage?'var(--blue)':'var(--surface)')+
+      ';color:'+(p===_prPage?'#fff':'var(--t2)')+';border-radius:6px;cursor:pointer">'+p+'</button>';
+  }
+  h+='<button '+(_prPage===tp?'disabled':'')+' onclick="_prPage++;_prRenderTable()" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--t2)">Sig. →</button>';
+  pg.innerHTML=h;
+}
+
 
 function renderMalla(){
   const mallas = mallaLoad();
