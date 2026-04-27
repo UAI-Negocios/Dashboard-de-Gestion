@@ -790,6 +790,12 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 .aud-prog-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:3px}
 .aud-prog-fill{height:100%;border-radius:2px;transition:width .4s}
 </style>
+
+
+
+  <!-- CDN Libraries (deben cargarse antes del script principal) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -816,6 +822,9 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
     <div class="sb-navdiv"></div>
     <button class="sb-navbtn" data-cat="admin" onclick="setCat('admin',this)">
       <span class="sb-navico">&#9881;</span>Admin
+    </button>
+    <button class="sb-navbtn" data-cat="control" onclick="setCat('control',this)">
+      <span class="sb-navico">&#9783;</span>Control de Gestión
     </button>
     <button class="sb-navbtn" data-cat="ayuda" onclick="setCat('ayuda',this)">
       <span class="sb-navico">&#9432;</span>Ayuda
@@ -890,60 +899,110 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 
 
 </div>DN libraries loaded before inline script -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script>
-/* ── Global error handler ── */
-window.onerror = function(msg, src, line, col, err) {
-  var div = document.createElement('div');
-  div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#ef4444;color:#fff;padding:8px 12px;font-size:11px;font-family:monospace;z-index:99999;max-height:80px;overflow:auto';
-  div.textContent = '⚠ JS Error: ' + msg + ' (línea ' + line + ')';
-  document.body.appendChild(div);
-  setTimeout(function(){div.remove();},8000);
-  return false;
+
+
+
+
+<!-- MODAL GENERADOR DE CALENDARIO -->
+<div class="gen-modal-bg" id="genModal">
+  <div class="gen-modal">
+    <div class="gen-modal-head">
+      <div>
+        <div class="gen-modal-title" id="genModalTitle">Generar Calendario</div>
+        <div class="gen-modal-sub" id="genModalSub">Define la frecuencia y parametros de las sesiones</div>
+      </div>
+      <button class="gen-modal-close" onclick="genCerrar()">&#10005;</button>
+    </div>
+    <div class="gen-modal-body">
+      <div class="gen-row">
+        <div class="gen-field">
+          <span class="gen-lbl">Frecuencia</span>
+          <select class="gen-sel" id="genFreq" onchange="genPreview()">
+            <option value="semanal">Semanal</option>
+            <option value="quincenal">Quincenal (cada 2 semanas)</option>
+            <option value="mensual">Mensual</option>
+          </select>
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">N° max de sesiones <span style="font-weight:400;text-transform:none">(opcional)</span></span>
+          <input class="gen-inp" id="genMaxSes" type="number" min="1" max="100" placeholder="Sin limite" oninput="genPreview()">
+        </div>
+      </div>
+      <div class="gen-field" style="margin-bottom:10px">
+        <span class="gen-lbl">Dias de la semana</span>
+        <div class="gen-dias" id="genDias">
+          <label class="gen-dia" id="gdLun"><input type="checkbox" value="1" onchange="genToggleDia(this,'gdLun');genPreview()">Lun</label>
+          <label class="gen-dia" id="gdMar"><input type="checkbox" value="2" onchange="genToggleDia(this,'gdMar');genPreview()">Mar</label>
+          <label class="gen-dia" id="gdMie"><input type="checkbox" value="3" onchange="genToggleDia(this,'gdMie');genPreview()">Mie</label>
+          <label class="gen-dia" id="gdJue"><input type="checkbox" value="4" onchange="genToggleDia(this,'gdJue');genPreview()">Jue</label>
+          <label class="gen-dia" id="gdVie"><input type="checkbox" value="5" onchange="genToggleDia(this,'gdVie');genPreview()">Vie</label>
+          <label class="gen-dia" id="gdSab"><input type="checkbox" value="6" onchange="genToggleDia(this,'gdSab');genPreview()">Sab</label>
+        </div>
+      </div>
+      <div class="gen-row tri">
+        <div class="gen-field">
+          <span class="gen-lbl">Hora inicio</span>
+          <input class="gen-inp" id="genHIni" type="time" value="17:00" oninput="genPreview()">
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">Hora termino</span>
+          <input class="gen-inp" id="genHFin" type="time" value="21:00" oninput="genPreview()">
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">Modalidad</span>
+          <select class="gen-sel" id="genModal2">
+            <option>Presencial</option>
+            <option>Online</option>
+            <option>Hibrido</option>
+          </select>
+        </div>
+      </div>
+      <div class="gen-row">
+        <div class="gen-field">
+          <span class="gen-lbl">Sede</span>
+          <input class="gen-inp" id="genSede" placeholder="Ej. Vitacura">
+        </div>
+        <div class="gen-field">
+          <span class="gen-lbl">Sala</span>
+          <input class="gen-inp" id="genSala" placeholder="Ej. Sala 3">
+        </div>
+      </div>
+      <!-- PREVIEW -->
+      <div class="gen-preview">
+        <div class="gen-preview-title">
+          Vista previa de sesiones
+          <span class="gen-preview-cnt" id="genCnt">0 sesiones</span>
+        </div>
+        <div class="gen-session-list" id="genList">
+          <div style="color:var(--t4);font-size:11px">Selecciona al menos un dia de la semana para ver el preview.</div>
+        </div>
+      </div>
+    </div>
+    <div class="gen-modal-foot">
+      <span id="genFootMsg" style="font-size:11px;color:var(--red);flex:1;display:none"></span>
+      <button class="btn btn-g" onclick="genCerrar()">Cancelar</button>
+      <button class="btn btn-p" onclick="genDescargar()" id="genBtnXls">Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
+
+<script>/* ── Estado global de la aplicación ─────────────────────────── */
+var APP = {
+  cat: 'dashboard', tab: 'home',
+  df: [], dfRes: [], globalFilter: [], charts: {},
+  simCambios: {}, simExcl: new Set(), propuesta: null, adminOk: false,
+  plan_cursos: (function(){ try { return JSON.parse(localStorage.getItem('plan_cursos')||'[]'); } catch(e){ return []; } })(),
 };
 
 
-
-/* ══════════════════════════════════════════════════════
-   GLOBAL STATE
-══════════════════════════════════════════════════════ */
-// Safety guards - show friendly error if CDN failed to load
-if (typeof Chart === 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f1f5f9;min-height:100vh"><h2 style="color:#ef4444">Error de carga</h2><p style="margin-top:12px;color:#94a3b8">No se pudo cargar Chart.js desde CDN.<br>Verifica tu conexión a internet e intenta recargar la página.</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 20px;background:#38bdf8;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">🔄 Recargar</button></div>';
-  });
-}
-if (typeof XLSX === 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    document.body.innerHTML = '<div style="font-family:sans-serif;padding:40px;background:#0f172a;color:#f1f5f9;min-height:100vh"><h2 style="color:#ef4444">Error de carga</h2><p style="margin-top:12px;color:#94a3b8">No se pudo cargar SheetJS (XLSX) desde CDN.<br>Verifica tu conexión a internet e intenta recargar la página.</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 20px;background:#38bdf8;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">🔄 Recargar</button></div>';
-  });
-}
-
-/* ══════════════════════════════════════════════════════
-   DATOS AUDITORIA — generados automáticamente
-══════════════════════════════════════════════════════ */
-const _AUDIT = {sin_sala:[],solapamientos:[],topes:[],feriados:[],contratos:[],stats:{total_sesiones:0,total_programas:0,total_profesores:0,total_sin_sala:0,total_solapamientos:0,total_topes:0,total_contratos:0}};
-
-const APP = {
-  df: [],
-  dfRes: [],
-  globalFilter: [],
-  cat: 'dashboard',
-  tab: 'home',          // simple ASCII key — NO emoji
-  charts: {},
-  adminOk: false,
-  simCambios: {},
-  propuesta: null,
-};
-
-// Tab keys: simple ASCII only — no emoji, no special chars
 const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
-  programas:    ['resumen','calidad','declaracion','declarado','contratos','anualdecl','informe'],
+  programas:    ['resumen','calidad'],
   calendarios:  ['calendario','reservas'],
-  planificador: ['plancursos','malla','planreporte'],
+  planificador: ['plancursos','malla','planreporte','propuestas'],
   admin:        ['gestion','turnos','validaciones','auditoria'],
+  control:      ['declaracion','declarado','contratos','anualdecl','informe','cruce'],
   ayuda:        ['manual','faqs'],
 };
 
@@ -959,6 +1018,7 @@ const TAB_LABELS = {
   declaracion:  'Declaración de Horas',
   anualdecl:    'Declarado por Año',
   informe:      '📄 Informe Ejecutivo',
+  cruce:        '🔀 Reporte de Cruce',
   declarado:    'Declarado vs Obligación',
   contratos:    'Contratos Emitidos',
   calendario:   'Calendario',
@@ -968,6 +1028,7 @@ const TAB_LABELS = {
   validaciones: 'Validaciones',
   auditoria:    'Auditoría',
   plancursos:   'Planificador General',
+  propuestas:   '📅 Generador de Propuestas',
   malla:        'Malla Curricular',
   planreporte:   'Reporte Planificaciones',
   manual:       'Manual',
@@ -979,7 +1040,9 @@ const CAT_LABELS = {
   dashboard:   'Dashboard',
   programas:   'Programas',
   calendarios: 'Calendarios',
+  planificador:'Planificador',
   admin:       'Admin',
+  control:     'Control de Gestión',
   ayuda:       'Ayuda',
 };
 
@@ -995,7 +1058,7 @@ const IGNORE_VALS = new Set(['','nan','none','n/a','por definir','sin asignar','
    UTILS
 ══════════════════════════════════════════════════════ */
 const $  = id => document.getElementById(id);
-const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/["]/g,'&quot;');
 const fmt = n => Number(n).toLocaleString('es-CL');
 const today = () => { const d=new Date(); d.setHours(0,0,0,0); return d; }
 
@@ -1800,7 +1863,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','contratos','anualdecl','informe'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','contratos','anualdecl','informe','cruce'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -1815,6 +1878,7 @@ function refreshView() {
     declaracion:  renderDeclaracion,
     anualdecl:    renderAnualDecl,
     informe:      renderInformeEjecutivo,
+    cruce:        renderCruceInfo,
     declarado:    renderDeclarado,
   contratos:    renderContratos,
     calendario:   renderCalendario,
@@ -1824,6 +1888,7 @@ function refreshView() {
     validaciones: renderValidaciones,
     auditoria:    renderAuditoria,
     plancursos:   renderPlanificador,
+    propuestas:   renderPropuestasCalendario,
     malla:        renderMalla,
   planreporte:   renderPlanReporte,
     manual:       renderManual,
@@ -4247,7 +4312,7 @@ function buildProgDetail(rows){
 ═══════════════════════════════════════════════════════════════ */
 
 // ── Plan 2026 vs Declarado (precalculado) ─────────────────────
-const _DH = [{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"10694182","docente":"PÁEZ, AMALIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"10694182","docente":"PÁEZ, AMALIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"10694182","docente":"PÁEZ, AMALIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"10721301","docente":"CONTRERAS, PAOLA CECILIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"10721301","docente":"CONTRERAS, PAOLA CECILIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"10721301","docente":"CONTRERAS, PAOLA CECILIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"10911347","docente":"VIVES, LUIS ALIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"10911347","docente":"VIVES, LUIS ALIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"10911347","docente":"VIVES, LUIS ALIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"11472054","docente":"ALONSO, LEONARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"11472054","docente":"ALONSO, LEONARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"11472054","docente":"ALONSO, LEONARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"11639847","docente":"MASSON, PAOLA MARIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"11639847","docente":"MASSON, PAOLA MARIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"11639847","docente":"MASSON, PAOLA MARIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"12466722","docente":"THODES, MARÍA JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"12466722","docente":"THODES, MARÍA JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"12466722","docente":"THODES, MARÍA JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"13713243","docente":"NALLI, LISSETTE ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"13713243","docente":"NALLI, LISSETTE ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"13713243","docente":"NALLI, LISSETTE ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE608","asig":"OBSERVACIÓN EN TERRENO","rut":"15312775","docente":"SALAZAR, CRISTIAN ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE789","asig":"COACHING SUPERVISADO","rut":"15312775","docente":"SALAZAR, CRISTIAN ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE790","asig":"COACHING INDIVIDUAL II","rut":"15312775","docente":"SALAZAR, CRISTIAN ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"LAB101","asig":"LABORATORIOS","rut":"8028910","docente":"FUENZALIDA, PABLO ANDRÉS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE440","asig":"COACHING EJECUTIVO","rut":"8028910","docente":"FUENZALIDA, PABLO ANDRÉS","hrsPlan":0.0,"hrsDecl":14.0,"diff":-14.0,"cumplPct":1400.0,"declarado":true,"monto":1260000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE795","asig":"LABORATORIO DE CIERRE","rut":"8028910","docente":"FUENZALIDA, PABLO ANDRÉS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"LAB101","asig":"LABORATORIOS","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE440","asig":"COACHING EJECUTIVO","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":0.0,"hrsDecl":6.0,"diff":-6.0,"cumplPct":600.0,"declarado":true,"monto":840000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"CCE2026_2026/1","cc":"—","sigla":"PLE795","asig":"LABORATORIO DE CIERRE","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"10331530","docente":"CELIS, ALEJANDRO EDUARDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER765","asig":"COMPLIANCE Y DERECHO","rut":"12247648","docente":"GAJARDO, CARLOS EDUARDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DPR441","asig":"GESTIÓN DE RIESGOS CORPORATIVOS Y SISTEMA DE CONTROL INTERNO","rut":"12810916","docente":"DÍAZ, MIGUEL ANGEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"12866387","docente":"MUÑOZ, ANA MARÍA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"13433119","docente":"DEL VILLAR, LUCAS IGNACIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER764","asig":"COMPLIANCE Y LIBRE COMPETENCIA","rut":"15377147","docente":"BORQUEZ, FRANCISCO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"15635996","docente":"ECHEVERRÍA, PEDRO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DIS819","asig":"SOSTENIBILIDAD Y GOBIERNO CORPORATIVO","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"MGT414","asig":"INTRODUCCIÓN","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":4.0,"hrsDecl":0.0,"diff":4.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER750","asig":"FRAUDE CORPORATIVO: PREVENCIÓN, DETECCIÓN E INVESTIGACIÓN","rut":"17329454","docente":"ZAMORA, REBECA CONCEPCIÓN","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"PSO106","asig":"Taller de Integración","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":4.0,"hrsDecl":0.0,"diff":4.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCC2026_2026/1","cc":"2678","sigla":"DER753","asig":"HERRAMIENTAS Y TENDENCIAS PARA EL COMPLIANCE","rut":"8229895","docente":"PUMARINO, AUGUSTO ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN513","asig":"PERSPECTIVA APRENDIZAJE Y CRECIMIENTO BSC","rut":"12484626","docente":"CORONADO, FREDDY CHRISTIAN","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT393","asig":"MAPAS ESTRATÉGICOS Y BSC","rut":"12484626","docente":"CORONADO, FREDDY CHRISTIAN","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT761","asig":"INTRODUCCIÓN AL CONTROL DE GESTIÓN","rut":"12484626","docente":"CORONADO, FREDDY CHRISTIAN","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT483","asig":"ESTRATEGIA COMPETITIVA","rut":"12684239","docente":"INZUNZA, ALEJANDRO RODRIGO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"PLE451","asig":"TALLER DE COMUNICACIÓN EFECTIVA","rut":"14244218","docente":"MORGADO, MARÍA SOLEDAD","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN512","asig":"PERSPECTIVA CLIENTES BSC","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MKT429","asig":"BUSINESS INTELLIGENCE","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN515","asig":"TALLER DE ANÁLISIS FINANCIERO:INTERPRETANDO LA CREACIÓN DE VALOR","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"FIN848","asig":"TOOLKIT FINANCIERO: CUÁLES, CUÁNDO Y POR QUÉ?","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DCGE 2026_2026/1","cc":"8249","sigla":"MGT758","asig":"PROCESOS DE NEGOCIOS Y DRIVERS DE VALOR","rut":"27994566","docente":"VAN DE, JÖEL JORIS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF BL2026_2026/1","cc":"8969","sigla":"FIN102","asig":"TALLER DE HERRAMIENTAS ANALÍTICAS PARA FINANZAS","rut":"11599752","docente":"ZULETA, JAVIER FERNANDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF BL2026_2026/1","cc":"8969","sigla":"PLE436","asig":"TALLER DE INTEGRACIÓN","rut":"13074292","docente":"GORMAZ, NAISA CORINA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN404","asig":"ADMINISTRACIÓN DE INSTRUMENTO DE INTERMEDIACIÓN FINANCIERA","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN406","asig":"VALUACIÓN Y ANÁLISIS DE TÍTULOS DE RENTA FIJA","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN408","asig":"VALUACIÓN FORWARDS FUTUROS Y SWAPS","rut":"10588239","docente":"SANTIBÁÑEZ, FRANCISCO ANDRÉS JULIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN102","asig":"TALLER DE HERRAMIENTAS ANALÍTICAS PARA FINANZAS","rut":"11599752","docente":"ZULETA, JAVIER FERNANDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"PLE436","asig":"TALLER DE INTEGRACIÓN","rut":"13074292","docente":"GORMAZ, NAISA CORINA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"ECO437","asig":"ANÁLISIS MACROECONÓMICO","rut":"16018265","docente":"BERGER, FELIPE IGNACIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN405","asig":"VALUACIÓN Y ANÁLISIS ACCIONARIO","rut":"24432281","docente":"PÉREZ, JOAQUÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN400","asig":"CONTABILIDAD FINANCIERA Y ANÁLISIS DE ESTADOS FINANCIEROS","rut":"6970793","docente":"NIÑO, JORGE ENRIQUE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN402","asig":"FINANZAS CORPORATIVAS","rut":"7129878","docente":"CASTILLO, AUGUSTO OCTAVIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN531","asig":"VALUACIÓN DE OPCIONES","rut":"8769661","docente":"ESCOBAR, CARLOS JORGE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDF PR2026_2026/1","cc":"8971","sigla":"FIN565","asig":"GESTIÓN FINANCIERA DE LAS NECESIDADES OPERATIVAS DE FONDOS","rut":"8850854","docente":"ZURITA, SALVADOR","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE408","asig":"GESTIÓN DEL DESEMPEÑO Y COMPENSACIONES","rut":"10335414","docente":"DE LA CARRERA, MARÍA CONSTANZA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE404","asig":"TRABAJO Y GESTIÓN EN LA ERA DIGITAL","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE406","asig":"ATRACCIÓN, INTEGRACIÓN Y DESARROLLO DE PERSONAS","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE408","asig":"GESTIÓN DEL DESEMPEÑO Y COMPENSACIONES","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE406","asig":"ATRACCIÓN, INTEGRACIÓN Y DESARROLLO DE PERSONAS","rut":"10709486","docente":"LARA, RODRIGO FERNANDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"11493276","docente":"POLIZZI, PATRICIO ALEJANDRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE203","asig":"TALLER DE COMPETENCIAS LABORALES","rut":"11530619","docente":"BARROS, EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE406","asig":"ATRACCIÓN, INTEGRACIÓN Y DESARROLLO DE PERSONAS","rut":"11530619","docente":"BARROS, EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE408","asig":"GESTIÓN DEL DESEMPEÑO Y COMPENSACIONES","rut":"11530619","docente":"BARROS, EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"11628393","docente":"UNANUE, WENCESLAO MARIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE404","asig":"TRABAJO Y GESTIÓN EN LA ERA DIGITAL","rut":"12467176","docente":"VALDIVIESO, FELIPE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE205","asig":"TALLER COMPETENCIAS PARA DIRIGIR EQUIPOS DE TRABAJO","rut":"13077977","docente":"MADRID, HÉCTOR PABLO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"MGT406","asig":"TALLER DE HABILIDADES EN CONSULTORÍA","rut":"6926362","docente":"FUENZALIDA, RODRIGO JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE799","asig":"TALLER DE GESTIÓN DE SÍ MISMO","rut":"6926362","docente":"FUENZALIDA, RODRIGO JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE404","asig":"TRABAJO Y GESTIÓN EN LA ERA DIGITAL","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"PLE546","asig":"TALLER DE ON BOARDING E INTEGRACIÓN","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DDP 2026_2026/1","cc":"—","sigla":"ECO400","asig":"LA EMPRESA Y SU ENTORNO ECONÓMICO, SOCIAL Y LEGAL","rut":"9529160","docente":"LIZAMA, LUIS GUILLERMO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"PLE324","asig":"TALLER OPTIMIZACIÓN PERFIL RRSS DE NEGOCIOS","rut":"12721185","docente":"CASTRO, PATRICIO JOSÉ","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"PLE412","asig":"LIDERAZGO DE EQUIPOS COMERCIALES DE ALTO DESEMPEÑO","rut":"13074292","docente":"GORMAZ, NAISA CORINA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"MGT417","asig":"TALLER DE HABILIDADES EFECTIVAS DE VENTA","rut":"15357467","docente":"CÁRDENAS, PÍA","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"MGT485","asig":"TALLER DE INNOVACIÓN","rut":"15640637","docente":"MUSIC, DANICA","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DEV  2026_2026/1","cc":"8991","sigla":"TICS449","asig":"E-COMMERCE","rut":"15819247","docente":"ESPINOZA, JAIME ANDRES","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"PLE401","asig":"DIRECCIÓN DE PERSONAS","rut":"10371345","docente":"QUEZADA, ARIEL OSVALDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"DER422","asig":"DERECHO Y NEGOCIOS","rut":"12265463","docente":"LEÓN, RODRIGO AVELINO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"DER422","asig":"DERECHO Y NEGOCIOS","rut":"13233011","docente":"HUMPHREYS, PATRICK ALEXANDER","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"DER422","asig":"DERECHO Y NEGOCIOS","rut":"13432721","docente":"GUIDI, CATERINA MARÍA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"PLE428","asig":"COMUNICACIÓN EFECTIVA PARA LA GESTIÓN","rut":"14244218","docente":"MORGADO, MARÍA SOLEDAD","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MKT400","asig":"GESTIÓN DE MARKETING","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT030","asig":"EMPRESA Y SOCIEDAD: VISIÓN ESTRATÉGICA","rut":"24615144","docente":"CASARÍN, ARIEL ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"FIN401","asig":"INFORMACIÓN CONTABLE FINANCIERA PARA LA TOMA DE DECISIONES","rut":"6970793","docente":"NIÑO, JORGE ENRIQUE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"FIN535","asig":"ANÁLISIS FINANCIERO PARA LA GESTIÓN","rut":"6970793","docente":"NIÑO, JORGE ENRIQUE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT402","asig":"PROYECTO INTEGRADOR I","rut":"7274041","docente":"CÁNEPA, PABLO LUIS","hrsPlan":150.0,"hrsDecl":0.0,"diff":150.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"7274041","docente":"CÁNEPA, PABLO LUIS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT031","asig":"BOOTCAMP","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT401","asig":"EVALUACIÓN DE PROYECTOS","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT402","asig":"PROYECTO INTEGRADOR I","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":150.0,"hrsDecl":0.0,"diff":150.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"7791030","docente":"TOLEDO, ANDRÉS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DGN PR2026_2026/1","cc":"8841","sigla":"MGT403","asig":"CONTROL DE GESTIÓN ESTRATÉGICO","rut":"9793726","docente":"ANICH, NICOLÁS ENRIQUE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM00668","asig":"SUSTAINABILITY","rut":"10929862","docente":"VERCELLI, DANIEL","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM901","asig":"EXPERIENCE","rut":"12237455","docente":"LÓPEZ, CLAUDIO ALBERTO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM581","asig":"BEHAVIOUR","rut":"13633842","docente":"RIESLE, TATIANA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"DTS100","asig":"MINING","rut":"13830778","docente":"FRITIS, NICOLAS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MGT128","asig":"STRATEGY","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MIM400","asig":"INSIGHTS","rut":"15030833","docente":"ARAYA, LUIS ANDRÉS","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"FIN300","asig":"VALUE","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DIMM 2026_2026/1","cc":"—","sigla":"MGT435","asig":"ALINEAMIENTO ESTRATÉGICO","rut":"6374433","docente":"SINN, MARÍA FRANCISCA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DLC 2026_2026/1","cc":"8994","sigla":"PLE510","asig":"COACHING INDIVIDUAL I","rut":"8949767","docente":"MUNDACA, LUZ EUGENIA","hrsPlan":8.0,"hrsDecl":25.0,"diff":-17.0,"cumplPct":312.5,"declarado":true,"monto":4929082.740999999,"docProg":"NO","cerrada":"NO","mesIni":"Enero","mesFin":"Diciembre"},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MACH223","asig":"PROYECTO FINAL","rut":"12721185","docente":"CASTRO, PATRICIO JOSÉ","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00925","asig":"PAID MEDIA","rut":"17105356","docente":"BARRIOS, NICOLÁS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MACH223","asig":"PROYECTO FINAL","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00927","asig":"INTELIGENCIA ARTIFICIAL PARA EL MARKETING","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00928","asig":"ANALÍTICA DIGITAL","rut":"17346191","docente":"ROJAS, CAROLINA ALEJANDRA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT896","asig":"E-COMMERCE","rut":"17457221","docente":"Sanhueza, Luciano Fernando","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00926","asig":"SOCIAL MEDIA","rut":"17754052","docente":"RUETE, MARTIN PABLO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT896","asig":"E-COMMERCE","rut":"17815615","docente":"SILVA, SEBASTIÁN","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DMDE 2026_2026/1","cc":"8248","sigla":"MKT00924","asig":"MARKETING Y OPTIMIZACIÓN EN BUSCADORES: SEO Y SEM","rut":"26827822","docente":"RENDÓN, ORIAN","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"10715194","docente":"ESCANDÓN, FELIPE ANDRÉS","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"12025098","docente":"HERMOSILLA, MARÍA PAZ","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"12684239","docente":"INZUNZA, ALEJANDRO RODRIGO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"15320784","docente":"MUSA, MIGUEL ÁNGEL","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"17248137","docente":"ARACENA, CLAUDIO FELIPE","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI102","asig":"PENSAMIENTO ESTRATÉGICO CON LA INTELIGENCIA ARTIFICIAL","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI103","asig":"EJECUCIÓN Y ALINEAMIENTO DE PROYECTOS CON INTELIGENCIA ARTIFICIAL","rut":"20181578","docente":"HAPPEY, BEJAMIN MATHEW","hrsPlan":240.0,"hrsDecl":0.0,"diff":240.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"22091655","docente":"VERA, TOMÁS","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI101","asig":"FUNDAMENTOS DE LA INNOVACIÓN CORPORATIVA CON INTELIGENCIA ARTIFICIAL","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DNIA 2026_2026/1","cc":"8995","sigla":"DNI103","asig":"EJECUCIÓN Y ALINEAMIENTO DE PROYECTOS CON INTELIGENCIA ARTIFICIAL","rut":"7909615","docente":"JAPKE, MARCO ANTONIO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS001","asig":"ENTENDIENDO LOS NEGOCIOS Y SU ENTORNO GLOBAL","rut":"0","docente":"ALVAREZ, MARIA GABRIELA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS009","asig":"IMPULSANDO LA INNOVACIÓN Y EFICIENCIA DEL GASTO","rut":"0","docente":"CARRAL, MARIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"13054130","docente":"CUADRA, REINALDO CARLOS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS001","asig":"ENTENDIENDO LOS NEGOCIOS Y SU ENTORNO GLOBAL","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS003","asig":"BASES FINANCIERAS PARA COMPRADORES","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS006","asig":"IMPLEMENTANDO LA TRANSFORMACIÓN","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS007","asig":"TRABAJO FINAL CATEGORY PLAN","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS008","asig":"GENERANDO VENTAJAS COMPETITIVAS SOSTENIBLES","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"14480189","docente":"RENOM, GUSTAVO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS009","asig":"IMPULSANDO LA INNOVACIÓN Y EFICIENCIA DEL GASTO","rut":"23359931","docente":"KOBERG, ESTEBAN FRANCISCO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS003","asig":"BASES FINANCIERAS PARA COMPRADORES","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS008","asig":"GENERANDO VENTAJAS COMPETITIVAS SOSTENIBLES","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS010","asig":"GESTIONANDO EL CAMBIO","rut":"23982958","docente":"RODRÍGUEZ, DIEGO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS006","asig":"IMPLEMENTANDO LA TRANSFORMACIÓN","rut":"24942932","docente":"RIBBI, CLELIA ALIDA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS001","asig":"ENTENDIENDO LOS NEGOCIOS Y SU ENTORNO GLOBAL","rut":"7013908","docente":"MAGENDZO, IGNACIO IGAL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DSS 2026_2026/1","cc":"8996","sigla":"DSS009","asig":"IMPULSANDO LA INNOVACIÓN Y EFICIENCIA DEL GASTO","rut":"9097240","docente":"TRASLAVIÑA, JAVIER ALBERTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER767","asig":"BASE JURÍDICA","rut":"10346527","docente":"SOTO, EDMUNDO EDGARDO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER852","asig":"IMPUESTO A LAS VENTAS Y SERVICIOS - IVA","rut":"10346527","docente":"SOTO, EDMUNDO EDGARDO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER853","asig":"FISCALIZACIONES Y ACTUACIONES DEL SII","rut":"10346527","docente":"SOTO, EDMUNDO EDGARDO","hrsPlan":8.0,"hrsDecl":0.0,"diff":8.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER766","asig":"RENTAS DE TRABAJO","rut":"10545922","docente":"PEÑALOZA, MAURICIO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER761","asig":"ASPECTOS TRIBUTARIOS DE LA REORGANIZACIÓN EMPRESARIAL Y FISCALIZACIONES Y ACTUACIONES DEL SII","rut":"11837206","docente":"DELCORTO, CHRISTIAN RICARDO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER757","asig":"IMPUESTO A LA RENTA DE LAS EMPRESAS","rut":"16142068","docente":"GONZÁLEZ, LUIS ALBERTO","hrsPlan":40.0,"hrsDecl":0.0,"diff":40.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"ACCT429","asig":"BASE CONTABLE","rut":"16662054","docente":"MARTÍNEZ, NICOLÁS ANTONIO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"PLE436","asig":"TALLER DE INTEGRACIÓN","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER852","asig":"IMPUESTO A LAS VENTAS Y SERVICIOS - IVA","rut":"8749139","docente":"ALTAMIRANO, JULIA MARGARITA","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER757","asig":"IMPUESTO A LA RENTA DE LAS EMPRESAS","rut":"9383128","docente":"CORNEJO, JUAN IGNACIO","hrsPlan":40.0,"hrsDecl":0.0,"diff":40.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"DTE 2026_2026/1","cc":"8924","sigla":"DER762","asig":"TRIBUTACIÓN INTERNACIONAL Y PRECIOS DE TRANSFERENCIA","rut":"9383128","docente":"CORNEJO, JUAN IGNACIO","hrsPlan":16.0,"hrsDecl":0.0,"diff":16.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN849","asig":"FINANZAS CONDUCTUALES","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"10667679","docente":"BUSTAMANTE, GONZALO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"MGT479","asig":"ESTRUCTURA SOCIETARIA Y GOBIERNO CORPORATIVO","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN443","asig":"ADMINISTRACIÓN DE RIESGO FINANCIERO","rut":"12517400","docente":"ABARCA, ANA MARÍA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12722417","docente":"JOBET, JUAN CARLOS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"FIN456","asig":"ADMINISTRACIÓN DE CARTERAS DE INVERSIÓN","rut":"12852834","docente":"CASTAÑEDA, PABLO","hrsPlan":90.0,"hrsDecl":4.0,"diff":86.0,"cumplPct":4.4,"declarado":true,"monto":1047052.68,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Mayo"},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"FIN788","asig":"MERCADOS DE CAPITALES","rut":"12884051","docente":"MURÚA, PEDRO ANTONIO","hrsPlan":60.0,"hrsDecl":14.0,"diff":46.0,"cumplPct":23.3,"declarado":true,"monto":1260000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN847","asig":"CONTABILIDAD DE COBERTURA","rut":"13623679","docente":"CONCHA, CHRISTIAN EDUARDO","hrsPlan":60.0,"hrsDecl":4.0,"diff":56.0,"cumplPct":6.7,"declarado":true,"monto":380000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF  BL2025_2026/2","cc":"6047","sigla":"FIN901","asig":"MONEDAS DIGITALES","rut":"15320784","docente":"MUSA, MIGUEL ÁNGEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"15637190","docente":"TORRES, JUAN PABLO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"15959910","docente":"VALENZUELA, GABRIEL ANTONIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN464","asig":"FUSIONES Y ADQUISICIONES","rut":"24432281","docente":"PÉREZ, JOAQUÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"24615144","docente":"CASARÍN, ARIEL ANDRÉS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"7018223","docente":"COWAN, KEVIN NOEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN859","asig":"NEGOCIACIÓN FINANCIERA","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"6046","sigla":"FIN900","asig":"INVERSIONES EN ACTIVOS ALTERNATIVOS","rut":"8351880","docente":"MANZUR, RODRIGO LEONARDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF  BL2025_2026/2","cc":"—","sigla":"DER424","asig":"TRIBUTACIÓN Y EMPRESA","rut":"9500084","docente":"RENCORET, ERNESTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN849","asig":"FINANZAS CONDUCTUALES","rut":"10456413","docente":"LAVÍN, JAIME FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"10667679","docente":"BUSTAMANTE, GONZALO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"12086166","docente":"TORRES, JUAN PABLO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"MGT479","asig":"ESTRUCTURA SOCIETARIA Y GOBIERNO CORPORATIVO","rut":"12148609","docente":"HEUFEMANN, GERMÁN FERNANDO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN443","asig":"ADMINISTRACIÓN DE RIESGO FINANCIERO","rut":"12517400","docente":"ABARCA, ANA MARÍA","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"12722417","docente":"JOBET, JUAN CARLOS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN456","asig":"ADMINISTRACIÓN DE CARTERAS DE INVERSIÓN","rut":"12852834","docente":"CASTAÑEDA, PABLO","hrsPlan":90.0,"hrsDecl":4.0,"diff":86.0,"cumplPct":4.4,"declarado":true,"monto":1047052.68,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Mayo"},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN788","asig":"MERCADOS DE CAPITALES","rut":"12884051","docente":"MURÚA, PEDRO ANTONIO","hrsPlan":60.0,"hrsDecl":14.0,"diff":46.0,"cumplPct":23.3,"declarado":true,"monto":1260000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN847","asig":"CONTABILIDAD DE COBERTURA","rut":"13623679","docente":"CONCHA, CHRISTIAN EDUARDO","hrsPlan":60.0,"hrsDecl":4.0,"diff":56.0,"cumplPct":6.7,"declarado":true,"monto":380000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"15959910","docente":"VALENZUELA, GABRIEL ANTONIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN901","asig":"MONEDAS DIGITALES","rut":"16155314","docente":"PEREIRA, CRISTÓBAL ROBERTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN464","asig":"FUSIONES Y ADQUISICIONES","rut":"24432281","docente":"PÉREZ, JOAQUÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN534","asig":"TÓPICOS EN FINANZAS, SOSTENIBILIDAD Y SOCIEDAD","rut":"24615144","docente":"CASARÍN, ARIEL ANDRÉS","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN533","asig":"TÓPICOS EN FINANZAS Y TECNOLOGÍA","rut":"7018223","docente":"COWAN, KEVIN NOEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"6043","sigla":"FIN859","asig":"NEGOCIACIÓN FINANCIERA","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"FIN900","asig":"INVERSIONES EN ACTIVOS ALTERNATIVOS","rut":"8351880","docente":"MANZUR, RODRIGO LEONARDO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDF PR2025_2026/2","cc":"—","sigla":"DER424","asig":"TRIBUTACIÓN Y EMPRESA","rut":"9500084","docente":"RENCORET, ERNESTO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"MGT475","asig":"ESTRATEGIA Y GESTIÓN DE EMPRESA","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE435","asig":"DIAGNÓSTICO Y ADMINISTRACIÓN DEL CAMBIO","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE467","asig":"LIDERAZGO","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE469","asig":"FUNDAMENTOS DEL COMPORTAMIENTO: PERSONA Y ORGANIZACIÓN","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE473","asig":"TRABAJO DE GRADO","rut":"10364124","docente":"ARAYA, MARCELO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE467","asig":"LIDERAZGO","rut":"13077977","docente":"MADRID, HÉCTOR PABLO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"MGT475","asig":"ESTRATEGIA Y GESTIÓN DE EMPRESA","rut":"6374433","docente":"SINN, MARÍA FRANCISCA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE435","asig":"DIAGNÓSTICO Y ADMINISTRACIÓN DEL CAMBIO","rut":"6926362","docente":"FUENZALIDA, RODRIGO JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"MGT475","asig":"ESTRATEGIA Y GESTIÓN DE EMPRESA","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE467","asig":"LIDERAZGO","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE469","asig":"FUNDAMENTOS DEL COMPORTAMIENTO: PERSONA Y ORGANIZACIÓN","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MDP 2025_2026/2","cc":"—","sigla":"PLE473","asig":"TRABAJO DE GRADO","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PHIL427","asig":"ÉTICA Y RESPONSABILIDAD SOCIAL EMPRESARIAL - NEGOCIO SUSTENTABLE","rut":"0","docente":"MESEGUER, VÍCTOR","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PLE848","asig":"LIDERAZGO","rut":"13233971","docente":"BRAVO, DIEGO","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT545","asig":"ANALÍTICA DE DATOS PARA LA GESTIÓN","rut":"14111335","docente":"CARVAJAL, RODOLFO ANGHELLO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT917","asig":"PROYECTO INTEGRADOR II","rut":"14503820","docente":"BULGARINI, ROBERTO EMILIO","hrsPlan":300.0,"hrsDecl":0.0,"diff":300.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PHIL427","asig":"ÉTICA Y RESPONSABILIDAD SOCIAL EMPRESARIAL - NEGOCIO SUSTENTABLE","rut":"15821136","docente":"PEÑA, RICHARD MAURICIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MKT456","asig":"DESARROLLO DE NUEVOS MERCADOS","rut":"21609510","docente":"BILANCIO, GUILLERMO HÉCTOR","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT477","asig":"TRANSFORMANDO LA ORGANIZACIÓN","rut":"23537013","docente":"MARTÍN, IGNACIO","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT435","asig":"ALINEAMIENTO ESTRATÉGICO","rut":"23931576","docente":"UBEDA, RICARDO VICENTE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"FIN483","asig":"CÓMO FINANCIAR EL CRECIMIENTO","rut":"7129878","docente":"CASTILLO, AUGUSTO OCTAVIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PLE432","asig":"TALLER DE NEGOCIACIÓN","rut":"7245172","docente":"SANHUEZA, CARLOS RAFAEL","hrsPlan":30.0,"hrsDecl":0.0,"diff":30.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"PLE437","asig":"GESTIÓN DE PERSONAS EN LA ERA DIGITAL","rut":"7414664","docente":"VOLENSKI, GERSON","hrsPlan":60.0,"hrsDecl":0.0,"diff":60.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MGN PR2025_2026/2","cc":"6049","sigla":"MGT484","asig":"ESTRATEGIA Y GESTIÓN DE LA INNOVACIÓN","rut":"9097240","docente":"TRASLAVIÑA, JAVIER ALBERTO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DIS702","asig":"BUSINESS INTELLIGENCE","rut":"0","docente":"MONTEALEGRE, JOSE RAMIRO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT523","asig":"INNOVACIÓN EN MODELOS DE NEGOCIOS","rut":"10354877","docente":"LARENAS, ROBERTO ARNALDO","hrsPlan":0.0,"hrsDecl":12.0,"diff":-12.0,"cumplPct":1200.0,"declarado":true,"monto":1080000.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MKT527","asig":"ESTRATEGIA DE LA INNOVACIÓN","rut":"10354877","docente":"LARENAS, ROBERTO ARNALDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT522","asig":"GESTIÓN DE PORTAFOLIO DE INNOVACIONES","rut":"10508609","docente":"FERES, PATRICIO ANDRÉS","hrsPlan":0.0,"hrsDecl":12.0,"diff":-12.0,"cumplPct":1200.0,"declarado":true,"monto":2524008.0,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DIS818","asig":"LA STARTUP DE BASE TECNOLÓGICA, DE LA TESIS A LOS MERCADOS INTERNACIONALES","rut":"10588342","docente":"MARTÍNEZ, DANIEL EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT492","asig":"TALLER DE ECOSISTEMAS DE INNOVACIÓN","rut":"10597119","docente":"JARA, FELIPE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT790","asig":"DISEÑO DE EXPERIENCIAS","rut":"11125063","docente":"MARTINEZ, BERNARDITA SOFIA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"FIN536","asig":"FINANCIAMIENTO DE INNOVACIONES","rut":"11605899","docente":"DUFEU, CLAUDIO ANDRES","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT548","asig":"ECONOMÍA DE LA INNOVACIÓN: GESTIÓN Y POLÍTICAS PÚBLICAS","rut":"12059751","docente":"BRAVO, CLAUDIO CRISTIÁN","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DER425","asig":"PROTECCIÓN DE INNOVACIÓN","rut":"12265463","docente":"LEÓN, RODRIGO AVELINO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MGT547","asig":"GESTIÓN DE EQUIPOS INNOVADORES","rut":"13077977","docente":"MADRID, HÉCTOR PABLO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MKT529","asig":"MARKETING DE LA INNOVACIÓN","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DIS808","asig":"TALLER 4: COMUNICACIÓN DE LA INNOVACIÓN","rut":"15357467","docente":"CÁRDENAS, PÍA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"MKT527","asig":"ESTRATEGIA DE LA INNOVACIÓN","rut":"22527993","docente":"VIANA, HORACIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MI 2025_2026/2","cc":"—","sigla":"DER425","asig":"PROTECCIÓN DE INNOVACIÓN","rut":"9606173","docente":"SÁNCHEZ, GONZALO JOSE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MIM398","asig":"GROWTH","rut":"0","docente":"BREA, ALBERTO JOSE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MKT306","asig":"METRICS","rut":"12721185","docente":"CASTRO, PATRICIO JOSÉ","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MKT497","asig":"BRANDING","rut":"14746921","docente":"CASTELLUCCI, LUCIANO","hrsPlan":0.0,"hrsDecl":20.0,"diff":-20.0,"cumplPct":2000.0,"declarado":true,"monto":5975519.227,"docProg":"NO","cerrada":"NO","mesIni":"Marzo","mesFin":"Marzo"},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MKT342","asig":"ECOMMERCE","rut":"15819247","docente":"ESPINOZA, JAIME ANDRES","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"MIM639","asig":"PRICING","rut":"17120646","docente":"HALAL, MUNIRA CONSTANZA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"PLE198","asig":"CONTENT","rut":"17274392","docente":"AROS, CAROLINA ANDREA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MIMM 2025_2026/2","cc":"—","sigla":"TICS107","asig":"IA","rut":"17297956","docente":"CISTERNA, SEBASTIÁN IGNACIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"MKT864","asig":"DESARROLLO DE NUEVOS MERCADOS","rut":"10570170","docente":"CASTRO, RODRIGO HERNÁN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"FIN841","asig":"FINANZAS SOSTENIBLES","rut":"10994071","docente":"RUBINSTEIN, DIANA YAEL","hrsPlan":120.0,"hrsDecl":16.0,"diff":104.0,"cumplPct":13.3,"declarado":true,"monto":1520000.0,"docProg":"SI","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"INN101","asig":"PENSAMIENTO ESTRATÉGICO E INNOVACIÓN","rut":"12059751","docente":"BRAVO, CLAUDIO CRISTIÁN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"MGT802","asig":"ANÁLISIS ESTRATÉGICO Y PLANTEAMIENTO EMPRESARIAL","rut":"14503820","docente":"BULGARINI, ROBERTO EMILIO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"PER851","asig":"ASUNTOS CORPORATIVOS Y COMUNICACIONES","rut":"16575162","docente":"FIERRO, PEDRO SEBASTIÁN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"SOS107","asig":"TALLER DE CASOS DE NEGOCIOS SOSTENIBLES","rut":"17084089","docente":"LARRAÍN, MACARENA AMPARO MARÍA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"SOS106","asig":"TALLER DE DIAGNÓSTICO SOSTENIBILIDAD EMPRESARIAL","rut":"22653578","docente":"TORA, FANNY","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"LID205","asig":"LIDERAZGO ADAPTATIVO Y OPINIÓN PÚBLICA","rut":"23537013","docente":"MARTÍN, IGNACIO","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2025_2026/2","cc":"6057","sigla":"SOS200","asig":"PROYECTO APLICADO DE GRADO CAPSTONE","rut":"9097240","docente":"TRASLAVIÑA, JAVIER ALBERTO","hrsPlan":420.0,"hrsDecl":0.0,"diff":420.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"SOS102","asig":"GOBERNANZA DE LA SOSTENIBILIDAD","rut":"10994071","docente":"RUBINSTEIN, DIANA YAEL","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"ECO408","asig":"EVALUACIÓN SOCIO-AMBIENTAL DE PROYECTOS","rut":"12628823","docente":"PAGE, BENJAMÍN","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"SOS103","asig":"NEGOCIOS SOSTENIBLES","rut":"15779865","docente":"EGAÑA, PABLO ANDRÉS","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"ECO407","asig":"ECONOMÍA PARA LA SOSTENIBILIDAD","rut":"16628144","docente":"VILLAGRA, MIJAIL ROLANDO","hrsPlan":120.0,"hrsDecl":0.0,"diff":120.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MNS 2026_2026/1","cc":"8976","sigla":"SOS101","asig":"TRANSICIÓN A LA SOSTENIBILIDAD","rut":"9904943","docente":"OPAZO, JOSÉ LUIS","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM303","asig":"ESTRATEGIAS PARA LA GESTIÓN DE CADENAS DE SUMINISTRO GLOBALES","rut":"10330785","docente":"GARCÍA, PABLO ANTONIO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM206","asig":"SOSTENIBILIDAD EN OPERACIONES Y CADENAS DE SUMINISTRO","rut":"13451074","docente":"MARTINEZ CARO, LUCIA","hrsPlan":0.0,"hrsDecl":10.0,"diff":-10.0,"cumplPct":1000.0,"declarado":true,"monto":800000.0,"docProg":"SI","cerrada":"NO","mesIni":"Marzo","mesFin":"Mayo"},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM207","asig":"MODELADO Y SIMULACIÓN DE PROCESOS DE TOMA DE DECISIÓN EN CADENAS DE SUMINISTRO","rut":"13451074","docente":"MARTINEZ CARO, LUCIA","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM207","asig":"MODELADO Y SIMULACIÓN DE PROCESOS DE TOMA DE DECISIÓN EN CADENAS DE SUMINISTRO","rut":"13729772","docente":"HERNANDEZ, JORGE","hrsPlan":90.0,"hrsDecl":0.0,"diff":90.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM304","asig":"VIAJE INTERNACIONAL MSCM","rut":"13729772","docente":"HERNANDEZ, JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM402","asig":"CAPSTONE","rut":"13729772","docente":"HERNANDEZ, JORGE","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM206","asig":"SOSTENIBILIDAD EN OPERACIONES Y CADENAS DE SUMINISTRO","rut":"17084089","docente":"LARRAÍN, MACARENA AMPARO MARÍA","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"SI","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM401","asig":"LIDERAZGO E INNOVACIÓN","rut":"23537013","docente":"MARTÍN, IGNACIO","hrsPlan":0.0,"hrsDecl":20.0,"diff":-20.0,"cumplPct":2000.0,"declarado":true,"monto":5612383.621,"docProg":"SI","cerrada":"NO","mesIni":"Marzo","mesFin":"Abril"},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM301","asig":"ESTRATEGIAS DE DIGITALIZACIÓN PARA CADENAS DE SUMINISTRO","rut":"9288913","docente":"VARAS, SAMUEL EDUARDO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""},{"periodo":"MSCM 2025_2026/2","cc":"—","sigla":"SCM302","asig":"COMUNICACIÓN EFECTIVA Y RESOLUCIÓN DE CONFLICTOS","rut":"9909733","docente":"SAGREDO, FRANCISCO","hrsPlan":0.0,"hrsDecl":0.0,"diff":0.0,"cumplPct":0.0,"declarado":false,"monto":0.0,"docProg":"NO","cerrada":"NO","mesIni":"","mesFin":""}];
+var _DH = [];
 
 // ── Estado módulo ─────────────────────────────────────────────
 var _dvo     = [];   // declaraciones cargadas (filas originales)
@@ -7918,6 +7983,1801 @@ function _ifDescargar() {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   GESTIÓN → VALIDADOR DE CONFLICTOS DE HORARIO
+══════════════════════════════════════════════════════════════ */
+
+function gValidarConflicto() {
+  var zona = document.getElementById('gConflictoZona');
+  if (!zona) return;
+
+  var progSel  = $('simProg') ? $('simProg').value : '';
+  var coordSel = $('simNew')  ? $('simNew').value  : '';
+  if (!progSel || !coordSel) { zona.innerHTML = ''; return; }
+
+  var df = getDF();
+  var sesProg  = df.filter(function(r){ return r['PROGRAMA'] === progSel; });
+  var sesCoord = df.filter(function(r){
+    return r['COORDINADORA RESPONSABLE'] === coordSel && r['PROGRAMA'] !== progSel;
+  });
+
+  // Sin datos suficientes
+  if (!sesProg.length) {
+    zona.innerHTML =
+      '<div style="padding:8px 12px;background:rgba(148,163,184,.08);border:1px solid var(--border);'+
+        'border-radius:6px;font-size:11px;color:var(--t3);margin-top:8px">'+
+        'ℹ️ Sin sesiones cargadas para <strong>'+esc(progSel)+'</strong> en el calendario actual.'+
+      '</div>';
+    return;
+  }
+  if (!sesCoord.length) {
+    zona.innerHTML =
+      '<div style="padding:8px 12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);'+
+        'border-radius:6px;font-size:11px;color:#10b981;margin-top:8px">'+
+        '✅ <strong>'+esc(coordSel)+'</strong> no tiene otros programas asignados en el calendario. Sin conflictos.'+
+      '</div>';
+    return;
+  }
+
+  // ── Parseo de horario ─────────────────────────────────────────
+  function parseHora(str) {
+    var m = String(str||'').match(/(\d{1,2}):(\d{2})/);
+    return m ? parseInt(m[1])*60 + parseInt(m[2]) : null;
+  }
+  function parseRango(str) {
+    if (!str) return null;
+    var parts = String(str).split(/\s*[-–—]\s*/);
+    var ini = parseHora(parts[0]);
+    var fin = parseHora(parts[1]);
+    if (!ini) return null;
+    if (!fin || fin <= ini) fin = ini + 120;
+    return { ini:ini, fin:fin, str:String(str).trim() };
+  }
+  function minToHMS(min) {
+    var h = Math.floor(min/60), m = min%60;
+    return h+':'+(m<10?'0':'')+m;
+  }
+  function solapan(a, b) { return a.ini < b.fin && b.ini < a.fin; }
+  function solapMinutos(a, b) {
+    return Math.max(0, Math.min(a.fin,b.fin) - Math.max(a.ini,b.ini));
+  }
+
+  // ── Buscar conflictos ─────────────────────────────────────────
+  var conflictos = [];
+  var visto = {};
+
+  sesProg.forEach(function(sp) {
+    var diaSP   = sp['Dia_Semana'] || '';
+    var fechaSP = sp['DIAS/FECHAS'];
+    var horSP   = parseRango(sp['HORARIO']);
+    var sedeSP  = sp['SEDE'] || '';
+    if (!diaSP && !fechaSP) return;
+
+    sesCoord.forEach(function(sc) {
+      var diaSC   = sc['Dia_Semana'] || '';
+      var fechaSC = sc['DIAS/FECHAS'];
+      var horSC   = parseRango(sc['HORARIO']);
+      var sedeSC  = sc['SEDE'] || '';
+
+      var mismaFecha = fechaSP && fechaSC &&
+        fechaSP instanceof Date && fechaSC instanceof Date &&
+        fechaSP.toDateString() === fechaSC.toDateString();
+      var mismoDia = diaSP && diaSC && diaSP === diaSC;
+      if (!mismaFecha && !mismoDia) return;
+
+      // Calcular nivel de conflicto
+      var tipoConflicto, minSolap = 0, nivel;
+      if (horSP && horSC) {
+        if (!solapan(horSP, horSC)) return;  // mismo día pero horas distintas → OK
+        minSolap = solapMinutos(horSP, horSC);
+        tipoConflicto = 'Solapamiento de horario';
+        nivel = minSolap >= 60 ? 'alto' : 'medio';
+      } else {
+        tipoConflicto = 'Mismo día sin horario definido';
+        nivel = 'medio';
+      }
+
+      // Detectar si misma sede (agrava el conflicto)
+      var mismaSede = sedeSP && sedeSC &&
+        sedeSP.toLowerCase().split(/[\s,\-]/)[0] === sedeSC.toLowerCase().split(/[\s,\-]/)[0];
+
+      var key = sc['PROGRAMA'] + '||' + diaSP + '||' + (horSP?horSP.str:'');
+      if (visto[key]) return;
+      visto[key] = true;
+
+      conflictos.push({
+        progA:       progSel,
+        progB:       sc['PROGRAMA'],
+        dia:         diaSP || (fechaSP instanceof Date ? fechaSP.toLocaleDateString('es-CL',{weekday:'long'}) : ''),
+        fechaStr:    fechaSP instanceof Date ? fechaSP.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '',
+        horA:        horSP ? horSP.str : null,
+        horB:        horSC ? horSC.str : null,
+        sedeA:       sedeSP,
+        sedeB:       sedeSC,
+        minSolap:    minSolap,
+        tipo:        tipoConflicto,
+        nivel:       mismaSede ? 'alto' : nivel,
+        mismaSede:   mismaSede,
+      });
+    });
+  });
+
+  // ── Resumen del programa seleccionado ─────────────────────────
+  var sedeProg = sesProg[0]['SEDE'] || '—';
+  var diasProg = [...new Set(sesProg.map(function(r){return r['Dia_Semana']||'';}).filter(Boolean))].join(' · ');
+  var horProg  = [...new Set(sesProg.map(function(r){return r['HORARIO']||'';}).filter(Boolean))].slice(0,1).join('');
+  var nProgsSC = [...new Set(sesCoord.map(function(r){return r['PROGRAMA'];}))].length;
+
+  // ── Sin conflictos ────────────────────────────────────────────
+  if (!conflictos.length) {
+    zona.innerHTML =
+      '<div style="margin-top:8px;border:1px solid rgba(16,185,129,.3);border-radius:8px;overflow:hidden">'+
+        '<div style="padding:10px 14px;background:rgba(16,185,129,.08);'+
+          'display:flex;align-items:center;gap:10px">'+
+          '<span style="font-size:16px">✅</span>'+
+          '<div>'+
+            '<div style="font-size:12px;font-weight:700;color:#10b981">Sin conflictos de horario</div>'+
+            '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+
+              esc(coordSel)+' maneja '+nProgsSC+' programa(s) — ninguno coincide en día y hora con <strong>'+esc(abbr(progSel,36))+'</strong>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        // Detalle del programa a reasignar
+        '<div style="padding:8px 14px;background:var(--surface2);display:flex;gap:14px;flex-wrap:wrap">'+
+          '<span style="font-size:10px;color:var(--t3)">📅 Días: <strong style="color:var(--t2)">'+esc(diasProg||'—')+'</strong></span>'+
+          '<span style="font-size:10px;color:var(--t3)">🕐 Horario: <strong style="color:var(--t2)">'+esc(horProg||'—')+'</strong></span>'+
+          '<span style="font-size:10px;color:var(--t3)">📍 Sede: <strong style="color:var(--t2)">'+esc(sedeProg)+'</strong></span>'+
+        '</div>'+
+      '</div>';
+    return;
+  }
+
+  // ── Con conflictos ────────────────────────────────────────────
+  var nAlto   = conflictos.filter(function(cf){return cf.nivel==='alto';}).length;
+  var badgeColor = nAlto > 0 ? '#dc2626' : '#f59e0b';
+  var badgeBg    = nAlto > 0 ? 'rgba(220,38,38,.1)' : 'rgba(245,158,11,.1)';
+  var badgeBd    = nAlto > 0 ? 'rgba(220,38,38,.3)' : 'rgba(245,158,11,.3)';
+  var headerIco  = nAlto > 0 ? '🔴' : '🟡';
+  var headerTxt  = nAlto > 0 ? 'TOPE DE HORARIO DETECTADO' : 'POSIBLE CONFLICTO DE PROGRAMACIÓN';
+
+  zona.innerHTML =
+    '<div style="margin-top:8px;border:1.5px solid '+badgeColor+';border-radius:10px;overflow:hidden">'+
+
+    // ── Header ──────────────────────────────────────────────────
+    '<div style="padding:10px 16px;background:'+badgeBg+';display:flex;align-items:center;gap:10px">'+
+      '<span style="font-size:16px">'+headerIco+'</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-size:12px;font-weight:800;color:'+badgeColor+'">'+headerTxt+'</div>'+
+        '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+
+          '<strong>'+esc(coordSel)+'</strong> ya tiene programas asignados que coinciden con '+
+          '<strong>'+esc(abbr(progSel,34))+'</strong>'+
+        '</div>'+
+      '</div>'+
+      '<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;'+
+        'background:'+badgeBg+';color:'+badgeColor+';border:1px solid '+badgeBd+';white-space:nowrap">'+
+        conflictos.length+' conflicto(s)'+
+      '</span>'+
+    '</div>'+
+
+    // ── Detalle del programa a asignar ───────────────────────────
+    '<div style="padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);'+
+      'display:flex;flex-wrap:wrap;gap:12px;align-items:center">'+
+      '<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">'+
+        'Programa a reasignar:'+
+      '</span>'+
+      '<span style="font-size:11px;font-weight:700;color:var(--t1)">'+esc(abbr(progSel,40))+'</span>'+
+      (diasProg?'<span style="font-size:10px;color:var(--t3)">📅 <strong style="color:var(--t2)">'+esc(diasProg)+'</strong></span>':'')+
+      (horProg?'<span style="font-size:10px;color:var(--t3)">🕐 <strong style="color:var(--t2)">'+esc(horProg)+'</strong></span>':'')+
+      (sedeProg && sedeProg!=='—'?'<span style="font-size:10px;color:var(--t3)">📍 <strong style="color:var(--t2)">'+esc(sedeProg)+'</strong></span>':'')+
+    '</div>'+
+
+    // ── Conflictos detallados ────────────────────────────────────
+    '<div style="padding:10px 16px;display:flex;flex-direction:column;gap:8px">'+
+    conflictos.map(function(cf) {
+      var nivelColor = cf.nivel==='alto' ? '#dc2626' : '#f59e0b';
+      var nivelBg    = cf.nivel==='alto' ? 'rgba(220,38,38,.06)' : 'rgba(245,158,11,.06)';
+      var nivelIco   = cf.nivel==='alto' ? '🔴' : '🟡';
+      var nivelLbl   = cf.nivel==='alto' ? 'CRÍTICO' : 'MODERADO';
+
+      return '<div style="border:1px solid '+nivelColor.replace(')',', .3)').replace('rgb','rgba')+';'+
+        'border-radius:8px;overflow:hidden;background:'+nivelBg+'">'+
+
+        // Fila título del conflicto
+        '<div style="padding:8px 12px;display:flex;align-items:center;gap:8px;'+
+          'border-bottom:1px solid '+nivelColor.replace(')',', .15)').replace('rgb','rgba')+'">'+
+          '<span style="font-size:12px">'+nivelIco+'</span>'+
+          '<span style="font-size:11px;font-weight:700;color:'+nivelColor+'">'+cf.tipo+'</span>'+
+          '<span style="margin-left:auto;font-size:9px;font-weight:800;padding:1px 7px;border-radius:10px;'+
+            'background:'+nivelColor.replace(')',', .15)').replace('rgb','rgba')+';color:'+nivelColor+'">'+
+            nivelLbl+
+          '</span>'+
+        '</div>'+
+
+        // Detalle lado a lado
+        '<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;padding:10px 12px;align-items:start">'+
+
+          // Programa A
+          '<div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);'+
+            'border-radius:6px;padding:8px 10px">'+
+            '<div style="font-size:9px;font-weight:700;color:#2563eb;text-transform:uppercase;'+
+              'letter-spacing:.5px;margin-bottom:5px">Programa a reasignar</div>'+
+            '<div style="font-size:11px;font-weight:700;color:var(--t1);margin-bottom:6px">'+
+              esc(abbr(cf.progA,32))+
+            '</div>'+
+            '<div style="display:flex;flex-direction:column;gap:3px">'+
+              '<div style="font-size:10px;color:var(--t3)">📅 <strong style="color:var(--t2)">'+esc(cf.dia)+'</strong>'+
+                (cf.fechaStr?' ('+cf.fechaStr+')':'')+
+              '</div>'+
+              (cf.horA?'<div style="font-size:10px;color:var(--t3)">🕐 <strong style="color:var(--t2)">'+esc(cf.horA)+'</strong></div>':
+                '<div style="font-size:10px;color:var(--t4)">🕐 Horario no definido</div>')+
+              (cf.sedeA?'<div style="font-size:10px;color:var(--t3)">📍 <strong style="color:var(--t2)">'+esc(cf.sedeA)+'</strong></div>':'')
+            +'</div>'+
+          '</div>'+
+
+          // VS central
+          '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px">'+
+            '<div style="font-size:11px;font-weight:900;color:'+nivelColor+'">VS</div>'+
+            (cf.minSolap>0?
+              '<div style="font-size:9px;font-weight:700;color:'+nivelColor+';text-align:center;white-space:nowrap">'+
+                cf.minSolap+'min'+
+                '<br>solapado'+
+              '</div>':'') +
+            (cf.mismaSede?
+              '<div style="font-size:9px;font-weight:700;color:#dc2626;text-align:center;'+
+                'background:rgba(220,38,38,.1);border-radius:4px;padding:2px 5px;white-space:nowrap">'+
+                '⚠️ misma<br>sede'+
+              '</div>':'') +
+          '</div>'+
+
+          // Programa B (conflicto)
+          '<div style="background:'+nivelBg+';border:1px solid '+nivelColor.replace(')',', .2)').replace('rgb','rgba')+';'+
+            'border-radius:6px;padding:8px 10px">'+
+            '<div style="font-size:9px;font-weight:700;color:'+nivelColor+';text-transform:uppercase;'+
+              'letter-spacing:.5px;margin-bottom:5px">Programa en conflicto</div>'+
+            '<div style="font-size:11px;font-weight:700;color:var(--t1);margin-bottom:6px">'+
+              esc(abbr(cf.progB,32))+
+            '</div>'+
+            '<div style="display:flex;flex-direction:column;gap:3px">'+
+              '<div style="font-size:10px;color:var(--t3)">📅 <strong style="color:var(--t2)">'+esc(cf.dia)+'</strong></div>'+
+              (cf.horB?'<div style="font-size:10px;color:var(--t3)">🕐 <strong style="color:var(--t2)">'+esc(cf.horB)+'</strong></div>':
+                '<div style="font-size:10px;color:var(--t4)">🕐 Horario no definido</div>')+
+              (cf.sedeB?'<div style="font-size:10px;color:var(--t3)">📍 <strong style="color:var(--t2)">'+esc(cf.sedeB)+'</strong></div>':'')
+            +'</div>'+
+          '</div>'+
+
+        '</div>'+
+      '</div>';
+    }).join('')+
+    '</div>'+
+
+    // ── Recomendación ────────────────────────────────────────────
+    '<div style="padding:8px 16px;border-top:1px solid var(--border);'+
+      'background:var(--surface2);font-size:11px;color:var(--t3)">'+
+      (nAlto>0
+        ? '💡 <strong style="color:#dc2626">Recomendación:</strong> Considera cambiar el horario o la sede antes de confirmar esta reasignación, o selecciona otra coordinadora.'
+        : '💡 <strong style="color:#f59e0b">Recomendación:</strong> Verifica con la coordinadora si puede gestionar ambos programas en el mismo día.'
+      )+
+    '</div>'+
+
+  '</div>';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PLANIFICADOR → GENERADOR DE PROPUESTAS DE CALENDARIO
+   section-propuestas-calendario
+══════════════════════════════════════════════════════════════ */
+
+function renderPropuestasCalendario() {
+  var pg = $('page'); if (!pg) return;
+
+  pg.innerHTML =
+    '<div class="pg-title">Generador de Propuestas de Calendario</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:20px">'+
+      'Define los parámetros y genera automáticamente la distribución de sesiones en el rango solicitado'+
+    '</div>'+
+
+    // ── id requerido por spec ─────────────────────────────────────
+    '<div id="section-propuestas-calendario">'+
+
+    // ── Panel de parámetros ───────────────────────────────────────
+    // ── Panel 0: Buscador de programa ──────────────────────────
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;'+
+      'padding:18px 20px;margin-bottom:16px;'+
+      'background:linear-gradient(135deg,rgba(37,99,235,.05),rgba(124,58,237,.03))">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--t2);margin-bottom:12px;'+
+        'display:flex;align-items:center;gap:8px">'+
+        '<span style="font-size:18px">🔍</span> Buscar programa del calendario cargado'+
+        '<span style="font-size:10px;font-weight:400;color:var(--t3);margin-left:4px">'+
+          '— Autocompleta los parámetros con el calendario actual'+
+        '</span>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:flex-end">'+
+        '<div style="display:flex;flex-direction:column;gap:5px">'+
+          '<label style="font-size:10px;font-weight:700;color:var(--t3);'+
+            'text-transform:uppercase;letter-spacing:.5px">Programa</label>'+
+          '<div style="position:relative">'+
+            '<input id="ppBusqInput" type="text" '+
+              'placeholder="Escribe para buscar: Magíster, MBA, Diplomado…" '+
+              'oninput="ppBuscarProg(this.value)" '+
+              'autocomplete="off" '+
+              'style="'+_ppInp()+'padding-left:36px">'+
+            '<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px">🔍</span>'+
+            '<div id="ppBusqDrop" style="display:none;position:absolute;top:calc(100%+4px);left:0;right:0;'+
+              'background:var(--surface);border:1px solid var(--border);border-radius:8px;'+
+              'max-height:220px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.2)">'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        '<button onclick="ppCargarPrograma()" '+
+          'style="padding:9px 18px;background:#2563eb;color:#fff;border:none;border-radius:8px;'+
+            'font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;'+
+            'box-shadow:0 2px 8px rgba(37,99,235,.3)">'+
+          '📥 Cargar calendario'+
+        '</button>'+
+      '</div>'+
+      // Panel de previsualización del calendario actual
+      '<div id="ppCalPreview" style="margin-top:12px"></div>'+
+    '</div>'+
+
+    // ── Panel 1: Parámetros ─────────────────────────────────────
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;'+
+      'padding:20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'+
+
+      '<div style="font-size:13px;font-weight:700;color:var(--t2);margin-bottom:16px;'+
+        'display:flex;align-items:center;gap:8px">'+
+        '<span style="font-size:18px">⚙️</span> Parámetros de la Propuesta'+
+      '</div>'+
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
+
+        // ── Columna izquierda ───────────────────────────────────
+        '<div style="display:flex;flex-direction:column;gap:14px">'+
+
+          // Nombre del programa
+          _ppField('Nombre del Programa / Asignatura',
+            '<input id="ppNombre" type="text" placeholder="Ej: Magíster en Dirección — Módulo Finanzas" '+
+            'style="'+_ppInp()+'">') +
+
+          // Fechas
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+            _ppField('Fecha de Inicio',
+              '<input id="ppIni" type="date" style="'+_ppInp()+'">') +
+            _ppField('Fecha de Término',
+              '<input id="ppFin" type="date" style="'+_ppInp()+'">') +
+          '</div>'+
+
+          // Hora
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+            _ppField('Hora de inicio',
+              '<input id="ppHora" type="time" value="08:30" style="'+_ppInp()+'">') +
+            _ppField('Duración por sesión (hrs)',
+              '<input id="ppDuracion" type="number" min="1" max="10" value="4" step="0.5" style="'+_ppInp()+'">') +
+          '</div>'+
+
+          // Horas totales
+          _ppField('Total horas a cubrir (opcional)',
+            '<input id="ppHrsTotal" type="number" min="0" step="0.5" placeholder="Ej: 28" style="'+_ppInp()+'">') +
+
+        '</div>'+
+
+        // ── Columna derecha ─────────────────────────────────────
+        '<div style="display:flex;flex-direction:column;gap:14px">'+
+
+          // Días de la semana (checkboxes)
+          '<div>'+
+            '<label style="font-size:10px;font-weight:700;color:var(--t3);'+
+              'text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">'+
+              'Días de la semana'+
+            '</label>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:8px" id="ppDiasWrap">'+
+              [['L','Lunes'],['M','Martes'],['Mi','Miércoles'],['J','Jueves'],
+               ['V','Viernes'],['S','Sábado'],['D','Domingo']].map(function(d){
+                var isSD = d[0]==='S'||d[0]==='D';
+                return '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;'+
+                  'cursor:pointer">'+
+                  '<input type="checkbox" id="ppD'+d[0]+'" '+(isSD?'':'checked')+' '+
+                    'style="accent-color:#2563eb;width:16px;height:16px;cursor:pointer">'+
+                  '<span style="font-size:11px;font-weight:700;color:var(--t2);'+
+                    'padding:4px 8px;background:var(--surface2);border:1px solid var(--border);'+
+                    'border-radius:6px;min-width:32px;text-align:center">'+d[0]+'</span>'+
+                  '<span style="font-size:9px;color:var(--t3)">'+d[1].substring(0,3)+'</span>'+
+                '</label>';
+              }).join('')+
+            '</div>'+
+          '</div>'+
+
+          // Modalidad
+          _ppField('Modalidad',
+            '<select id="ppMod" style="'+_ppInp()+'">'+
+              '<option value="Presencial">Presencial</option>'+
+              '<option value="Online Sincrónico">Online Sincrónico</option>'+
+              '<option value="Híbrido">Híbrido</option>'+
+              '<option value="E-Learning">E-Learning</option>'+
+            '</select>') +
+
+          // Sede
+          _ppField('Sede / Sala',
+            '<input id="ppSede" type="text" placeholder="Ej: Santiago — Sala 302" style="'+_ppInp()+'">') +
+
+          // Calendario actual (JSON / texto libre)
+          _ppField('Calendario existente (JSON opcional)',
+            '<textarea id="ppCalJSON" rows="3" placeholder=\'[{"fecha":"2026-03-10","programa":"..."}]\' '+
+            'style="'+_ppInp()+'resize:vertical;min-height:64px;font-size:10px;font-family:monospace"></textarea>'+
+            '<div style="font-size:10px;color:var(--t3);margin-top:3px">'+
+              'Si pegas el JSON del calendario actual, la propuesta evitará fechas ya ocupadas'+
+            '</div>') +
+
+        '</div>'+
+
+      '</div>'+ // grid
+
+      // ── Botones ────────────────────────────────────────────────
+      '<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">'+
+        '<button onclick="ppGenerar()" '+
+          'style="padding:10px 24px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;'+
+            'border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;'+
+            'box-shadow:0 2px 10px rgba(37,99,235,.35);display:flex;align-items:center;gap:8px">'+
+          '📅 Generar Propuesta de Calendario'+
+        '</button>'+
+        '<button onclick="ppLimpiar()" '+
+          'style="padding:10px 16px;border:1px solid var(--border);background:var(--surface2);'+
+            'color:var(--t3);border-radius:8px;font-size:12px;cursor:pointer">'+
+          '🗑 Limpiar'+
+        '</button>'+
+      '</div>'+
+
+    '</div>'+ // panel params
+
+    // ── Resultado ─────────────────────────────────────────────────
+    '<div id="ppResultado"></div>'+
+
+    '</div>'; // section-propuestas-calendario
+}
+
+/* ── Helpers UI del generador ──────────────────────────────────── */
+function _ppInp() {
+  return 'width:100%;border:1px solid var(--border);border-radius:6px;background:var(--surface2);'+
+    'color:var(--t1);padding:8px 12px;font-size:12px;box-sizing:border-box;';
+}
+function _ppField(lbl, input) {
+  return '<div style="display:flex;flex-direction:column;gap:5px">'+
+    '<label style="font-size:10px;font-weight:700;color:var(--t3);'+
+      'text-transform:uppercase;letter-spacing:.5px">'+lbl+'</label>'+
+    input+
+  '</div>';
+}
+
+/* ── Limpiar ────────────────────────────────────────────────────── */
+/* ── Estado del buscador ─────────────────────────────────────────── */
+var _ppProgSel = null;  // programa actualmente seleccionado
+
+/* ── Buscar programa en APP.df ───────────────────────────────────── */
+function ppBuscarProg(q) {
+  var drop = document.getElementById('ppBusqDrop');
+  if (!drop) return;
+
+  var df = getDF();
+  if (!df.length) {
+    drop.style.display = 'none';
+    return;
+  }
+
+  q = q.trim().toLowerCase();
+  if (!q || q.length < 2) { drop.style.display = 'none'; return; }
+
+  // Obtener programas únicos con metadata
+  var progMap = {};
+  df.forEach(function(r) {
+    var p = r['PROGRAMA']; if (!p) return;
+    if (!progMap[p]) {
+      progMap[p] = {
+        nombre: p,
+        abrev:  r['Programa_Abrev'] || r['NOMBRE ABREVIADO'] || '',
+        coord:  r['COORDINADORA RESPONSABLE'] || '',
+        sede:   r['SEDE'] || '',
+        count:  0,
+        fechas: [],
+        dias:   new Set(),
+        horarios: new Set(),
+      };
+    }
+    var m = progMap[p];
+    m.count++;
+    if (r['DIAS/FECHAS'] instanceof Date) m.fechas.push(r['DIAS/FECHAS']);
+    if (r['Dia_Semana']) m.dias.add(r['Dia_Semana']);
+    if (r['HORARIO'])   m.horarios.add(String(r['HORARIO']).trim());
+  });
+
+  // Filtrar por query
+  var resultados = Object.values(progMap).filter(function(p) {
+    return p.nombre.toLowerCase().includes(q) ||
+           (p.abrev && p.abrev.toLowerCase().includes(q)) ||
+           (p.coord && p.coord.toLowerCase().includes(q));
+  }).slice(0, 12);
+
+  if (!resultados.length) {
+    drop.innerHTML =
+      '<div style="padding:12px 16px;font-size:12px;color:var(--t3);text-align:center">'+
+        'Sin resultados para "'+esc(q)+'"'+
+      '</div>';
+    drop.style.display = 'block';
+    return;
+  }
+
+  drop.innerHTML = resultados.map(function(p) {
+    var nSes = p.count;
+    var diasStr = [...p.dias].slice(0,3).join(' · ');
+    var horStr  = [...p.horarios].slice(0,1).join('');
+    return '<div onclick="ppSeleccionarProg(\''+esc(p.nombre).replace(/'/g,"\\'")+'\')" '+
+      'style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);'+
+        'transition:background .15s" '+
+      'onmouseover="this.style.background=\'rgba(37,99,235,.08)\'" '+
+      'onmouseout="this.style.background=\'transparent\'">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--t1)">'+esc(p.nombre)+'</div>'+
+      '<div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">'+
+        '<span style="font-size:10px;color:var(--t3)">📋 '+nSes+' sesiones</span>'+
+        (diasStr?'<span style="font-size:10px;color:var(--t3)">📅 '+esc(diasStr)+'</span>':'') +
+        (horStr? '<span style="font-size:10px;color:var(--t3)">🕐 '+esc(horStr)+'</span>':'') +
+        (p.coord?'<span style="font-size:10px;color:var(--t3)">👩 '+esc(abbr(p.coord,22))+'</span>':'') +
+      '</div>'+
+    '</div>';
+  }).join('');
+  drop.style.display = 'block';
+}
+
+/* ── Seleccionar programa del dropdown ───────────────────────────── */
+function ppSeleccionarProg(nombre) {
+  var inp  = document.getElementById('ppBusqInput');
+  var drop = document.getElementById('ppBusqDrop');
+  if (inp)  inp.value  = nombre;
+  if (drop) drop.style.display = 'none';
+  _ppProgSel = nombre;
+  ppMostrarCalendarioActual(nombre);
+}
+
+/* ── Cargar calendario del programa seleccionado → autocompletar ── */
+function ppCargarPrograma() {
+  var inp = document.getElementById('ppBusqInput');
+  var q   = inp ? inp.value.trim() : '';
+  if (!q) { showToast('Escribe o selecciona un programa','warn'); return; }
+
+  var df = getDF();
+  // Buscar coincidencia exacta o parcial
+  var sesiones = df.filter(function(r){
+    return r['PROGRAMA'] && r['PROGRAMA'].toLowerCase().includes(q.toLowerCase());
+  });
+
+  if (!sesiones.length) { showToast('No se encontraron sesiones para ese programa','warn'); return; }
+
+  // Tomar el nombre completo del primer match
+  var nombreReal = sesiones[0]['PROGRAMA'];
+  _ppProgSel = nombreReal;
+  if (inp) inp.value = nombreReal;
+
+  ppMostrarCalendarioActual(nombreReal);
+  ppAutocompletar(nombreReal, sesiones);
+  showToast('Calendario cargado: '+sesiones.length+' sesiones','ok');
+}
+
+/* ── Mostrar calendario actual del programa ──────────────────────── */
+function ppMostrarCalendarioActual(nombre) {
+  var df = getDF();
+  var sesiones = df.filter(function(r){ return r['PROGRAMA'] === nombre; })
+    .sort(function(a,b){
+      var da = a['DIAS/FECHAS'] instanceof Date ? a['DIAS/FECHAS'] : new Date(0);
+      var db = b['DIAS/FECHAS'] instanceof Date ? b['DIAS/FECHAS'] : new Date(0);
+      return da - db;
+    });
+
+  var prev = document.getElementById('ppCalPreview');
+  if (!prev) return;
+
+  if (!sesiones.length) { prev.innerHTML = ''; return; }
+
+  // Calcular resumen
+  var fechas  = sesiones.filter(function(r){ return r['DIAS/FECHAS'] instanceof Date; })
+                        .map(function(r){ return r['DIAS/FECHAS']; });
+  var fIni    = fechas.length ? new Date(Math.min.apply(null,fechas)) : null;
+  var fFin    = fechas.length ? new Date(Math.max.apply(null,fechas)) : null;
+  var dias    = [...new Set(sesiones.map(function(r){ return r['Dia_Semana']; }).filter(Boolean))];
+  var hors    = [...new Set(sesiones.map(function(r){ return r['HORARIO']; }).filter(Boolean))];
+  var profs   = [...new Set(sesiones.map(function(r){ return r['PROFESOR']; }).filter(Boolean))];
+  var sede    = sesiones[0]['SEDE'] || '';
+  var coord   = sesiones[0]['COORDINADORA RESPONSABLE'] || '';
+
+  // ── HTML del preview ──────────────────────────────────────────
+  prev.innerHTML =
+    '<div style="border:1px solid rgba(37,99,235,.25);border-radius:8px;overflow:hidden;margin-top:4px">'+
+
+    // Header strip
+    '<div style="padding:8px 14px;background:rgba(37,99,235,.08);display:flex;align-items:center;gap:8px;'+
+      'border-bottom:1px solid rgba(37,99,235,.15)">'+
+      '<span style="font-size:12px">📅</span>'+
+      '<span style="font-size:11px;font-weight:700;color:#2563eb">Calendario actual: '+esc(abbr(nombre,50))+'</span>'+
+      '<span style="margin-left:auto;font-size:10px;font-weight:700;padding:2px 8px;'+
+        'background:rgba(37,99,235,.15);color:#2563eb;border-radius:10px">'+
+        sesiones.length+' sesiones'+
+      '</span>'+
+    '</div>'+
+
+    // KPIs del calendario actual
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)">'+
+    [
+      {ico:'📅',l:'Inicio',v:fIni?fIni.toLocaleDateString('es-CL'):'—'},
+      {ico:'🏁',l:'Término',v:fFin?fFin.toLocaleDateString('es-CL'):'—'},
+      {ico:'📋',l:'Sesiones',v:sesiones.length},
+      {ico:'📆',l:'Días',v:dias.join(' · ')||'—'},
+    ].map(function(k){
+      return '<div style="padding:8px 12px;border-right:1px solid var(--border)">'+
+        '<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+k.ico+' '+k.l+'</div>'+
+        '<div style="font-size:13px;font-weight:800;color:var(--t1)">'+k.v+'</div>'+
+      '</div>';
+    }).join('')+
+    '</div>'+
+
+    // Info adicional
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;background:var(--surface2)">'+
+      (hors.length?'<span style="font-size:10px;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--t2)">🕐 '+esc(hors.slice(0,2).join(' / '))+'</span>':'') +
+      (coord?'<span style="font-size:10px;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--t2)">👩 '+esc(abbr(coord,24))+'</span>':'') +
+      (sede?'<span style="font-size:10px;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--t2)">📍 '+esc(sede)+'</span>':'') +
+      (profs.length?'<span style="font-size:10px;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--t2)">👨‍🏫 '+profs.length+' docente(s)</span>':'') +
+    '</div>'+
+
+    // Tabla sesiones existentes (colapsable, top 8)
+    '<div style="padding:8px 14px">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;'+
+        'letter-spacing:.5px;margin-bottom:6px">Sesiones registradas (top 8)</div>'+
+      '<div style="overflow-x:auto">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+        '<thead><tr style="background:var(--surface2)">'+
+          '<th style="padding:5px 10px;text-align:left;color:var(--t3);font-size:10px">#</th>'+
+          '<th style="padding:5px 10px;text-align:left;color:var(--t3);font-size:10px">Fecha</th>'+
+          '<th style="padding:5px 10px;text-align:left;color:var(--t3);font-size:10px">Día</th>'+
+          '<th style="padding:5px 10px;text-align:left;color:var(--t3);font-size:10px">Horario</th>'+
+          '<th style="padding:5px 10px;text-align:left;color:var(--t3);font-size:10px">Docente</th>'+
+          '<th style="padding:5px 10px;text-align:left;color:var(--t3);font-size:10px">Asignatura</th>'+
+        '</tr></thead>'+
+        '<tbody>'+
+        sesiones.slice(0,8).map(function(r,i){
+          var f = r['DIAS/FECHAS'] instanceof Date
+            ? r['DIAS/FECHAS'].toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'})
+            : '—';
+          return '<tr style="border-bottom:1px solid var(--border);background:'+(i%2?'var(--surface2)':'var(--surface)')+'">'+
+            '<td style="padding:5px 10px;color:var(--t3);font-size:10px">'+(i+1)+'</td>'+
+            '<td style="padding:5px 10px;font-weight:700">'+f+'</td>'+
+            '<td style="padding:5px 10px">'+
+              '<span style="font-size:10px;padding:1px 7px;border-radius:10px;'+
+                'background:rgba(37,99,235,.1);color:#2563eb;font-weight:700">'+
+                esc(r['Dia_Semana']||'—')+'</span>'+
+            '</td>'+
+            '<td style="padding:5px 10px;color:var(--t3)">'+esc(r['HORARIO']||'—')+'</td>'+
+            '<td style="padding:5px 10px;font-size:10px">'+esc(abbr(r['PROFESOR']||'—',20))+'</td>'+
+            '<td style="padding:5px 10px;font-size:10px;color:var(--t3)">'+esc(abbr(r['ASIGNATURA']||'—',22))+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody>'+
+      '</table>'+
+      '</div>'+
+      (sesiones.length>8?
+        '<div style="font-size:10px;color:var(--t3);margin-top:4px;text-align:right">'+
+          '… y '+(sesiones.length-8)+' sesión(es) más'+
+        '</div>':'') +
+    '</div>'+
+
+    // Botón: usar fechas para cargar y proponer siguiente período
+    '<div style="padding:8px 14px;border-top:1px solid var(--border);'+
+      'display:flex;align-items:center;gap:10px;background:rgba(16,185,129,.04)">'+
+      '<span style="font-size:11px;color:var(--t3)">'+
+        '🚀 Usa este calendario como base y genera la propuesta del siguiente período'+
+      '</span>'+
+      '<button onclick="ppAutocompletar(\''+esc(nombre).replace(/'/g,"\\'")+'\',null)" '+
+        'style="margin-left:auto;padding:6px 14px;background:#10b981;color:#fff;border:none;'+
+          'border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'+
+        '⚡ Autocompletar parámetros'+
+      '</button>'+
+    '</div>'+
+
+  '</div>';
+}
+
+/* ── Autocompletar parámetros del formulario ─────────────────────── */
+function ppAutocompletar(nombre, sesionesExt) {
+  var df = getDF();
+  var ses = sesionesExt || df.filter(function(r){ return r['PROGRAMA'] === nombre; });
+  if (!ses.length) return;
+
+  // Nombre
+  var inpN = document.getElementById('ppNombre');
+  if (inpN) inpN.value = nombre;
+
+  // Fechas del calendario actual → proponer siguiente período (+12 meses)
+  var fechas = ses.filter(function(r){ return r['DIAS/FECHAS'] instanceof Date; })
+                  .map(function(r){ return r['DIAS/FECHAS']; });
+  if (fechas.length) {
+    var fIni = new Date(Math.min.apply(null,fechas));
+    var fFin = new Date(Math.max.apply(null,fechas));
+    var duracion = fFin - fIni; // milisegundos
+
+    // Propuesta: mismo período pero +1 año (o +6 meses si dura menos de 6 meses)
+    var offset = duracion < 180*86400000 ? 180*86400000 : 365*86400000;
+    var nuevoIni = new Date(fIni.getTime() + offset);
+    var nuevoFin = new Date(fFin.getTime() + offset);
+
+    var fmt = function(d){ return d.toISOString().substring(0,10); };
+    var inpI = document.getElementById('ppIni');
+    var inpF = document.getElementById('ppFin');
+    if (inpI) inpI.value = fmt(nuevoIni);
+    if (inpF) inpF.value = fmt(nuevoFin);
+  }
+
+  // Horario → extraer hora de inicio
+  var hors = ses.map(function(r){ return String(r['HORARIO']||''); }).filter(Boolean);
+  if (hors.length) {
+    var horMas = {};
+    hors.forEach(function(h){ horMas[h] = (horMas[h]||0)+1; });
+    var horTop = Object.entries(horMas).sort(function(a,b){return b[1]-a[1];})[0][0];
+    var mHora = horTop.match(/(\d{1,2}:\d{2})/);
+    var inpH = document.getElementById('ppHora');
+    if (inpH && mHora) inpH.value = mHora[1];
+  }
+
+  // Sede
+  var sedes = ses.map(function(r){ return r['SEDE']||''; }).filter(Boolean);
+  if (sedes.length) {
+    var inpS = document.getElementById('ppSede');
+    if (inpS) inpS.value = sedes[0];
+  }
+
+  // Días de semana más frecuentes
+  var diasMap = {Lunes:1,Martes:2,Miércoles:3,Jueves:4,Viernes:5,Sábado:6,Domingo:0};
+  var diasFreq = {};
+  ses.forEach(function(r){ if(r['Dia_Semana']) diasFreq[r['Dia_Semana']]=(diasFreq[r['Dia_Semana']]||0)+1; });
+  var diasPrincipales = Object.keys(diasFreq).sort(function(a,b){ return diasFreq[b]-diasFreq[a]; });
+
+  // Limpiar checkboxes y marcar los días del programa
+  var idsDias = {Lunes:'ppDL',Martes:'ppDM',Miércoles:'ppDMi',Jueves:'ppDJ',
+                 Viernes:'ppDV',Sábado:'ppDS',Domingo:'ppDD'};
+  Object.values(idsDias).forEach(function(id){ var el=$(id); if(el) el.checked=false; });
+  diasPrincipales.forEach(function(dia){
+    var id = idsDias[dia]; var el = $(id);
+    if (el) el.checked = true;
+  });
+
+  // JSON del calendario actual → pre-poblar el textarea de fechas bloqueadas
+  var calData = ses.filter(function(r){ return r['DIAS/FECHAS'] instanceof Date; })
+                   .map(function(r){
+    return {
+      fecha: r['DIAS/FECHAS'].toISOString().substring(0,10),
+      programa: r['PROGRAMA'],
+      dia: r['Dia_Semana'],
+      horario: r['HORARIO'],
+    };
+  });
+  var inpJSON = document.getElementById('ppCalJSON');
+  if (inpJSON) inpJSON.value = JSON.stringify(calData, null, 2);
+
+  // Calcular horas totales aproximadas del período
+  var hrsT = ses.reduce(function(s,r){return s+(parseFloat(r['HORAS'])||0);},0);
+  if (hrsT > 0) {
+    var inpHrs = document.getElementById('ppHrsTotal');
+    if (inpHrs) inpHrs.value = hrsT.toFixed(1);
+  }
+
+  // Estimación de duración por sesión
+  if (hors.length && fechas.length) {
+    var horRef = hors[0];
+    var partes = horRef.split(/[-–]/);
+    if (partes.length >= 2) {
+      var p1 = partes[0].match(/(\d{1,2}):(\d{2})/);
+      var p2 = partes[1].match(/(\d{1,2}):(\d{2})/);
+      if (p1 && p2) {
+        var minI = parseInt(p1[1])*60+parseInt(p1[2]);
+        var minF = parseInt(p2[1])*60+parseInt(p2[2]);
+        var durSes = (minF-minI)/60;
+        if (durSes > 0 && durSes <= 12) {
+          var inpD = document.getElementById('ppDuracion');
+          if (inpD) inpD.value = durSes.toFixed(1);
+        }
+      }
+    }
+  }
+
+  showToast('Parámetros autocompletos desde el calendario de '+abbr(nombre,30),'ok');
+}
+
+/* ── Cerrar dropdown al click fuera ─────────────────────────────── */
+document.addEventListener('click', function(e) {
+  var drop = document.getElementById('ppBusqDrop');
+  var inp  = document.getElementById('ppBusqInput');
+  if (drop && inp && !inp.contains(e.target) && !drop.contains(e.target)) {
+    drop.style.display = 'none';
+  }
+});
+
+
+function ppLimpiar() {
+  var r = document.getElementById('ppResultado');
+  if (r) r.innerHTML = '';
+  var campos = ['ppNombre','ppIni','ppFin','ppHrsTotal','ppSede','ppCalJSON'];
+  campos.forEach(function(id){ var el = $(id); if (el) el.value=''; });
+  ['ppDL','ppDM','ppDMi','ppDJ','ppDV'].forEach(function(id){
+    var el = $(id); if (el) el.checked=true;
+  });
+  ['ppDS','ppDD'].forEach(function(id){ var el=$(id); if(el) el.checked=false; });
+  var hp = $('ppHora'); if(hp) hp.value='08:30';
+  var dp = $('ppDuracion'); if(dp) dp.value='4';
+  var mp = $('ppMod'); if(mp) mp.selectedIndex=0;
+}
+
+/* ── Función principal: calcular propuesta ──────────────────────── */
+function ppGenerar() {
+  var nombre    = ($('ppNombre')   ||{value:''}).value.trim() || 'Programa sin nombre';
+  var iniStr    = ($('ppIni')      ||{value:''}).value;
+  var finStr    = ($('ppFin')      ||{value:''}).value;
+  var hora      = ($('ppHora')     ||{value:'08:30'}).value || '08:30';
+  var dur       = parseFloat(($('ppDuracion')||{value:'4'}).value)||4;
+  var hrsTotal  = parseFloat(($('ppHrsTotal')||{value:'0'}).value)||0;
+  var modalidad = ($('ppMod')      ||{value:'Presencial'}).value;
+  var sede      = ($('ppSede')     ||{value:''}).value.trim();
+  var calJSON   = ($('ppCalJSON')  ||{value:''}).value.trim();
+  var res       = document.getElementById('ppResultado');
+  if (!res) return;
+
+  // Validar fechas
+  if (!iniStr || !finStr) {
+    res.innerHTML = '<div style="padding:12px;color:#dc2626;background:rgba(220,38,38,.08);'+
+      'border:1px solid rgba(220,38,38,.3);border-radius:8px;font-size:12px">'+
+      '⚠️ Define la fecha de inicio y término.</div>';
+    return;
+  }
+  var fechaIni = new Date(iniStr + 'T12:00:00');
+  var fechaFin = new Date(finStr + 'T12:00:00');
+  if (fechaFin <= fechaIni) {
+    res.innerHTML = '<div style="padding:12px;color:#dc2626;background:rgba(220,38,38,.08);'+
+      'border:1px solid rgba(220,38,38,.3);border-radius:8px;font-size:12px">'+
+      '⚠️ La fecha de término debe ser posterior a la de inicio.</div>';
+    return;
+  }
+
+  // Días seleccionados (0=Dom,1=Lun,...,6=Sab)
+  var diasMap = {ppDL:1,ppDM:2,ppDMi:3,ppDJ:4,ppDV:5,ppDS:6,ppDD:0};
+  var diasSel = [];
+  Object.keys(diasMap).forEach(function(id){
+    var el = $(id); if (el && el.checked) diasSel.push(diasMap[id]);
+  });
+  if (!diasSel.length) {
+    res.innerHTML = '<div style="padding:12px;color:#f59e0b;background:rgba(245,158,11,.08);'+
+      'border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:12px">'+
+      '⚠️ Selecciona al menos un día de la semana.</div>';
+    return;
+  }
+
+  // Fechas bloqueadas del calendario existente
+  var bloqueadas = {};
+  if (calJSON) {
+    try {
+      var cal = JSON.parse(calJSON);
+      if (Array.isArray(cal)) {
+        cal.forEach(function(e){
+          if (e.fecha) bloqueadas[e.fecha.substring(0,10)] = true;
+        });
+      }
+    } catch(e) { /* ignorar JSON inválido */ }
+  }
+
+  // Generar lista de fechas
+  var DIAS_NOMBRE = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  var DIAS_ABR    = ['D','L','M','Mi','J','V','S'];
+  var sesiones = [];
+  var cursor   = new Date(fechaIni);
+  var hrsAcum  = 0;
+  var maxSes   = hrsTotal > 0 ? Math.ceil(hrsTotal / dur) : 500; // límite de seguridad
+
+  while (cursor <= fechaFin && sesiones.length < maxSes) {
+    var dow = cursor.getDay();
+    if (diasSel.indexOf(dow) >= 0) {
+      var fStr = cursor.toISOString().substring(0,10);
+      if (!bloqueadas[fStr]) {
+        hrsAcum += dur;
+        // Hora fin
+        var hm   = hora.split(':');
+        var minI = parseInt(hm[0])*60 + parseInt(hm[1]||0);
+        var minF = minI + Math.round(dur*60);
+        var hFin = Math.floor(minF/60)+':'+(minF%60<10?'0':'')+minF%60;
+
+        sesiones.push({
+          n:        sesiones.length+1,
+          fecha:    fStr,
+          fechaFmt: cursor.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}),
+          dia:      DIAS_NOMBRE[dow],
+          diaAbr:   DIAS_ABR[dow],
+          hora:     hora+' – '+hFin,
+          dur:      dur,
+          hrsAcum:  hrsAcum,
+          bloqueada:false,
+        });
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  if (!sesiones.length) {
+    res.innerHTML = '<div style="padding:12px;color:#f59e0b;background:rgba(245,158,11,.08);'+
+      'border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:12px">'+
+      '⚠️ No se generaron sesiones. Revisa las fechas y los días seleccionados.</div>';
+    return;
+  }
+
+  // Calcular si se cubre el total de horas
+  var cubreTotal = hrsTotal > 0 ? hrsAcum >= hrsTotal : true;
+  var okColor    = cubreTotal ? '#10b981' : '#f59e0b';
+  var okTxt      = cubreTotal
+    ? '✅ La propuesta cubre las '+hrsTotal+' horas en '+sesiones.length+' sesiones.'
+    : '⚠️ La propuesta cubre '+hrsAcum+' de '+hrsTotal+' horas ('+sesiones.length+' sesiones). Amplía el rango de fechas.';
+
+  // ── HTML del resultado ────────────────────────────────────────
+  res.innerHTML =
+    // Resumen KPIs
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;'+
+      'overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">'+
+
+      // Header
+      '<div style="padding:14px 20px;background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(124,58,237,.06));'+
+        'border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between">'+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:800;color:var(--t1)">📅 Propuesta: '+esc(nombre)+'</div>'+
+          '<div style="font-size:11px;color:var(--t3);margin-top:3px">'+
+            fechaIni.toLocaleDateString('es-CL')+' → '+fechaFin.toLocaleDateString('es-CL')+
+            ' · '+modalidad+(sede?' · '+sede:'')+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px">'+
+          '<button onclick="ppExportarExcel()" '+
+            'style="padding:6px 14px;background:#10b981;color:#fff;border:none;border-radius:6px;'+
+              'font-size:11px;font-weight:700;cursor:pointer">📊 Excel</button>'+
+          '<button onclick="ppExportarJSON()" '+
+            'style="padding:6px 14px;border:1px solid var(--border);background:var(--surface2);'+
+              'color:var(--t2);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">📋 JSON</button>'+
+        '</div>'+
+      '</div>'+
+
+      // KPI strip
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--border)">'+
+      [
+        {l:'Sesiones',v:sesiones.length,s:'generadas',c:'#2563eb'},
+        {l:'Horas totales',v:hrsAcum.toFixed(1)+'h',s:'acumuladas',c:okColor},
+        {l:'Duración/sesión',v:dur+'h',s:modalidad,c:'var(--t2)'},
+        {l:'Rango',
+         v:Math.round((fechaFin-fechaIni)/(86400000))+'d',
+         s:'días calendario',c:'var(--t2)'},
+        {l:'Días activos',
+         v:diasSel.map(function(d){return DIAS_ABR[d];}).join(' '),
+         s:diasSel.length+' día(s)/sem',c:'#7c3aed'},
+      ].map(function(k){
+        return '<div style="padding:12px 16px;border-right:1px solid var(--border)">'+
+          '<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:4px">'+k.l+'</div>'+
+          '<div style="font-size:20px;font-weight:900;color:'+k.c+'">'+k.v+'</div>'+
+          '<div style="font-size:10px;color:var(--t4)">'+k.s+'</div>'+
+        '</div>';
+      }).join('')+
+      '</div>'+
+
+      // Alerta cobertura
+      '<div style="padding:10px 20px;background:rgba('+
+        (cubreTotal?'16,185,129':'245,158,11')+',.06);border-bottom:1px solid var(--border);'+
+        'font-size:11px;font-weight:600;color:'+okColor+'">'+
+        okTxt+
+      '</div>'+
+
+      // Tabla de sesiones
+      '<div style="overflow-x:auto">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px" id="ppTabla">'+
+        '<thead>'+
+          '<tr style="background:var(--surface2)">'+
+            '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;'+
+              'color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border);width:40px">#</th>'+
+            '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;'+
+              'color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border)">Fecha</th>'+
+            '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;'+
+              'color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border)">Día</th>'+
+            '<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;'+
+              'color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border)">Horario</th>'+
+            '<th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:700;'+
+              'color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border)">Hrs sesión</th>'+
+            '<th style="padding:10px 14px;text-align:right;font-size:10px;font-weight:700;'+
+              'color:#2563eb;text-transform:uppercase;border-bottom:2px solid var(--border)">Hrs acum.</th>'+
+            '<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;'+
+              'color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border)">Estado</th>'+
+          '</tr>'+
+        '</thead>'+
+        '<tbody>'+
+        sesiones.map(function(s,i){
+          var bg = i%2===0?'var(--surface)':'var(--surface2)';
+          var cumpl = hrsTotal>0 ? Math.min(s.hrsAcum/hrsTotal*100,100) : 100;
+          var pctC = '#10b981';
+          var isDow= [6,0].indexOf(new Date(s.fecha+'T12:00').getDay())>=0;
+          return '<tr style="background:'+bg+';border-bottom:1px solid var(--border)">'+
+            '<td style="padding:9px 14px;font-size:11px;font-weight:800;color:var(--t3)">'+ s.n +'</td>'+
+            '<td style="padding:9px 14px;font-weight:700;color:var(--t1)">'+s.fechaFmt+'</td>'+
+            '<td style="padding:9px 14px">'+
+              '<span style="padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;'+
+                'background:'+(isDow?'rgba(124,58,237,.1)':'rgba(37,99,235,.1)')+';'+
+                'color:'+(isDow?'#7c3aed':'#2563eb')+'">'+s.dia+'</span>'+
+            '</td>'+
+            '<td style="padding:9px 14px;font-size:12px;color:var(--t2)">'+esc(s.hora)+'</td>'+
+            '<td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--t2)">'+s.dur+'h</td>'+
+            '<td style="padding:9px 14px;text-align:right;font-weight:800;color:#2563eb">'+s.hrsAcum.toFixed(1)+'h</td>'+
+            '<td style="padding:9px 14px;text-align:center">'+
+              '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;'+
+                'background:rgba(16,185,129,.1);color:#10b981">✅ Programada</span>'+
+            '</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody>'+
+      '</table>'+
+      '</div>'+
+    '</div>';
+
+  // Guardar sesiones para exportar
+  window._ppUltimasSesiones = sesiones;
+  window._ppNombre = nombre;
+}
+
+/* ── Exportar Excel ─────────────────────────────────────────────── */
+function ppExportarExcel() {
+  var ses = window._ppUltimasSesiones;
+  if (!ses || !ses.length) return;
+  var rows = ses.map(function(s){
+    return {'N°':s.n,'Fecha':s.fechaFmt,'Día':s.dia,'Horario':s.hora,
+      'Horas sesión':s.dur,'Horas acumuladas':s.hrsAcum,'Estado':'Programada'};
+  });
+  try {
+    var ws = XLSX.utils.json_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Propuesta');
+    XLSX.writeFile(wb, 'Propuesta_Calendario_'+(window._ppNombre||'').replace(/\s/g,'_')+'.xlsx');
+  } catch(e){ showToast('Error al exportar: '+e.message,'err'); }
+}
+
+/* ── Exportar JSON ──────────────────────────────────────────────── */
+function ppExportarJSON() {
+  var ses = window._ppUltimasSesiones;
+  if (!ses || !ses.length) return;
+  var data = ses.map(function(s){
+    return {n:s.n,fecha:s.fecha,dia:s.dia,hora:s.hora,duracion:s.dur,hrsAcum:s.hrsAcum};
+  });
+  var blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download='propuesta_calendario.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},200);
+  showToast('JSON descargado','ok');
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   CONTROL DE GESTIÓN → REPORTE DE CRUCE DE INFORMACIÓN
+   Compara: SPA (Horas) vs Horas Asignadas vs Horas Presenciales
+══════════════════════════════════════════════════════════════════ */
+
+/* ── Estado del módulo ────────────────────────────────────────── */
+var _crData   = { spa: [], malla: [] };   // datos cargados
+var _crResult = [];                        // resultado del cruce
+
+function renderCruceInfo() {
+  var pg = $('page'); if (!pg) return;
+
+  pg.innerHTML =
+    '<div class="pg-title">Reporte de Cruce de Información</div>' +
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:20px">' +
+      'Compara horas SPA · horas asignadas · horas presenciales de la malla. ' +
+      'Carga los dos archivos y genera el reporte de brechas.' +
+    '</div>' +
+
+    // ── Panel de carga de archivos ─────────────────────────────
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">' +
+
+      // Archivo 1: SPA
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<div style="width:36px;height:36px;background:rgba(37,99,235,.1);border-radius:8px;' +
+            'display:flex;align-items:center;justify-content:center;font-size:18px">📋</div>' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--t1)">Archivo SPA</div>' +
+            '<div style="font-size:10px;color:var(--t3)">Actividades del SPA · columna "Horas"</div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="crZonaSPA" style="border:1.5px dashed var(--border);border-radius:8px;padding:20px;' +
+          'text-align:center;cursor:pointer;transition:border-color .2s;background:var(--surface2)" ' +
+          'ondragover="event.preventDefault();this.style.borderColor=\'#2563eb\'" ' +
+          'ondragleave="this.style.borderColor=\'var(--border)\'" ' +
+          'ondrop="crHandleDrop(event,\'spa\')" ' +
+          'onclick="$( \'crFileSPA\').click()">' +
+          '<input type="file" id="crFileSPA" accept=".xlsx,.xls,.csv" style="display:none" ' +
+            'onchange="crCargarArchivo(this,\'spa\')">' +
+          '<div style="font-size:28px;margin-bottom:6px">📊</div>' +
+          '<div style="font-size:12px;font-weight:600;color:var(--t2)">Arrastra el Excel aquí</div>' +
+          '<div style="font-size:10px;color:var(--t3);margin-top:3px">o clic para seleccionar · xlsx / xls / csv</div>' +
+        '</div>' +
+        '<div id="crStatusSPA" style="min-height:20px;margin-top:8px;font-size:11px;color:var(--t3)"></div>' +
+        // Columnas obligatorias
+        '<div style="margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:10px;color:var(--t3)">' +
+          '<strong style="color:var(--t2)">Columnas requeridas:</strong> ' +
+          'Docente / RUT · Sigla / Código · Horas · Programa / CC · Tipo Actividad' +
+        '</div>' +
+      '</div>' +
+
+      // Archivo 2: Malla
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<div style="width:36px;height:36px;background:rgba(124,58,237,.1);border-radius:8px;' +
+            'display:flex;align-items:center;justify-content:center;font-size:18px">📐</div>' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:700;color:var(--t1)">Horas Asignadas / Malla</div>' +
+            '<div style="font-size:10px;color:var(--t3)">Horas planificadas · malla curricular</div>' +
+          '</div>' +
+        '</div>' +
+        '<div id="crZonaMalla" style="border:1.5px dashed var(--border);border-radius:8px;padding:20px;' +
+          'text-align:center;cursor:pointer;transition:border-color .2s;background:var(--surface2)" ' +
+          'ondragover="event.preventDefault();this.style.borderColor=\'#7c3aed\'" ' +
+          'ondragleave="this.style.borderColor=\'var(--border)\'" ' +
+          'ondrop="crHandleDrop(event,\'malla\')" ' +
+          'onclick="$(\'crFileMalla\').click()">' +
+          '<input type="file" id="crFileMalla" accept=".xlsx,.xls,.csv" style="display:none" ' +
+            'onchange="crCargarArchivo(this,\'malla\')">' +
+          '<div style="font-size:28px;margin-bottom:6px">📐</div>' +
+          '<div style="font-size:12px;font-weight:600;color:var(--t2)">Arrastra el Excel aquí</div>' +
+          '<div style="font-size:10px;color:var(--t3);margin-top:3px">o clic para seleccionar · xlsx / xls / csv</div>' +
+        '</div>' +
+        '<div id="crStatusMalla" style="min-height:20px;margin-top:8px;font-size:11px;color:var(--t3)"></div>' +
+        '<div style="margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:10px;color:var(--t3)">' +
+          '<strong style="color:var(--t2)">Columnas requeridas:</strong> ' +
+          'Docente / RUT · Sigla / Código · Hrs Asignadas · Hrs Presenciales · Programa / CC' +
+        '</div>' +
+      '</div>' +
+
+    '</div>' + // grid archivos
+
+    // ── Filtro por programa + Botón generar ─────────────────────
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;' +
+      'padding:14px 18px;margin-bottom:16px">'+
+      '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">'+
+
+        // Filtro por programa/CC
+        '<div style="display:flex;flex-direction:column;gap:5px;min-width:280px;flex:1">'+
+          '<label style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">'+
+            '🏷️ Filtrar por Programa / CC'+
+          '</label>'+
+          '<div style="display:flex;gap:8px">'+
+            // Select CC
+            '<select id="crFiltroCC" onchange="crGenerar()" '+
+              'style="border:1px solid var(--border);border-radius:6px;background:var(--surface2);'+
+                'color:var(--t1);padding:8px 10px;font-size:12px;min-width:150px;cursor:pointer">'+
+              '<option value="">Todos los CC</option>'+
+            '</select>'+
+            // Input texto libre
+            '<input id="crFiltroProg" type="text" '+
+              'placeholder="Buscar por nombre de programa…" '+
+              'oninput="crGenerar()" '+
+              'style="border:1px solid var(--border);border-radius:6px;background:var(--surface2);'+
+                'color:var(--t1);padding:8px 12px;font-size:12px;flex:1;box-sizing:border-box">'+
+          '</div>'+
+        '</div>'+
+
+        // Botones
+        '<div style="display:flex;gap:8px;align-items:flex-end">'+
+          '<button onclick="crGenerar()" '+
+            'style="padding:10px 22px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;' +
+              'border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;' +
+              'box-shadow:0 2px 12px rgba(37,99,235,.35);display:flex;align-items:center;gap:8px">'+
+            '🔀 Generar Reporte'+
+          '</button>'+
+
+          '<button onclick="crLimpiar()" '+
+            'style="padding:10px 14px;border:1px solid var(--border);background:var(--surface2);'+
+              'color:var(--t3);border-radius:8px;font-size:12px;cursor:pointer">🗑 Limpiar</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="crBadge" style="font-size:11px;color:var(--t3);margin-top:8px"></div>'+
+    '</div>' +
+
+    // ── Badge de filtro activo + Resultado ─────────────────────
+    '<div id="crBadgeProg" style="margin-bottom:8px"></div>'+
+    '<div id="crResultado"></div>';
+}
+
+
+
+/* ── Drag & drop ────────────────────────────────────────────── */
+function crHandleDrop(ev, tipo) {
+  ev.preventDefault();
+  var z=$('crZona'+(tipo==='spa'?'SPA':'Malla'));
+  if(z) z.style.borderColor='var(--border)';
+  if(ev.dataTransfer.files.length) crProcesarArchivo(ev.dataTransfer.files[0],tipo);
+}
+function crCargarArchivo(input,tipo){
+  if(input.files.length) crProcesarArchivo(input.files[0],tipo);
+}
+
+/* ── Normalización agresiva ──────────────────────────────────── */
+function crExtractCC(prog) {
+  var m = String(prog||''). match(/^(\d{4,})/);
+  return m ? m[1] : null;
+}
+function crNorm(s) {
+  var STOP = {'DE':1,'LA':1,'LAS':1,'LOS':1,'EL':1,'EN':1,'Y':1,'A':1,'AL':1,
+              'DEL':1,'UN':1,'UNA':1,'SU':1,'SE':1,'CON':1,'POR':1,'PARA':1,'E':1,'O':1};
+  return String(s||'').toUpperCase()
+    .replace(/Á/g,'A').replace(/É/g,'E').replace(/Í/g,'I')
+    .replace(/Ó/g,'O').replace(/Ú/g,'U').replace(/Ñ/g,'N')
+    .replace(/\(.*?\)/g,'')
+    .replace(/[^A-Z0-9\s]/g,' ')
+    .replace(/\s+/g,' ').trim()
+    .split(' ')
+    .filter(function(w){ return w.length>1 && !STOP[w]; })
+    .join(' ');
+}
+
+/* ── Similitud Jaccard por palabras ─────────────────────────── */
+function crSim(a, b) {
+  var wa = a.split(' ').filter(Boolean);
+  var wb = b.split(' ').filter(Boolean);
+  if (!wa.length || !wb.length) return 0;
+  var sa = {}, inter = 0, union = {};
+  wa.forEach(function(w){ sa[w]=1; union[w]=1; });
+  wb.forEach(function(w){ union[w]=1; if(sa[w]) inter++; });
+  return inter / Object.keys(union).length;
+}
+
+/* ── Procesar archivo ─────────────────────────────────────────── */
+function crProcesarArchivo(file, tipo) {
+  var stEl=$('crStatus'+(tipo==='spa'?'SPA':'Malla'));
+  if(stEl) stEl.innerHTML='<span style="color:var(--t3)">⏳ Leyendo…</span>';
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try {
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      var raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+
+      // Detectar fila de headers
+      var hRow=-1;
+      for(var i=0;i<Math.min(raw.length,8);i++){
+        if(raw[i].filter(function(v){return String(v||'').trim().length>1;}).length>=3){hRow=i;break;}
+      }
+      if(hRow<0) throw new Error('No se encontró fila de encabezados');
+
+      var hdrs=raw[hRow].map(function(h){return crNorm(h);});
+      var rows=raw.slice(hRow+1);
+
+      function col(aliases){
+        for(var ai=0;ai<aliases.length;ai++){
+          var a=crNorm(aliases[ai]);
+          for(var hi=0;hi<hdrs.length;hi++){
+            var h=hdrs[hi];
+            if(h===a || h.indexOf(a)>=0 || (a.length>3 && a.indexOf(h)>=0)) return hi;
+          }
+        }
+        return -1;
+      }
+
+      var datos=[], lastProg='', lastPer='';
+
+      if(tipo==='spa'){
+        var iP=col(['PROGRAMA']), iN=col(['NOMBRE','ASIGNATURA']),
+            iT=col(['TIPO']), iHA=col(['HORAS ASIGNADAS','HORAS_ASIGNADAS']),
+            iH=col(['HORAS','HRS']);
+        if(iN<0||iH<0) throw new Error('Columnas no detectadas. Encontradas: '+
+          raw[hRow].filter(Boolean).join(' | '));
+        rows.forEach(function(r){
+          var p=String(r[iP]||'').trim(), n=String(r[iN]||'').trim();
+          if(p) lastProg=p;
+          if(!n||n.toLowerCase()==='total general') return;
+          datos.push({
+            programa:lastProg, nombre:n, tipo:String(r[iT]||'').trim(),
+            hrsSPA:parseFloat(r[iH])||0, hrsAsig:parseFloat(r[iHA])||0,
+            cc: crExtractCC(lastProg) || '',
+            _norm:crNorm(n), _progNorm:crNorm(lastProg),
+          });
+        });
+      } else {
+        var iP2=col(['PROGRAMA']),iE=col(['PERIODO','SEMESTRE']),
+            iN2=col(['NOMBRE','ASIGNATURA']),iHP=col(['HP','HORAS PRESENCIALES','HORAS']);
+        if(iN2<0||iHP<0) throw new Error('Columnas no detectadas. Encontradas: '+
+          raw[hRow].filter(Boolean).join(' | '));
+        rows.forEach(function(r){
+          var p=String(r[iP2]||'').trim(), pe=String(r[iE]||'').trim(),
+              n=String(r[iN2]||'').trim();
+          if(p)  lastProg=p;
+          if(pe) lastPer=pe;
+          if(!n) return;
+          datos.push({
+            programa:lastProg, periodo:lastPer, nombre:n,
+            hrsPres:parseFloat(r[iHP])||0,
+            cc: crExtractCC(lastProg) || lastProg,
+            _norm:crNorm(n), _progNorm:crNorm(lastProg),
+          });
+        });
+      }
+
+      if(!datos.length) throw new Error('No se encontraron registros');
+      _crData[tipo]=datos;
+
+      if(stEl) stEl.innerHTML=
+        '<div style="color:#10b981;font-weight:700;margin-top:4px">✅ '+datos.length+
+        ' registros · hoja: '+wb.SheetNames[0]+'</div>'+
+        '<div style="font-size:10px;color:var(--t3);margin-top:2px">'+
+        'Cols detectadas: '+raw[hRow].filter(Boolean).join(' | ')+'</div>';
+
+      var sp=_crData.spa.length,ma=_crData.malla.length;
+      var b=$('crBadge');
+      if(b) b.innerHTML=(sp?'<span style="color:#10b981">📋 SPA: '+sp+'</span> ':'')+
+        (ma?'<span style="color:#10b981;margin-left:10px">📐 Malla: '+ma+'</span>':'');
+
+      if(sp&&ma) crGenerar();
+    } catch(err){
+      if(stEl) stEl.innerHTML='<span style="color:#dc2626">❌ '+esc(err.message)+'</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ── Generar reporte ──────────────────────────────────────────── */
+function crGenerar() {
+  var res=$('crResultado'); if(!res) return;
+
+  if(!_crData.spa.length&&!_crData.malla.length){
+    res.innerHTML='<div style="padding:14px;color:#f59e0b;background:rgba(245,158,11,.08);'+
+      'border:1px solid rgba(245,158,11,.3);border-radius:8px">'+
+      '⚠️ Carga al menos un archivo para generar el reporte.</div>';
+    return;
+  }
+
+  /* ── MATCHING FUZZY ────────────────────────────────────────── */
+  // Paso 1: match exacto por nombre normalizado
+  // Paso 2: match fuzzy por similitud Jaccard ≥ 0.55
+  // Paso 3: todo lo que no matchea → Solo SPA / Solo Malla
+
+  var UMBRAL = 0.55;
+  var idx={}; // key = norm(nombre)
+  var mallaPendiente = _crData.malla.slice();
+
+  _crData.spa.forEach(function(sp){
+    var key=sp._norm;
+    // Buscar match exacto en malla
+    var matchIdx=-1;
+    for(var i=0;i<mallaPendiente.length;i++){
+      if(mallaPendiente[i]._norm===key){ matchIdx=i; break; }
+    }
+    // Si no hay exacto, buscar fuzzy
+    if(matchIdx<0){
+      var bestSim=0, bestI=-1;
+      mallaPendiente.forEach(function(m,i){
+        var sim=crSim(sp._norm, m._norm);
+        if(sim>bestSim){ bestSim=sim; bestI=i; }
+      });
+      if(bestSim>=UMBRAL) matchIdx=bestI;
+    }
+
+    if(matchIdx>=0){
+      var ma=mallaPendiente[matchIdx];
+      idx[key]={
+        nombreSPA:sp.nombre, nombreMalla:ma.nombre,
+        progSPA:sp.programa, progMalla:ma.programa, periodo:ma.periodo,
+        hrsSPA:sp.hrsSPA, hrsAsig:sp.hrsAsig, hrsPres:ma.hrsPres,
+        tipo:sp.tipo, fuenteSPA:true, fuenteMalla:true, matched:true,
+        cc: sp.cc || crExtractCC(sp.programa) || ma.cc || '',
+      };
+      mallaPendiente.splice(matchIdx,1); // usar cada malla solo una vez
+    } else {
+      idx[key+sp.programa]={
+        nombreSPA:sp.nombre, nombreMalla:'',
+        progSPA:sp.programa, progMalla:'', periodo:'',
+        hrsSPA:sp.hrsSPA, hrsAsig:sp.hrsAsig, hrsPres:0,
+        tipo:sp.tipo, fuenteSPA:true, fuenteMalla:false, matched:false,
+        cc: sp.cc || crExtractCC(sp.programa) || '',
+      };
+    }
+  });
+
+  // Agregar malla sin match
+  mallaPendiente.forEach(function(ma){
+    idx['malla_'+ma._norm+ma.programa]={
+      nombreSPA:'', nombreMalla:ma.nombre,
+      progSPA:'', progMalla:ma.programa, periodo:ma.periodo,
+      hrsSPA:0, hrsAsig:0, hrsPres:ma.hrsPres,
+      tipo:'', fuenteSPA:false, fuenteMalla:true, matched:false,
+      cc: ma.cc || crExtractCC(ma.programa) || ma.programa || '',
+    };
+  });
+
+  _crResult=Object.values(idx).sort(function(a,b){
+    return (b.hrsSPA+b.hrsPres)-(a.hrsSPA+a.hrsPres);
+  });
+
+  /* ── KPIs ──────────────────────────────────────────────────── */
+  var N          = _crResult.length;
+  var nCruzados  = _crResult.filter(function(r){return r.fuenteSPA&&r.fuenteMalla;}).length;
+  var nOk        = _crResult.filter(function(r){return r.fuenteSPA&&r.fuenteMalla&&Math.abs(r.hrsSPA-r.hrsPres)<1;}).length;
+  var nBrechaPos = _crResult.filter(function(r){return r.fuenteSPA&&r.fuenteMalla&&r.hrsSPA-r.hrsPres>1;}).length;
+  var nBrechaNeg = _crResult.filter(function(r){return r.fuenteSPA&&r.fuenteMalla&&r.hrsPres-r.hrsSPA>1;}).length;
+  var nSoloSPA   = _crResult.filter(function(r){return r.fuenteSPA&&!r.fuenteMalla;}).length;
+  var nSoloMalla = _crResult.filter(function(r){return !r.fuenteSPA&&r.fuenteMalla;}).length;
+  var totSPA     = _crResult.reduce(function(s,r){return s+r.hrsSPA;},0);
+  var totPres    = _crResult.reduce(function(s,r){return s+r.hrsPres;},0);
+  var totAsig    = _crResult.reduce(function(s,r){return s+r.hrsAsig;},0);
+
+  // ── Filtros por CC y programa/nombre ───────────────────────
+  var filtroCC   = (($('crFiltroCC')  ||{value:''}).value||'').trim();
+  var filtroProg = (($('crFiltroProg')||{value:''}).value||'').trim().toLowerCase();
+
+  // Actualizar opciones del select de CC con los CCs disponibles en _crResult
+  var ccEl = $('crFiltroCC');
+  if (ccEl && ccEl.options.length <= 1) {
+    var ccs = {};
+    _crResult.forEach(function(r){
+      var cc = r.cc || crExtractCC(r.progSPA) || crExtractCC(r.progMalla);
+      if (cc) ccs[cc] = (r.progSPA||r.progMalla||cc);
+    });
+    Object.keys(ccs).sort().forEach(function(cc){
+      var opt = document.createElement('option');
+      opt.value = cc;
+      opt.textContent = 'CC ' + cc + ' — ' + abbr(ccs[cc].replace(/^\d+\s*/,''),28);
+      ccEl.appendChild(opt);
+    });
+  }
+
+  var resultFiltrado = _crResult.filter(function(r){
+    var ccR    = r.cc || crExtractCC(r.progSPA) || crExtractCC(r.progMalla) || '';
+    var okCC   = !filtroCC   || ccR === filtroCC;
+    var okProg = !filtroProg ||
+      (r.progSPA||'').toLowerCase().indexOf(filtroProg)>=0 ||
+      (r.progMalla||'').toLowerCase().indexOf(filtroProg)>=0;
+    return okCC && okProg;
+  });
+
+  // Recalcular KPIs sobre el subconjunto filtrado
+  var N          = resultFiltrado.length;
+  var nCruzados  = resultFiltrado.filter(function(r){return r.fuenteSPA&&r.fuenteMalla;}).length;
+  var nOk        = resultFiltrado.filter(function(r){return r.fuenteSPA&&r.fuenteMalla&&Math.abs(r.hrsSPA-r.hrsPres)<1;}).length;
+  var nBrechaPos = resultFiltrado.filter(function(r){return r.fuenteSPA&&r.fuenteMalla&&r.hrsSPA-r.hrsPres>1;}).length;
+  var nBrechaNeg = resultFiltrado.filter(function(r){return r.fuenteSPA&&r.fuenteMalla&&r.hrsPres-r.hrsSPA>1;}).length;
+  var nSoloSPA   = resultFiltrado.filter(function(r){return r.fuenteSPA&&!r.fuenteMalla;}).length;
+  var nSoloMalla = resultFiltrado.filter(function(r){return !r.fuenteSPA&&r.fuenteMalla;}).length;
+  var totSPA     = resultFiltrado.reduce(function(s,r){return s+r.hrsSPA;},0);
+  var totPres    = resultFiltrado.reduce(function(s,r){return s+r.hrsPres;},0);
+  var totAsig    = resultFiltrado.reduce(function(s,r){return s+r.hrsAsig;},0);
+
+  // Mostrar badge de filtro activo
+  var badgeProg = $('crBadgeProg');
+  if (badgeProg) {
+    var badges = [];
+    if (filtroCC)   badges.push('<span style="font-size:10px;padding:3px 10px;background:rgba(124,58,237,.12);color:#7c3aed;border-radius:12px;border:1px solid rgba(124,58,237,.25)">CC '+esc(filtroCC)+'<button onclick="var el=$(\'crFiltroCC\');if(el){el.value=\'\';el.dispatchEvent(new Event(\'change\'));}" style="margin-left:5px;background:none;border:none;cursor:pointer;color:#7c3aed;font-size:12px;padding:0">×</button></span>');
+    if (filtroProg) badges.push('<span style="font-size:10px;padding:3px 10px;background:rgba(37,99,235,.12);color:#2563eb;border-radius:12px;border:1px solid rgba(37,99,235,.25)">🏷️ "'+esc(filtroProg)+'"<button onclick="var el=$(\'crFiltroProg\');if(el){el.value=\'\';crGenerar();}" style="margin-left:5px;background:none;border:none;cursor:pointer;color:#2563eb;font-size:12px;padding:0">×</button></span>');
+    if (badges.length) badges.push('<span style="font-size:10px;color:var(--t3)">'+N+' resultado(s)</span>');
+    badgeProg.innerHTML = badges.join(' ');
+  }
+
+  var filtro=($('crFiltro')||{value:'todos'}).value||'todos';
+  var filas=resultFiltrado.filter(function(r){
+    if(filtro==='brecha_pos') return r.fuenteSPA&&r.fuenteMalla&&r.hrsSPA-r.hrsPres>1;
+    if(filtro==='brecha_neg') return r.fuenteSPA&&r.fuenteMalla&&r.hrsPres-r.hrsSPA>1;
+    if(filtro==='ok')         return r.fuenteSPA&&r.fuenteMalla&&Math.abs(r.hrsSPA-r.hrsPres)<1;
+    if(filtro==='solo_spa')   return r.fuenteSPA&&!r.fuenteMalla;
+    if(filtro==='solo_malla') return !r.fuenteSPA&&r.fuenteMalla;
+    return true;
+  });
+
+  res.innerHTML =
+
+  /* ── KPI strip ─────────────────────────────────────────────── */
+  '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px">'+
+  [
+    {ico:'🔀',lbl:'Total Cruzados',  val:nCruzados, sub:'ambas fuentes',       c:'#2563eb',bg:'rgba(37,99,235,.08)'},
+    {ico:'✅',lbl:'Coinciden',       val:nOk,       sub:'brecha < 1h',         c:'#10b981',bg:'rgba(16,185,129,.08)'},
+    {ico:'⬆️',lbl:'SPA > Malla',    val:nBrechaPos,sub:'SPA tiene más horas', c:'#f59e0b',bg:'rgba(245,158,11,.08)'},
+    {ico:'⬇️',lbl:'Malla > SPA',    val:nBrechaNeg,sub:'Malla tiene más hrs', c:'#dc2626',bg:'rgba(220,38,38,.08)'},
+    {ico:'📋',lbl:'Solo SPA',        val:nSoloSPA,  sub:'sin malla',           c:'#7c3aed',bg:'rgba(124,58,237,.08)'},
+    {ico:'📐',lbl:'Solo Malla',      val:nSoloMalla,sub:'sin SPA',             c:'#94a3b8',bg:'rgba(148,163,184,.08)'},
+  ].map(function(k){
+    return '<div style="background:'+k.bg+';border:1px solid var(--border);border-radius:10px;'+
+      'padding:12px 14px;border-left:3px solid '+k.c+'">'+
+      '<div style="font-size:18px;margin-bottom:2px">'+k.ico+'</div>'+
+      '<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:3px">'+k.lbl+'</div>'+
+      '<div style="font-size:26px;font-weight:900;color:'+k.c+'">'+k.val+'</div>'+
+      '<div style="font-size:10px;color:var(--t3);margin-top:2px">'+k.sub+'</div>'+
+    '</div>';
+  }).join('')+
+  '</div>'+
+
+  /* ── Dashboard analítico estilo Smart School ───────────────── */
+  '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;'+
+    'overflow:hidden;margin-bottom:16px">'+
+
+    // ── Header del panel ────────────────────────────────────────
+    '<div style="padding:16px 20px;border-bottom:1px solid #21262d;'+
+      'display:flex;align-items:center;justify-content:space-between">'+
+      '<div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span style="font-size:16px">📊</span>'+
+          '<span style="font-size:14px;font-weight:800;color:#f0f6ff">'+
+            'Comparativo Horas SPA vs Malla'+
+          '</span>'+
+        '</div>'+
+        '<div style="font-size:10px;color:#8b949e;margin-top:3px">'+
+          'Horas por asignatura · '+
+          (filtroProg||filtroCC?'Filtro activo: '+(filtroCC?'CC '+filtroCC+' ':'')+
+            (filtroProg?'"'+filtroProg+'"':''):'Todos los programas')+
+        '</div>'+
+      '</div>'+
+      // Mini-KPIs en el header
+      '<div style="display:flex;gap:20px">'+
+      [
+        {lbl:'Total SPA',    val:totSPA.toFixed(0)+'h',  c:'#f0b429'},
+        {lbl:'Total Malla',  val:totPres.toFixed(0)+'h', c:'#388bfd'},
+        {lbl:'Δ Brecha',
+         val:(totSPA-totPres>=0?'+':'')+(totSPA-totPres).toFixed(0)+'h',
+         c:Math.abs(totSPA-totPres)<5?'#3fb950':'#f85149'},
+      ].map(function(k){
+        return '<div style="text-align:center">'+
+          '<div style="font-size:18px;font-weight:900;color:'+k.c+';line-height:1">'+k.val+'</div>'+
+          '<div style="font-size:9px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">'+k.lbl+'</div>'+
+        '</div>';
+      }).join('')+
+      '</div>'+
+    '</div>'+
+
+    // ── Leyenda ──────────────────────────────────────────────────
+    '<div style="padding:8px 20px;background:#161b22;border-bottom:1px solid #21262d;'+
+      'display:flex;gap:18px">'+
+      '<span style="font-size:10px;color:#8b949e;display:flex;align-items:center;gap:5px">'+
+        '<span style="width:12px;height:12px;border-radius:2px;background:#f0b429;display:inline-block"></span>'+
+        'Horas SPA (ejecutadas)'+
+      '</span>'+
+      '<span style="font-size:10px;color:#8b949e;display:flex;align-items:center;gap:5px">'+
+        '<span style="width:12px;height:12px;border-radius:2px;background:#388bfd;display:inline-block"></span>'+
+        'Horas Presenciales Malla (planificadas)'+
+      '</span>'+
+      '<span style="font-size:10px;color:#8b949e;display:flex;align-items:center;gap:5px">'+
+        '<span style="width:12px;height:12px;border-radius:2px;background:#3fb950;display:inline-block"></span>'+
+        'Coincide ±1h'+
+      '</span>'+
+    '</div>'+
+
+    // ── Barras por asignatura ────────────────────────────────────
+    '<div style="padding:12px 0;max-height:520px;overflow-y:auto">'+
+    (function(){
+      var items = resultFiltrado.filter(function(r){
+        return r.fuenteSPA || r.fuenteMalla;
+      }).sort(function(a,b){
+        return Math.max(b.hrsSPA,b.hrsPres) - Math.max(a.hrsSPA,a.hrsPres);
+      });
+      var maxH = items.reduce(function(m,r){ return Math.max(m,r.hrsSPA,r.hrsPres); },1);
+
+      return items.map(function(r,i){
+        var nombre   = abbr(r.nombreSPA||r.nombreMalla||'—', 28);
+        var brecha   = r.hrsSPA - r.hrsPres;
+        var absB     = Math.abs(brecha);
+        var isCruz   = r.fuenteSPA && r.fuenteMalla;
+        var barColor = !isCruz ? '#6e7681' :
+                       absB < 1 ? '#3fb950' :
+                       brecha > 0 ? '#f0b429' : '#f85149';
+        var bIcon    = !isCruz ? (r.fuenteSPA?'📋':'📐') :
+                       absB < 1 ? '✅' :
+                       brecha > 0 ? '⬆' : '⬇';
+        var bLabel   = absB < 1 ? '' :
+                       (brecha>0?'+':'')+brecha.toFixed(0)+'h';
+        var pctSPA   = (r.hrsSPA  / maxH * 100).toFixed(1);
+        var pctPres  = (r.hrsPres / maxH * 100).toFixed(1);
+        var rowBg    = i%2===0 ? 'transparent' : 'rgba(255,255,255,.02)';
+
+        return '<div style="display:grid;grid-template-columns:200px 1fr 90px;'+
+          'gap:0;align-items:center;padding:6px 20px;background:'+rowBg+';'+
+          'border-bottom:1px solid rgba(255,255,255,.04)" '+
+          'onmouseover="this.style.background=\'rgba(56,139,253,.07)\'" '+
+          'onmouseout="this.style.background=\''+rowBg+'\'">' +
+
+          // Nombre
+          '<div style="padding-right:12px">'+
+            '<div style="font-size:11px;font-weight:700;color:#e6edf3;'+
+              'white-space:nowrap;overflow:hidden;text-overflow:ellipsis" '+
+              'title="'+(r.nombreSPA||r.nombreMalla||'')+'">'+esc(nombre)+'</div>'+
+            (r.progSPA||r.progMalla ?
+              '<div style="font-size:9px;color:#8b949e;margin-top:2px;'+
+                'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+                esc(abbr(r.progSPA||r.progMalla,26))+'</div>' : '')+
+          '</div>'+
+
+          // Barras dobles
+          '<div style="display:flex;flex-direction:column;gap:4px;padding-right:10px">'+
+            // Barra SPA
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<div style="width:30px;font-size:9px;color:#f0b429;text-align:right;'+
+                'font-weight:700;flex-shrink:0">SPA</div>'+
+              '<div style="flex:1;height:16px;background:rgba(255,255,255,.06);'+
+                'border-radius:3px;overflow:hidden;position:relative">'+
+                '<div style="position:absolute;top:0;left:0;height:100%;'+
+                  'width:'+pctSPA+'%;'+
+                  'background:linear-gradient(90deg,#f0b429,#f0b429cc);'+
+                  'border-radius:3px;transition:width .4s ease;'+
+                  'min-width:'+(r.hrsSPA>0?'3px':'0')+'">'+
+                '</div>'+
+              '</div>'+
+              '<div style="width:32px;font-size:11px;font-weight:800;color:#f0b429;'+
+                'text-align:right;flex-shrink:0">'+
+                (r.hrsSPA>0?r.hrsSPA.toFixed(0)+'h':'—')+
+              '</div>'+
+            '</div>'+
+            // Barra Malla
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<div style="width:30px;font-size:9px;color:#388bfd;text-align:right;'+
+                'font-weight:700;flex-shrink:0">Malla</div>'+
+              '<div style="flex:1;height:16px;background:rgba(255,255,255,.06);'+
+                'border-radius:3px;overflow:hidden;position:relative">'+
+                '<div style="position:absolute;top:0;left:0;height:100%;'+
+                  'width:'+pctPres+'%;'+
+                  'background:linear-gradient(90deg,#388bfd,#388bfdcc);'+
+                  'border-radius:3px;transition:width .4s ease;'+
+                  'min-width:'+(r.hrsPres>0?'3px':'0')+'">'+
+                '</div>'+
+              '</div>'+
+              '<div style="width:32px;font-size:11px;font-weight:800;color:#388bfd;'+
+                'text-align:right;flex-shrink:0">'+
+                (r.hrsPres>0?r.hrsPres.toFixed(0)+'h':'—')+
+              '</div>'+
+            '</div>'+
+          '</div>'+
+
+          // Badge brecha
+          '<div style="display:flex;flex-direction:column;align-items:center;'+
+            'justify-content:center;gap:3px;padding-left:8px;'+
+            'border-left:1px solid rgba(255,255,255,.06)">'+
+            '<div style="font-size:14px">'+bIcon+'</div>'+
+            (bLabel?
+              '<div style="font-size:10px;font-weight:800;color:'+barColor+';'+
+                'background:'+barColor+'1a;padding:1px 6px;border-radius:8px;'+
+                'border:1px solid '+barColor+'33">'+bLabel+'</div>':
+              '<div style="font-size:9px;color:#3fb950">OK</div>')+
+          '</div>'+
+
+        '</div>';
+      }).join('');
+    })()+
+    '</div>'+
+
+    // ── Footer con totales ───────────────────────────────────────
+    '<div style="padding:10px 20px;background:#161b22;border-top:1px solid #21262d;'+
+      'display:flex;gap:0">'+
+      '<div style="width:200px;font-size:11px;font-weight:700;color:#8b949e;'+
+        'padding-right:12px">TOTALES</div>'+
+      '<div style="flex:1;display:flex;gap:0">'+
+        '<div style="flex:1;display:flex;align-items:center;gap:6px">'+
+          '<div style="width:30px;font-size:9px;color:#f0b429;text-align:right;font-weight:700">SPA</div>'+
+          '<div style="flex:1"></div>'+
+          '<div style="width:32px;font-size:12px;font-weight:900;color:#f0b429;text-align:right">'+
+            totSPA.toFixed(0)+'h'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="width:90px;padding-left:8px;border-left:1px solid rgba(255,255,255,.06);'+
+        'display:flex;align-items:center;justify-content:center">'+
+        '<div style="font-size:12px;font-weight:900;color:'+
+          (Math.abs(totSPA-totPres)<5?'#3fb950':'#f85149')+'">'+
+          (totSPA-totPres>=0?'+':'')+(totSPA-totPres).toFixed(0)+'h'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+  '</div>'+
+
+  /* ── Filtro ─────────────────────────────────────────────────── */
+  '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--t2)">Filtrar:</div>'+
+    '<select id="crFiltro" onchange="crGenerar()" '+
+      'style="border:1px solid var(--border);border-radius:6px;background:var(--surface2);'+
+        'color:var(--t1);padding:6px 12px;font-size:12px">'+
+      '<option value="todos">Todos ('+N+')</option>'+
+      '<option value="brecha_pos">⬆️ SPA > Malla ('+nBrechaPos+')</option>'+
+      '<option value="brecha_neg">⬇️ Malla > SPA ('+nBrechaNeg+')</option>'+
+      '<option value="ok">✅ Coinciden ('+nOk+')</option>'+
+      '<option value="solo_spa">📋 Solo SPA ('+nSoloSPA+')</option>'+
+      '<option value="solo_malla">📐 Solo Malla ('+nSoloMalla+')</option>'+
+    '</select>'+
+    '<span style="font-size:10px;color:var(--t3)">Umbral de similitud para matching: 55%</span>'+
+    '<div style="margin-left:auto">'+
+      '<button onclick="crExportarExcel()" '+
+        'style="padding:7px 14px;background:#10b981;color:#fff;border:none;border-radius:6px;'+
+          'font-size:11px;font-weight:700;cursor:pointer">📊 Exportar Excel</button>'+
+    '</div>'+
+  '</div>'+
+
+  /* ── Tabla ──────────────────────────────────────────────────── */
+  '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+  '<div style="overflow-x:auto">'+
+  '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead>'+
+  '<tr style="background:var(--surface2);border-bottom:2px solid var(--border)">'+
+    '<th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">Estado</th>'+
+    '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;min-width:200px">Asignatura SPA</th>'+
+    '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;min-width:180px">Asignatura Malla</th>'+
+    '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">Programa SPA</th>'+
+    '<th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;color:var(--t3)">Prog.<br>Malla</th>'+
+    '<th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;color:var(--t3)">Per.</th>'+
+    '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;color:#f59e0b">Hrs SPA</th>'+
+    '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;color:#7c3aed">Hrs Asig.</th>'+
+    '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;color:#2563eb">Hrs Malla</th>'+
+    '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;color:var(--t3)">Δ Brecha</th>'+
+  '</tr></thead><tbody>'+
+  filas.map(function(r,i){
+    var brecha=r.hrsSPA-r.hrsPres, absB=Math.abs(brecha);
+    var estado,color,bg;
+    if(!r.fuenteSPA&&r.fuenteMalla){estado='📐 Solo Malla';color='#94a3b8';bg='rgba(148,163,184,.06)';}
+    else if(r.fuenteSPA&&!r.fuenteMalla){estado='📋 Solo SPA';color='#7c3aed';bg='rgba(124,58,237,.06)';}
+    else if(absB<1){estado='✅ OK';color='#10b981';bg='transparent';}
+    else if(brecha>0){estado='⬆️ SPA>Malla';color='#f59e0b';bg='rgba(245,158,11,.05)';}
+    else{estado='⬇️ Malla>SPA';color='#dc2626';bg='rgba(220,38,38,.05)';}
+    var bStr=absB<1?'—':(brecha>0?'+':'')+brecha.toFixed(1)+'h';
+    return '<tr style="border-bottom:1px solid var(--border);background:'+(i%2?'var(--surface2)':bg||'var(--surface)')+'">'+
+      '<td style="padding:8px 12px;text-align:center">'+
+        '<span style="font-size:11px;font-weight:700;color:'+color+';padding:2px 8px;'+
+          'border-radius:10px;background:'+bg+';white-space:nowrap">'+estado+'</span>'+
+      '</td>'+
+      '<td style="padding:8px 12px;font-weight:600;color:var(--t1);font-size:11px" title="'+esc(r.nombreSPA)+'">'+esc(abbr(r.nombreSPA||'—',34))+'</td>'+
+      '<td style="padding:8px 12px;font-size:10px;color:var(--t3)" title="'+esc(r.nombreMalla)+'">'+
+        (r.nombreMalla&&r.nombreMalla!==r.nombreSPA?'<span style="color:#2563eb">'+esc(abbr(r.nombreMalla,32))+'</span>':'—')+
+      '</td>'+
+      '<td style="padding:8px 12px;font-size:10px;color:var(--t3)" title="'+esc(r.progSPA)+'">'+esc(abbr(r.progSPA||'—',22))+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:#2563eb">'+esc(r.progMalla||'—')+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;font-size:11px;color:var(--t3)">'+esc(r.periodo||'—')+'</td>'+
+      '<td style="padding:8px 12px;text-align:right;font-weight:700;color:#f59e0b">'+( r.hrsSPA?r.hrsSPA.toFixed(1):'—')+'</td>'+
+      '<td style="padding:8px 12px;text-align:right;color:#7c3aed">'+( r.hrsAsig?r.hrsAsig.toFixed(1):'—')+'</td>'+
+      '<td style="padding:8px 12px;text-align:right;font-weight:700;color:#2563eb">'+( r.hrsPres?r.hrsPres.toFixed(1):'—')+'</td>'+
+      '<td style="padding:8px 12px;text-align:right;font-weight:800;color:'+(absB<1?'var(--t3)':brecha>0?'#f59e0b':'#dc2626')+'">'+bStr+'</td>'+
+    '</tr>';
+  }).join('')+
+  '</tbody>'+
+  '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border);font-weight:800">'+
+    '<td colspan="6" style="padding:10px 12px;font-size:11px;color:var(--t3)">TOTALES ('+filas.length+' registros)</td>'+
+    '<td style="padding:10px 12px;text-align:right;color:#f59e0b">'+filas.reduce(function(s,r){return s+r.hrsSPA;},0).toFixed(1)+'</td>'+
+    '<td style="padding:10px 12px;text-align:right;color:#7c3aed">'+filas.reduce(function(s,r){return s+r.hrsAsig;},0).toFixed(1)+'</td>'+
+    '<td style="padding:10px 12px;text-align:right;color:#2563eb">'+filas.reduce(function(s,r){return s+r.hrsPres;},0).toFixed(1)+'</td>'+
+    '<td style="padding:10px 12px;text-align:right;color:var(--t2)">'+
+      (function(){var b=filas.reduce(function(s,r){return s+(r.hrsSPA-r.hrsPres);},0);return (b>=0?'+':'')+b.toFixed(1);})()+
+    '</td>'+
+  '</tr></tfoot>'+
+  '</table></div></div>';
+}
+
+/* ── Exportar ─────────────────────────────────────────────────── */
+function crExportarExcel(){
+  if(!_crResult.length) return;
+  var rows=_crResult.map(function(r){
+    var b=r.hrsSPA-r.hrsPres;
+    return{'Asignatura SPA':r.nombreSPA,'Asignatura Malla':r.nombreMalla,
+      'Programa SPA':r.progSPA,'Prog. Malla':r.progMalla,'Período':r.periodo,
+      'Hrs SPA':r.hrsSPA||'','Hrs Asig. SPA':r.hrsAsig||'',
+      'Hrs Presenciales Malla':r.hrsPres||'','Brecha (SPA-Malla)':b.toFixed(1),
+      'Estado':!r.fuenteSPA?'Solo Malla':!r.fuenteMalla?'Solo SPA':
+        Math.abs(b)<1?'OK':b>0?'SPA > Malla':'Malla > SPA'};
+  });
+  try{
+    var ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Cruce');
+    XLSX.writeFile(wb,'Reporte_Cruce_SPA_Malla.xlsx');
+    showToast('Excel exportado','ok');
+  }catch(e){showToast('Error: '+e.message,'err');}
+}
+
+/* ── Limpiar ──────────────────────────────────────────────────── */
+function crLimpiar(){
+  _crData={spa:[],malla:[]};_crResult=[];
+  ['crStatusSPA','crStatusMalla','crResultado','crBadge'].forEach(function(id){
+    var el=$(id);if(el)el.innerHTML='';});
+  ['crFileSPA','crFileMalla','crFiltroProg'].forEach(function(id){var el=$(id);if(el)el.value='';}); var ccEl2=$('crFiltroCC'); if(ccEl2){ccEl2.value='';while(ccEl2.options.length>1)ccEl2.remove(1);}
+  var bp=$('crBadgeProg'); if(bp) bp.innerHTML='';
+}
+
+
 function renderCalendario() {
   const df=getDF();
   const now=new Date();
@@ -8333,6 +10193,8 @@ function showAdmin() {
             '➕ Agregar' +
           '</button>' +
         '</div>' +
+        // Zona de alerta de conflicto
+        '<div id="gConflictoZona" style="margin-top:10px"></div>' +
       '</div>' +
 
       // ── Lista acumulada de cambios ─────────────────────────
@@ -8370,6 +10232,91 @@ function showAdmin() {
 
   updAdmin();
 }
+
+/* ── Calcular conflictos entre un programa y los programas actuales de una coord ─ */
+function _gConflictosPara(progSel, coordDest, df) {
+  var sesProg  = df.filter(function(r){ return r['PROGRAMA'] === progSel; });
+  var sesCoord = df.filter(function(r){
+    return r['COORDINADORA RESPONSABLE'] === coordDest && r['PROGRAMA'] !== progSel;
+  });
+  if (!sesProg.length || !sesCoord.length) return [];
+
+  function parseRango(str) {
+    if (!str) return null;
+    var parts = String(str).split(/\s*[-–—]\s*/);
+    var toMin = function(s){ var m=String(s||'').match(/(\d{1,2}):(\d{2})/); return m?parseInt(m[1])*60+parseInt(m[2]):null; };
+    var ini = toMin(parts[0]), fin = toMin(parts[1]);
+    if (!ini) return null;
+    if (!fin || fin<=ini) fin = ini+120;
+    return {ini:ini, fin:fin, str:String(str).trim()};
+  }
+  function solapan(a,b){ return a.ini < b.fin && b.ini < a.fin; }
+  function solapMin(a,b){ return Math.max(0, Math.min(a.fin,b.fin) - Math.max(a.ini,b.ini)); }
+
+  var conflictos = [], visto = {};
+  sesProg.forEach(function(sp){
+    var diaSP=sp['Dia_Semana']||'', fechaSP=sp['DIAS/FECHAS'], horSP=parseRango(sp['HORARIO']), sedeSP=sp['SEDE']||'';
+    if (!diaSP && !fechaSP) return;
+    sesCoord.forEach(function(sc){
+      var diaSC=sc['Dia_Semana']||'', fechaSC=sc['DIAS/FECHAS'], horSC=parseRango(sc['HORARIO']), sedeSC=sc['SEDE']||'';
+      var mismaDia   = diaSP && diaSC && diaSP===diaSC;
+      var mismaFecha = fechaSP instanceof Date && fechaSC instanceof Date && fechaSP.toDateString()===fechaSC.toDateString();
+      if (!mismaDia && !mismaFecha) return;
+      if (horSP && horSC && !solapan(horSP,horSC)) return;
+      var key = sc['PROGRAMA']+'||'+diaSP+'||'+(horSP?horSP.str:'');
+      if (visto[key]) return; visto[key]=true;
+      var minS = (horSP&&horSC) ? solapMin(horSP,horSC) : 0;
+      var mismaSede = sedeSP && sedeSC && sedeSP.toLowerCase().split(/[\s,\-]/)[0]===sedeSC.toLowerCase().split(/[\s,\-]/)[0];
+      conflictos.push({
+        progB: sc['PROGRAMA'], dia: diaSP||'', horA: horSP?horSP.str:'', horB: horSC?horSC.str:'',
+        sedeA: sedeSP, sedeB: sedeSC, minSolap: minS, mismaSede: mismaSede,
+        nivel: (mismaSede||minS>=60) ? 'alto' : 'medio',
+      });
+    });
+  });
+  return conflictos;
+}
+
+/* ── Render inline del badge de conflicto para una card ──────────── */
+function _gRenderConflictoBadge(conflictos) {
+  if (!conflictos.length) {
+    return '<div style="display:flex;align-items:center;gap:5px;margin-top:8px;padding:5px 10px;'+
+      'background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:6px">'+
+      '<span style="font-size:11px">✅</span>'+
+      '<span style="font-size:10px;color:#10b981;font-weight:600">Sin tope de horario</span>'+
+    '</div>';
+  }
+  var nAlto  = conflictos.filter(function(cf){ return cf.nivel==='alto'; }).length;
+  var color  = nAlto ? '#dc2626' : '#f59e0b';
+  var bg     = nAlto ? 'rgba(220,38,38,.08)'  : 'rgba(245,158,11,.08)';
+  var border = nAlto ? 'rgba(220,38,38,.25)' : 'rgba(245,158,11,.25)';
+  var ico    = nAlto ? '🔴' : '🟡';
+
+  return '<div style="margin-top:8px;border:1px solid '+border+';border-radius:6px;overflow:hidden">'+
+    // Header compacto
+    '<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:'+bg+'">'+
+      '<span style="font-size:11px">'+ico+'</span>'+
+      '<span style="font-size:10px;font-weight:800;color:'+color+'">TOPE DE HORARIO</span>'+
+      '<span style="margin-left:auto;font-size:9px;padding:1px 6px;border-radius:8px;'+
+        'background:'+bg+';color:'+color+';border:1px solid '+border+'">'+
+        conflictos.length+' conflicto(s)'+
+      '</span>'+
+    '</div>'+
+    // Detalle por conflicto
+    '<div style="padding:6px 10px;display:flex;flex-direction:column;gap:4px">'+
+    conflictos.map(function(cf){
+      var linea = '⚠️ <strong>'+esc(abbr(cf.progB,30))+'</strong>';
+      if (cf.dia)    linea += ' — '+esc(cf.dia);
+      if (cf.horA)   linea += ' <span style="color:'+color+'">'+esc(cf.horA)+'</span>';
+      if (cf.horB && cf.horB!==cf.horA) linea += ' vs '+esc(cf.horB);
+      if (cf.minSolap>0) linea += ' <em style="color:var(--t3)">('+cf.minSolap+' min solapado)</em>';
+      if (cf.mismaSede && cf.sedeA) linea += ' 📍 '+esc(cf.sedeA);
+      return '<div style="font-size:10px;color:var(--t2);line-height:1.5">'+linea+'</div>';
+    }).join('')+
+    '</div>'+
+  '</div>';
+}
+
 
 function updAdmin() {
   var df = getDF();
@@ -8505,8 +10452,13 @@ function updAdmin() {
     }).join('');
 
   var simNewEl = $('simNew');
-  if (simNewEl) simNewEl.innerHTML = coordsPool
-    .map(function(co){ return '<option value="'+esc(co)+'">'+esc(co)+'</option>'; }).join('');
+  if (simNewEl) {
+    simNewEl.innerHTML = coordsPool
+      .map(function(co){ return '<option value="'+esc(co)+'">'+esc(co)+'</option>'; }).join('');
+    simNewEl.onchange = function(){ gValidarConflicto(); };
+  }
+  var simProgEl2 = $('simProg');
+  if (simProgEl2) simProgEl2.onchange = function(){ gValidarConflicto(); };
 
   // ── Cambios activos ────────────────────────────────────
   var gCam = $('gCambios');
@@ -8605,7 +10557,15 @@ function updAdmin() {
               '✕' +
             '</button>' +
 
-          '</div>';
+          '</div>' +
+
+          // ── Badge de conflicto de horario ────────────────────
+          (function(){
+            var cfls = _gConflictosPara(prog, nc, getDF());
+            return _gRenderConflictoBadge(cfls);
+          })()+
+
+        '</div>';
         }).join('') +
         '</div>';
     }
@@ -10812,90 +12772,7 @@ document.addEventListener('DOMContentLoaded', init);
    · Filtro por CC
    · Tabla comparativa con brecha y tendencia ↑↓
 ═══════════════════════════════════════════════════════════════════ */
+
 </script>
-
-<!-- MODAL GENERADOR DE CALENDARIO -->
-<div class="gen-modal-bg" id="genModal">
-  <div class="gen-modal">
-    <div class="gen-modal-head">
-      <div>
-        <div class="gen-modal-title" id="genModalTitle">Generar Calendario</div>
-        <div class="gen-modal-sub" id="genModalSub">Define la frecuencia y parametros de las sesiones</div>
-      </div>
-      <button class="gen-modal-close" onclick="genCerrar()">&#10005;</button>
-    </div>
-    <div class="gen-modal-body">
-      <div class="gen-row">
-        <div class="gen-field">
-          <span class="gen-lbl">Frecuencia</span>
-          <select class="gen-sel" id="genFreq" onchange="genPreview()">
-            <option value="semanal">Semanal</option>
-            <option value="quincenal">Quincenal (cada 2 semanas)</option>
-            <option value="mensual">Mensual</option>
-          </select>
-        </div>
-        <div class="gen-field">
-          <span class="gen-lbl">N° max de sesiones <span style="font-weight:400;text-transform:none">(opcional)</span></span>
-          <input class="gen-inp" id="genMaxSes" type="number" min="1" max="100" placeholder="Sin limite" oninput="genPreview()">
-        </div>
-      </div>
-      <div class="gen-field" style="margin-bottom:10px">
-        <span class="gen-lbl">Dias de la semana</span>
-        <div class="gen-dias" id="genDias">
-          <label class="gen-dia" id="gdLun"><input type="checkbox" value="1" onchange="genToggleDia(this,'gdLun');genPreview()">Lun</label>
-          <label class="gen-dia" id="gdMar"><input type="checkbox" value="2" onchange="genToggleDia(this,'gdMar');genPreview()">Mar</label>
-          <label class="gen-dia" id="gdMie"><input type="checkbox" value="3" onchange="genToggleDia(this,'gdMie');genPreview()">Mie</label>
-          <label class="gen-dia" id="gdJue"><input type="checkbox" value="4" onchange="genToggleDia(this,'gdJue');genPreview()">Jue</label>
-          <label class="gen-dia" id="gdVie"><input type="checkbox" value="5" onchange="genToggleDia(this,'gdVie');genPreview()">Vie</label>
-          <label class="gen-dia" id="gdSab"><input type="checkbox" value="6" onchange="genToggleDia(this,'gdSab');genPreview()">Sab</label>
-        </div>
-      </div>
-      <div class="gen-row tri">
-        <div class="gen-field">
-          <span class="gen-lbl">Hora inicio</span>
-          <input class="gen-inp" id="genHIni" type="time" value="17:00" oninput="genPreview()">
-        </div>
-        <div class="gen-field">
-          <span class="gen-lbl">Hora termino</span>
-          <input class="gen-inp" id="genHFin" type="time" value="21:00" oninput="genPreview()">
-        </div>
-        <div class="gen-field">
-          <span class="gen-lbl">Modalidad</span>
-          <select class="gen-sel" id="genModal2">
-            <option>Presencial</option>
-            <option>Online</option>
-            <option>Hibrido</option>
-          </select>
-        </div>
-      </div>
-      <div class="gen-row">
-        <div class="gen-field">
-          <span class="gen-lbl">Sede</span>
-          <input class="gen-inp" id="genSede" placeholder="Ej. Vitacura">
-        </div>
-        <div class="gen-field">
-          <span class="gen-lbl">Sala</span>
-          <input class="gen-inp" id="genSala" placeholder="Ej. Sala 3">
-        </div>
-      </div>
-      <!-- PREVIEW -->
-      <div class="gen-preview">
-        <div class="gen-preview-title">
-          Vista previa de sesiones
-          <span class="gen-preview-cnt" id="genCnt">0 sesiones</span>
-        </div>
-        <div class="gen-session-list" id="genList">
-          <div style="color:var(--t4);font-size:11px">Selecciona al menos un dia de la semana para ver el preview.</div>
-        </div>
-      </div>
-    </div>
-    <div class="gen-modal-foot">
-      <span id="genFootMsg" style="font-size:11px;color:var(--red);flex:1;display:none"></span>
-      <button class="btn btn-g" onclick="genCerrar()">Cancelar</button>
-      <button class="btn btn-p" onclick="genDescargar()" id="genBtnXls">Descargar Excel</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
