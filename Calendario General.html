@@ -12218,7 +12218,7 @@ function crProcesarArchivo(file, tipo) {
 
       // Detectar fila de headers
       var hRow=-1;
-      for(var i=0;i<Math.min(raw.length,8);i++){
+      for(var i=0;i<Math.min(raw.length,12);i++){
         if(raw[i].filter(function(v){return String(v||'').trim().length>1;}).length>=3){hRow=i;break;}
       }
       if(hRow<0) throw new Error('No se encontró fila de encabezados');
@@ -12279,17 +12279,25 @@ function crProcesarArchivo(file, tipo) {
       if(!datos.length) throw new Error('No se encontraron registros');
       _crData[tipo]=datos;
 
+      var progNames = tipo==='malla'
+        ? uniq(datos.map(function(d){return d.programa;}).filter(Boolean))
+        : uniq(datos.map(function(d){return d.programa;}).filter(Boolean));
       if(stEl) stEl.innerHTML=
         '<div style="color:#10b981;font-weight:700;margin-top:4px">✅ '+datos.length+
-        ' registros · hoja: '+wb.SheetNames[0]+'</div>'+
+        ' registros · '+progNames.length+' programa(s) · hoja: '+wb.SheetNames[0]+'</div>'+
         '<div style="font-size:10px;color:var(--t3);margin-top:2px">'+
-        'Cols detectadas: '+raw[hRow].filter(Boolean).join(' | ')+'</div>';
+        'Cols: '+raw[hRow].filter(Boolean).join(' | ')+'</div>'+
+        '<div style="font-size:10px;color:#8b949e;margin-top:2px">'+
+        'Programas: '+progNames.slice(0,3).join(', ')+(progNames.length>3?' ...':'')+'</div>';
 
       var sp=_crData.spa.length,ma=_crData.malla.length;
       var b=$('crBadge');
       if(b) b.innerHTML=(sp?'<span style="color:#10b981">📋 SPA: '+sp+'</span> ':'')+
         (ma?'<span style="color:#10b981;margin-left:10px">📐 Malla: '+ma+'</span>':'');
 
+      // Resetear filtro CC al auto-generar
+      var ccR = $('crFiltroCC'); if(ccR) ccR.value = '';
+      var prR = $('crFiltroProg'); if(prR) prR.value = '';
       if(sp&&ma) crGenerar();
     } catch(err){
       if(stEl) stEl.innerHTML='<span style="color:#dc2626">❌ '+esc(err.message)+'</span>';
@@ -12389,7 +12397,10 @@ function crGenerar() {
 
   // Actualizar opciones del select de CC con los CCs disponibles en _crResult
   var ccEl = $('crFiltroCC');
-  if (ccEl && ccEl.options.length <= 1) {
+  if (ccEl) {
+    // Siempre reconstruir para reflejar datos actuales
+    var prevCC = ccEl.value;
+    ccEl.innerHTML = '<option value="">Todos</option>';
     var ccs = {};
     _crResult.forEach(function(r){
       var cc = r.cc || crExtractCC(r.progSPA) || crExtractCC(r.progMalla);
@@ -12401,11 +12412,16 @@ function crGenerar() {
       opt.textContent = 'CC ' + cc + ' — ' + abbr(ccs[cc].replace(/^\d+\s*/,''),28);
       ccEl.appendChild(opt);
     });
+    if(prevCC && ccEl.querySelector('option[value="'+prevCC+'"]')) {
+      ccEl.value = prevCC;
+    } else {
+      ccEl.value = ''; // Resetear a Todos
+    }
   }
 
   var resultFiltrado = _crResult.filter(function(r){
     var ccR    = r.cc || crExtractCC(r.progSPA) || crExtractCC(r.progMalla) || '';
-    var okCC   = !filtroCC   || ccR === filtroCC;
+    var okCC   = !filtroCC   || ccR === filtroCC || !ccR;
     var okProg = !filtroProg ||
       (r.progSPA||'').toLowerCase().indexOf(filtroProg)>=0 ||
       (r.progMalla||'').toLowerCase().indexOf(filtroProg)>=0;
@@ -14362,7 +14378,7 @@ function updAdmin() {
       var simCoord = APP.simCambios[p.prog] || p.coord;
       var changed  = APP.simCambios[p.prog] && APP.simCambios[p.prog] !== p.coord;
       return '<option value="'+esc(p.prog)+'" '+(changed?'style="color:#2563eb"':'')+'>'+
-        esc(abbr(p.prog,40))+' ['+esc(abbr(simCoord,18))+']'+(changed?' ✱':'')+
+        esc(p.prog)+' ['+esc(simCoord)+']'+(changed?' ✱':'')+
       '</option>';
     }).join('');
 
@@ -14676,13 +14692,13 @@ function _gQuitarCambio(prog) {
 
 /* ── Exportar simulación ────────────────────────────────────────── */
 function _gExportarSimulacion() {
+  try {
   // Usar APP.df completo para que ningún filtro de UI excluya programas
   var df      = APP.df || [];
   var mes     = $('gM') ? $('gM').value : '';
   // Solo aplicar filtro de mes si está activo; ignorar APP.globalFilter
   var dfC     = mes ? df.filter(function(r){ return r['Mes']===mes; }) : df;
   var cambios = Object.entries(APP.simCambios||{});
-  if (!cambios.length) { showToast('Sin cambios para exportar','warn'); return; }
 
   var progLoad = computeLoadByProgInDf(dfC);
   var umbral   = parseFloat($('gUmbral') ? $('gUmbral').value : 60) || 60;
@@ -14748,7 +14764,7 @@ function _gExportarSimulacion() {
       'Topes (+1)':           fProg2.topes?'Sí':'No',
       'Viajes (+1)':          fProg2.viajes?'Sí':'No',
       'Δ Factores':           getFactoresDelta(prog).toFixed(1),
-      'Puntaje Ajustado':     Math.max(0,(original?original.puntaje:0)+getFactoresDelta(prog)).toFixed(1),
+      'Puntaje Ajustado':     Math.max(0,(orig?orig.puntaje:0)+getFactoresDelta(prog)).toFixed(1),
       'Tope de Horario':      hayConflicto ? 'SÍ ⚠️' : 'No',
       'N° Conflictos':        conflictos.length,
       'Detalle Topes':        conflictoResumen || '—',
@@ -14922,7 +14938,6 @@ function _gExportarSimulacion() {
 
 
   // ── Generar Excel con 4 hojas ────────────────────────────────
-  try {
     var wb = XLSX.utils.book_new();
 
     // Hoja 1 — Reasignaciones
@@ -14959,9 +14974,10 @@ function _gExportarSimulacion() {
     XLSX.utils.book_append_sheet(wb, ws4, '4. Detalle Carga Actual');
 
     XLSX.writeFile(wb, 'Simulacion_Carga_Laboral.xlsx');
-    showToast('Excel · 4 hojas: Reasignaciones · Carga · Topes · Detalle Completo','ok');
+    showToast('Excel exportado con 4 hojas','ok');
   } catch(err) {
-    showToast('Error al exportar: '+err.message,'err');
+    alert('ERROR: ' + err.message);
+    console.error(err);
   }
 }
 
@@ -17490,3 +17506,4 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
+
