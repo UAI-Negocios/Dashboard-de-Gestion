@@ -10908,6 +10908,10 @@ function _gConflictosPara(progSel, coordDest, df) {
         progB: sc['PROGRAMA'], dia: diaSP||'',
         horA: horSP?horSP.str:'', horB: horSC?horSC.str:'',
         sedeA: sedeSP, sedeB: sedeSC,
+        asigA: sp['ASIGNATURA']||sp['Nombre']||'',
+        asigB: sc['ASIGNATURA']||sc['Nombre']||'',
+        modalA: sp['Modalidad_Calc']||sp['MODALIDAD']||'',
+        modalB: sc['Modalidad_Calc']||sc['MODALIDAD']||'',
         minSolap: minS, mismaSede: mismaSede,
         nivel: (mismaSede||minS>=60) ? 'alto' : 'medio',
       });
@@ -10917,6 +10921,277 @@ function _gConflictosPara(progSel, coordDest, df) {
 }
 
 /* ── Render del panel de conflictos dentro de la card ─────────── */
+/* ══════════════════════════════════════════════════════════════════
+   VISTA SIMULADA DETALLADA — Cómo quedaría cada coordinadora
+   después de aplicar las reasignaciones
+══════════════════════════════════════════════════════════════════ */
+function _gRenderVistaSim(dfC, cambios, progLoad) {
+  var wrap = $('gVistaSimWrap');
+  if(!wrap) return;
+
+  if(!cambios.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'block';
+
+  // Construir mapa simulado: coord → programas
+  var simMap = {};
+  progLoad.forEach(function(p){
+    var coordFinal = APP.simCambios[p.prog] || p.coord;
+    if(!simMap[coordFinal]) simMap[coordFinal] = [];
+    simMap[coordFinal].push({
+      prog: p.prog, coordOrig: p.coord, coordFinal: coordFinal,
+      esCambiado: !!APP.simCambios[p.prog],
+      ses: p.ses, alum: p.alum, puntaje: p.puntaje
+    });
+  });
+
+  var coordsOrden = Object.keys(simMap).sort();
+
+  // Para cada coord, calcular datos detallados desde dfC
+  var html =
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden;' +
+      'border-top:3px solid #a78bfa">' +
+
+    // Header
+    '<div style="padding:14px 20px;background:#161b22;border-bottom:1px solid #21262d;' +
+      'display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
+      '<div>' +
+        '<div style="font-size:14px;font-weight:900;color:#f0f6ff">' +
+          '🔮 Vista Simulada Detallada</div>' +
+        '<div style="font-size:11px;color:#8b949e;margin-top:2px">' +
+          'Así quedaría la carga de cada coordinadora después de las reasignaciones</div>' +
+      '</div>' +
+      '<span style="font-size:10px;padding:4px 12px;background:rgba(167,139,250,.12);' +
+        'color:#a78bfa;border-radius:8px;border:1px solid rgba(167,139,250,.3);font-weight:700">' +
+        cambios.length + ' cambio(s) aplicado(s)</span>' +
+    '</div>' +
+
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:16px">';
+
+  coordsOrden.forEach(function(co){
+    var progs  = simMap[co].sort(function(a,b){ return b.puntaje - a.puntaje; });
+    var totalPts = progs.reduce(function(s,p){ return s + p.puntaje; }, 0);
+    var totalSes = progs.reduce(function(s,p){ return s + p.ses; }, 0);
+    var tieneNuevos = progs.some(function(p){ return p.esCambiado; });
+    var umbral  = parseFloat(($('gUmbral')||{value:60}).value) || 60;
+    var estado  = totalPts >= umbral ? {c:'#f85149',lbl:'SOBRECARGADA',ico:'🔴'}
+                : totalPts >= umbral*0.75 ? {c:'#f0b429',lbl:'ATENCIÓN',ico:'🟡'}
+                : {c:'#3fb950',lbl:'NORMAL',ico:'🟢'};
+
+    // Sesiones de esta coord en dfC (simuladas = con cambios aplicados)
+    var sesCoord = [];
+    progs.forEach(function(p){
+      dfC.filter(function(r){ return r['PROGRAMA'] === p.prog; }).forEach(function(r){
+        sesCoord.push(r);
+      });
+    });
+
+    // Días de la semana
+    var diasSem = {};
+    sesCoord.forEach(function(r){
+      var d = r['Dia_Semana']||'';
+      if(d) diasSem[d] = (diasSem[d]||0) + 1;
+    });
+
+    // Modalidades
+    var mods = {};
+    sesCoord.forEach(function(r){
+      var m = r['Modalidad_Calc']||'Sin definir';
+      mods[m] = (mods[m]||0) + 1;
+    });
+
+    // Sedes
+    var sedes = {};
+    sesCoord.forEach(function(r){
+      var s = r['SEDE']||'';
+      if(s) sedes[s] = (sedes[s]||0) + 1;
+    });
+
+    // Horarios
+    var horarios = {};
+    sesCoord.forEach(function(r){
+      var h = r['HORARIO']||'';
+      if(h) horarios[h] = (horarios[h]||0) + 1;
+    });
+    var horTop = Object.entries(horarios).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
+
+    // Topes internos (días con 2+ programas distintos de esta coord)
+    var diaProgs = {};
+    sesCoord.forEach(function(r){
+      if(!r['DIAS/FECHAS']) return;
+      var k = fmtDate(r['DIAS/FECHAS']);
+      if(!diaProgs[k]) diaProgs[k] = {dia:'', progs:new Set(), sedes:new Set(), horas:new Set()};
+      diaProgs[k].dia = r['Dia_Semana']||'';
+      diaProgs[k].progs.add(r['PROGRAMA']);
+      if(r['SEDE']) diaProgs[k].sedes.add(r['SEDE']);
+      if(r['HORARIO']) diaProgs[k].horas.add(r['HORARIO']);
+    });
+    var topes = Object.entries(diaProgs).filter(function(e){ return e[1].progs.size >= 2; })
+      .sort(function(a,b){ return b[1].progs.size - a[1].progs.size; });
+    var nCrit = topes.filter(function(e){ return e[1].progs.size >= 3; }).length;
+
+    html +=
+      '<div style="background:#161b22;border:1px solid '+estado.c+'44;border-radius:12px;overflow:hidden;' +
+        'border-left:4px solid '+estado.c+'">' +
+
+      // Header coordinadora
+      '<div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;' +
+        'flex-wrap:wrap;gap:10px;cursor:pointer" ' +
+        'onclick="(function(){var d=document.getElementById(\'vsim_'+co.replace(/[^a-zA-Z0-9]/g,'_')+'\');' +
+          'if(d)d.style.display=d.style.display===\'none\'?\'block\':\'none\';})()">' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+          '<span style="font-size:16px">'+estado.ico+'</span>' +
+          '<div>' +
+            '<div style="font-size:14px;font-weight:900;color:#f0f6ff">'+esc(co)+'</div>' +
+            '<div style="font-size:10px;color:#8b949e;margin-top:2px">' +
+              progs.length+' programa(s) · '+totalSes+' sesiones · '+
+              Object.keys(diasSem).length+' días/semana'+
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:12px;align-items:center">' +
+          '<div style="text-align:center">' +
+            '<div style="font-size:20px;font-weight:900;color:'+estado.c+'">'+totalPts.toFixed(1)+'</div>' +
+            '<div style="font-size:9px;color:#6e7681">PUNTAJE</div>' +
+          '</div>' +
+          '<span style="font-size:10px;padding:3px 10px;border-radius:8px;font-weight:700;' +
+            'background:'+estado.c+'22;color:'+estado.c+';border:1px solid '+estado.c+'44">' +
+            estado.lbl+'</span>' +
+          (tieneNuevos ? '<span style="font-size:10px;padding:3px 10px;border-radius:8px;' +
+            'background:rgba(56,139,253,.12);color:#388bfd;border:1px solid rgba(56,139,253,.3);' +
+            'font-weight:700">CON CAMBIOS</span>' : '') +
+        '</div>' +
+      '</div>' +
+
+      // Panel expandible
+      '<div id="vsim_'+co.replace(/[^a-zA-Z0-9]/g,'_')+'" style="display:none;border-top:1px solid #21262d">' +
+
+        // Fila de métricas
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #21262d">' +
+
+          // Días de semana
+          '<div style="padding:12px 16px;border-right:1px solid #21262d">' +
+            '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;margin-bottom:8px">📅 Días de clase</div>' +
+            Object.entries(diasSem).sort(function(a,b){return b[1]-a[1];}).map(function(e){
+              return '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">' +
+                '<span style="color:#e6edf3">'+esc(e[0])+'</span>' +
+                '<span style="color:#388bfd;font-weight:700">'+e[1]+'</span></div>';
+            }).join('') +
+          '</div>' +
+
+          // Modalidad
+          '<div style="padding:12px 16px;border-right:1px solid #21262d">' +
+            '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;margin-bottom:8px">🖥️ Modalidad</div>' +
+            Object.entries(mods).sort(function(a,b){return b[1]-a[1];}).map(function(e){
+              var mc = e[0].toLowerCase().includes('online')?'#22d3ee':
+                       e[0].toLowerCase().includes('presencial')?'#3fb950':'#a78bfa';
+              return '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">' +
+                '<span style="color:#e6edf3">'+esc(e[0])+'</span>' +
+                '<span style="color:'+mc+';font-weight:700">'+e[1]+'</span></div>';
+            }).join('') +
+          '</div>' +
+
+          // Sedes
+          '<div style="padding:12px 16px;border-right:1px solid #21262d">' +
+            '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;margin-bottom:8px">📍 Sedes</div>' +
+            Object.entries(sedes).sort(function(a,b){return b[1]-a[1];}).map(function(e){
+              return '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">' +
+                '<span style="color:#e6edf3">'+esc(abbr(e[0],16))+'</span>' +
+                '<span style="color:#f0b429;font-weight:700">'+e[1]+'</span></div>';
+            }).join('') +
+          '</div>' +
+
+          // Horarios top
+          '<div style="padding:12px 16px">' +
+            '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;margin-bottom:8px">🕐 Horarios frecuentes</div>' +
+            horTop.map(function(e){
+              return '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">' +
+                '<span style="color:#e6edf3">'+esc(e[0])+'</span>' +
+                '<span style="color:#8b949e;font-weight:700">'+e[1]+' ses.</span></div>';
+            }).join('') +
+          '</div>' +
+
+        '</div>' +
+
+        // Programas asignados
+        '<div style="padding:12px 16px;border-bottom:1px solid #21262d">' +
+          '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;margin-bottom:8px">' +
+            '🎓 Programas asignados ('+progs.length+')</div>' +
+          '<div style="display:flex;flex-direction:column;gap:4px">' +
+          progs.map(function(p){
+            return '<div style="display:flex;align-items:center;justify-content:space-between;' +
+              'padding:6px 10px;background:#0d1117;border-radius:6px;' +
+              'border-left:3px solid '+(p.esCambiado?'#388bfd':estado.c)+'">' +
+              '<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">' +
+                (p.esCambiado
+                  ? '<span style="font-size:9px;padding:1px 6px;background:rgba(56,139,253,.12);' +
+                      'color:#388bfd;border-radius:4px;font-weight:700;flex-shrink:0">' +
+                      '↙ desde '+esc(abbr(p.coordOrig,14))+'</span>'
+                  : '<span style="font-size:9px;color:#6e7681;flex-shrink:0">✓ original</span>') +
+                '<span style="font-size:11px;color:#e6edf3;font-weight:700;' +
+                  'white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(p.prog)+'">' +
+                  esc(abbr(p.prog,38))+'</span>' +
+              '</div>' +
+              '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0">' +
+                '<span style="font-size:10px;color:#8b949e">'+p.ses+' ses.</span>' +
+                '<span style="font-size:10px;color:#a78bfa;font-weight:800">'+p.puntaje.toFixed(1)+' pts</span>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+          '</div>' +
+        '</div>' +
+
+        // Topes internos
+        '<div style="padding:12px 16px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+            '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase">' +
+              '⚠️ Topes internos (días con 2+ programas)</div>' +
+            '<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;' +
+              'background:'+(topes.length?'rgba(248,81,73,.12)':'rgba(63,185,80,.12)')+';' +
+              'color:'+(topes.length?'#f85149':'#3fb950')+'">' +
+              topes.length+' día(s)</span>' +
+          '</div>' +
+          (topes.length
+            ? '<div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto">' +
+              topes.slice(0,10).map(function(e){
+                var fecha = e[0], info = e[1];
+                var progsArr = [...info.progs];
+                var sedesArr = [...info.sedes];
+                var horasArr = [...info.horas];
+                var esCrit = progsArr.length >= 3;
+                return '<div style="padding:8px 10px;background:#0d1117;border-radius:6px;' +
+                  'border-left:3px solid '+(esCrit?'#f85149':'#f0b429')+'">' +
+                  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+                    '<span style="font-size:11px;font-weight:900;color:'+(esCrit?'#f85149':'#f0b429')+'">'+esc(fecha)+'</span>' +
+                    (info.dia ? '<span style="font-size:9px;padding:1px 6px;background:rgba(255,255,255,.06);' +
+                      'border-radius:4px;color:#8b949e">'+esc(info.dia)+'</span>' : '') +
+                    (esCrit ? '<span style="font-size:9px;padding:1px 6px;background:rgba(248,81,73,.15);' +
+                      'color:#f85149;border-radius:4px;font-weight:700">CRÍTICO</span>' : '') +
+                  '</div>' +
+                  '<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:#8b949e">' +
+                    '<span>🎓 '+progsArr.map(function(p){return esc(abbr(p,24));}).join(' · ')+'</span>' +
+                    (sedesArr.length ? '<span>📍 '+sedesArr.join(' / ')+'</span>' : '') +
+                    (horasArr.length ? '<span>🕐 '+horasArr.join(' · ')+'</span>' : '') +
+                  '</div>' +
+                '</div>';
+              }).join('') +
+              (topes.length > 10 ? '<div style="font-size:9px;color:#6e7681;text-align:center;padding:4px">… y '+(topes.length-10)+' día(s) más</div>' : '') +
+              '</div>'
+            : '<div style="font-size:10px;color:#3fb950;padding:6px 0">✅ Sin topes internos</div>'
+          ) +
+        '</div>' +
+
+      '</div>' + // cierre panel expandible
+    '</div>';    // cierre card coord
+  });
+
+  html += '</div></div>';
+  wrap.innerHTML = html;
+}
+
+
 function _gRenderConflictoBadge(conflictos) {
   if (!conflictos.length) {
     return '<div style="display:flex;align-items:center;gap:8px;margin:0 18px 14px;' +
@@ -10945,17 +11220,41 @@ function _gRenderConflictoBadge(conflictos) {
     '</div>' +
     '<div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px">' +
     conflictos.map(function(cf){
-      var linea = '<span style="font-size:12px">⚠️</span> ' +
-        '<strong style="color:#f0f6ff;font-size:11px">'+esc(abbr(cf.progB,32))+'</strong>';
-      if (cf.dia)  linea += '<span style="color:#8b949e;font-size:11px"> — '+esc(cf.dia)+'</span>';
-      if (cf.horA) linea += ' <span style="color:'+color+';font-weight:700;font-size:11px">'+esc(cf.horA)+'</span>';
-      if (cf.horB && cf.horB!==cf.horA)
-        linea += '<span style="color:#8b949e;font-size:11px"> vs '+esc(cf.horB)+'</span>';
-      if (cf.minSolap>0)
-        linea += ' <em style="color:#8b949e;font-size:10px">('+cf.minSolap+' min solapado)</em>';
-      if (cf.mismaSede && cf.sedeA)
-        linea += '<span style="color:#f0b429;font-size:11px"> 📍 '+esc(cf.sedeA)+'</span>';
-      return '<div style="display:flex;align-items:center;gap:6px;line-height:1.5">'+linea+'</div>';
+      return '<div style="padding:8px 10px;background:rgba(0,0,0,.15);border-radius:8px;'+
+          'border-left:3px solid '+color+'">'+
+
+        // Línea 1: Programa en conflicto + día + horarios
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+
+          '<span style="font-size:11px">⚠️</span>'+
+          '<strong style="color:#f0f6ff;font-size:11px">'+esc(cf.progB)+'</strong>'+
+          (cf.dia ? '<span style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,.06);'+
+            'border-radius:4px;color:#8b949e">'+esc(cf.dia)+'</span>' : '')+
+          (cf.horA ? '<span style="color:'+color+';font-weight:800;font-size:11px">'+esc(cf.horA)+'</span>' : '')+
+          (cf.horB && cf.horB!==cf.horA
+            ? '<span style="color:#6e7681;font-size:10px">vs</span>'+
+              '<span style="color:#8b949e;font-size:11px">'+esc(cf.horB)+'</span>' : '')+
+          (cf.minSolap>0
+            ? '<span style="font-size:9px;padding:1px 6px;background:rgba(248,81,73,.15);'+
+                'border-radius:4px;color:#f85149;font-weight:700">'+cf.minSolap+' min solapado</span>' : '')+
+        '</div>'+
+
+        // Línea 2: Asignaturas + modalidades + sedes
+        '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:10px;color:#8b949e">'+
+          // Curso que topa
+          (cf.asigB
+            ? '<span>📚 <span style="color:#e6edf3">'+esc(abbr(cf.asigB,30))+'</span></span>' : '')+
+          // Modalidades
+          (cf.modalA || cf.modalB
+            ? '<span>🖥️ '+esc(cf.modalA||'—')+' vs '+esc(cf.modalB||'—')+'</span>' : '')+
+          // Sedes
+          (cf.sedeA || cf.sedeB
+            ? '<span>📍 '+esc(cf.sedeA||'—')+
+              (cf.mismaSede ? ' <span style="color:#f85149;font-weight:700">= MISMA SEDE</span>' :
+               cf.sedeB && cf.sedeB!==cf.sedeA ? ' vs '+esc(cf.sedeB) : '')+
+              '</span>' : '')+
+        '</div>'+
+
+      '</div>';
     }).join('') +
     '</div>' +
   '</div>';
@@ -14243,7 +14542,10 @@ function showAdmin() {
         '<div style="font-size:10px;color:#8b949e;margin-top:2px">Coordinadora · Programa · Distribución mensual</div>' +
       '</div>' +
       '<div style="overflow-x:auto;padding:16px"><div id="gestMatriz"></div></div>' +
-    '</div>';
+    '</div>' +
+
+    // ── Vista Simulada Detallada ──────────────────────────────────
+    '<div id="gVistaSimWrap" style="display:none;margin-top:20px"></div>';
 
   updAdmin();
 }
@@ -14623,6 +14925,9 @@ function updAdmin() {
         nExcl+' excluida'+(nExcl>1?'s':'')+' del balanceo</span>';
     }
   }
+
+  // Vista simulada detallada
+  _gRenderVistaSim(dfC, cambios, progLoad);
 
   // Show propuesta balanceo
   if (APP.propuesta) renderPropuesta(APP.propuesta, load, progLoad);
