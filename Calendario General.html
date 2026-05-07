@@ -14849,10 +14849,13 @@ function updAdmin() {
 
   if (sy.length) df = df.filter(function(r){ return r['DIAS/FECHAS'] && sy.includes(String(r['DIAS/FECHAS'].getFullYear())); });
   var dfC = mes ? df.filter(function(r){ return r['Mes'] === mes; }) : df;
+  // Para cálculo de CARGA: filtrar por AÑO pero NO por mes
+  // El puntaje es la carga anual completa, no del mes
+  var dfLoad = df; // df ya está filtrado por año (sy) pero NO por mes
 
   // ── KPIs globales ─────────────────────────────────────
-  var load = computeLoadByCoord(dfC);
-  var loadSim = computeLoadSim(dfC);
+  var load    = computeLoadByCoord(dfLoad);
+  var loadSim = computeLoadSim(dfLoad);
   var pMax = load[0] ? load[0].puntaje : 0;
   var pMin = load.length ? load[load.length-1].puntaje : 0;
   var avg  = load.length ? load.reduce(function(s,r){return s+r.puntaje;},0)/load.length : 0;
@@ -14962,7 +14965,7 @@ function updAdmin() {
   }
 
   // ── Selector de programa (con coord actual) ─────────────
-  var progLoad = computeLoadByProgInDf(dfC);
+  var progLoad = computeLoadByProgInDf(dfLoad);
   var coordsPool = uniq(APP.df.map(function(r){ return r['COORDINADORA RESPONSABLE']; })).sort();
   var simProgEl = $('simProg');
   if (simProgEl) simProgEl.innerHTML = progLoad
@@ -15230,10 +15233,10 @@ function updAdmin() {
   }
 
   // ── Gráfico de Modalidades ──────────────────────────────
-  _gRenderModalidades(dfC);
+  _gRenderModalidades(dfLoad);
 
   // Vista simulada detallada
-  _gRenderVistaSim(dfC, cambios, progLoad);
+  _gRenderVistaSim(dfLoad, cambios, progLoad);
 
   // Show propuesta balanceo
   if (APP.propuesta) renderPropuesta(APP.propuesta, load, progLoad);
@@ -15307,9 +15310,15 @@ function _gExportarSimulacion() {
   if(!Object.keys(APP.simCambios||{}).length) { showToast('Sin cambios para exportar','err'); return; }
   if(typeof XLSX === 'undefined') { showToast('Librería XLSX no cargada','err'); return; }
 
-  var df      = APP.df || [];
-  var mes     = $('gM') ? $('gM').value : '';
-  var dfC     = mes ? df.filter(function(r){ return r['Mes']===mes; }) : df;
+  // Usar misma lógica que updAdmin: filtrar por año seleccionado pero no por mes
+  var dfC = (function(){
+    var _df = getDF();
+    var _sy = getDF_sel('gY');
+    if(_sy.length) _df = _df.filter(function(r){
+      return r['DIAS/FECHAS'] && _sy.includes(String(r['DIAS/FECHAS'].getFullYear()));
+    });
+    return _df;
+  })();
   var cambios = Object.entries(APP.simCambios||{});
   var umbral  = parseFloat(($('gUmbral')||{value:'60'}).value) || 60;
 
