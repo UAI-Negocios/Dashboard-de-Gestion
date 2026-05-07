@@ -1600,69 +1600,64 @@ function fmtDateShort(d) {
 function parseDate(v) {
   if (v === null || v === undefined || v === '') return null;
 
-  // ✅ Ya es un Date object (SheetJS con cellDates:true lo entrega así)
+  // Ya es Date
   if (v instanceof Date) {
     return isNaN(v.getTime()) ? null : v;
   }
 
-  // ✅ Número — puede ser serial Excel (entero) o número de JS
+  // Serial Excel
   if (typeof v === 'number') {
     if (!isFinite(v) || v < 1) return null;
-    // Serial Excel: días desde 1899-12-30
-    // SheetJS con raw:true puede dar seriales para fechas no convertidas
     if (v > 1000 && v < 100000) {
-      // Corregir bug de Excel 1900 (leap year bug): seriales >= 60 son correctos
-      const serial = v >= 60 ? v : v + 1; // raro pero seguro
-      const ms = (serial - 25569) * 86400 * 1000;
-      const d = new Date(ms);
-      // Normalizar a medianoche local para evitar desfases de zona horaria
-      const local = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      var serial = v >= 60 ? v : v + 1;
+      var ms = (serial - 25569) * 86400 * 1000;
+      var d = new Date(ms);
+      var local = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
       return isNaN(local.getTime()) ? null : local;
     }
     return null;
   }
 
   if (typeof v === 'string') {
-    const s = v.trim();
+    var s = v.trim();
     if (!s) return null;
 
-    // dd/mm/yyyy  dd-mm-yyyy  dd.mm.yyyy
-    let m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+    // ── Formato SheetJS raw:false → M/D/YY o M/D/YYYY (americano) ──
+    // Detectar: "5/5/26", "5/12/26", "12/3/2026"
+    var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
     if (m) {
-      const day = parseInt(m[1]), mon = parseInt(m[2]);
-      const y = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
-      // Decidir si es dd/mm o mm/dd: si primer número > 12, forzar dd/mm
-      if (day > 12) {
-        const d = new Date(y, mon - 1, day);
-        return isNaN(d.getTime()) ? null : d;
-      }
-      // Asumir dd/mm (formato latinoamericano)
-      const d = new Date(y, mon - 1, day);
+      var n1 = parseInt(m[1]), n2 = parseInt(m[2]);
+      var y = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+      // SheetJS SIEMPRE usa formato americano (M/D/Y) cuando raw:false
+      // Mes = n1, Día = n2
+      var d = new Date(y, n1 - 1, n2);
       return isNaN(d.getTime()) ? null : d;
     }
 
-    // yyyy-mm-dd (ISO)
-    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    // ── dd-mm-yyyy, dd.mm.yyyy (con guión o punto = formato latino) ──
+    m = s.match(/^(\d{1,2})[\-\.](\d{1,2})[\-\.](\d{2,4})$/);
     if (m) {
-      const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
-      return isNaN(d.getTime()) ? null : d;
+      var day = parseInt(m[1]), mon = parseInt(m[2]);
+      var y2 = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+      var d2 = new Date(y2, mon - 1, day);
+      return isNaN(d2.getTime()) ? null : d2;
     }
 
-    // m/d/yyyy o mm/dd/yyyy (formato americano que puede venir de SheetJS raw:false)
-    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    // ── yyyy-mm-dd (ISO) ──
+    m = s.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})/);
     if (m) {
-      // En este caso SheetJS usa formato americano: mes/día/año
-      const dAm = new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
-      return isNaN(dAm.getTime()) ? null : dAm;
+      var d3 = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+      return isNaN(d3.getTime()) ? null : d3;
     }
 
-    // Último recurso: Date.parse (puede ser ambiguo)
-    const dp = new Date(s);
+    // Último recurso
+    var dp = new Date(s);
     return isNaN(dp.getTime()) ? null : dp;
   }
 
   return null;
 }
+
 
 function calcMod(sede) {
   const s = String(sede||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1733,7 +1728,12 @@ function showToast(msg, type='info') {
    FILE UPLOAD & PARSING
 ══════════════════════════════════════════════════════ */
 function normalizeKey(k) {
-  return String(k).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+  return String(k).trim().toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')  // quitar diacríticos
+    .replace(/[^A-Z0-9\s]/g,' ')      // reemplazar Nº°/\.,-: etc por espacio
+    .replace(/\s+/g,' ')
+    .trim();
 }
 
 function findCol(obj, candidates) {
@@ -10859,6 +10859,107 @@ function _ifDescargar() {
 ══════════════════════════════════════════════════════════════ */
 
 /* ── Calcular conflictos entre programa y coordinadora destino ──── */
+/* ── Gráficos de Distribución por Modalidad ──────────────────── */
+function _gRenderModalidades(df) {
+  if(!df || !df.length) return;
+
+  // Contar por modalidad
+  var modCount = { 'Presencial': 0, 'Online': 0, 'Híbrido': 0, 'Otro': 0 };
+  df.forEach(function(r){
+    var m = (r['Modalidad_Calc'] || r['MODALIDAD'] || '').toLowerCase();
+    if(m.includes('presencial')) modCount['Presencial']++;
+    else if(m.includes('online')) modCount['Online']++;
+    else if(m.includes('híb') || m.includes('hib') || m.includes('blend')) modCount['Híbrido']++;
+    else modCount['Otro']++;
+  });
+  if(modCount['Otro'] === 0) delete modCount['Otro'];
+
+  var labels = Object.keys(modCount);
+  var vals   = Object.values(modCount);
+  var total  = vals.reduce(function(s,v){ return s+v; }, 0);
+  var MCOLS  = { 'Presencial':'#3fb950', 'Online':'#22d3ee', 'Híbrido':'#a78bfa', 'Otro':'#8b949e' };
+  var colors = labels.map(function(l){ return MCOLS[l] || '#8b949e'; });
+
+  // Pie chart
+  makeChart('chartModalidades', {
+    type: 'doughnut',
+    data: {
+      labels: labels.map(function(l,i){
+        return l + ' — ' + vals[i] + ' (' + Math.round(vals[i]/total*100) + '%)';
+      }),
+      datasets: [{
+        data: vals,
+        backgroundColor: colors.map(function(c){ return c+'bb'; }),
+        borderColor: colors,
+        borderWidth: 2,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      cutout: '52%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#8b949e', font: { size: 10 }, padding: 10, boxWidth: 14 }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var pct = Math.round(ctx.parsed / total * 100);
+              return ' ' + ctx.parsed + ' sesiones (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Barras apiladas por coordinadora
+  var coords = [];
+  var coordMod = {};
+  df.forEach(function(r){
+    var co = r['COORDINADORA RESPONSABLE'] || 'Sin asignar';
+    var m  = (r['Modalidad_Calc'] || r['MODALIDAD'] || '').toLowerCase();
+    var cat = m.includes('presencial') ? 'Presencial'
+            : m.includes('online') ? 'Online'
+            : (m.includes('híb') || m.includes('hib')) ? 'Híbrido' : 'Otro';
+    if(!coordMod[co]) { coordMod[co] = {'Presencial':0,'Online':0,'Híbrido':0,'Otro':0}; coords.push(co); }
+    coordMod[co][cat]++;
+  });
+  coords = coords.sort(function(a,b){
+    var sa = Object.values(coordMod[a]).reduce(function(s,v){return s+v;},0);
+    var sb = Object.values(coordMod[b]).reduce(function(s,v){return s+v;},0);
+    return sb-sa;
+  }).slice(0,8);
+
+  var mods = Object.keys(modCount);
+  makeChart('chartModalCoord', {
+    type: 'bar',
+    data: {
+      labels: coords.map(function(co){ return abbr(co,18); }),
+      datasets: mods.map(function(mod){
+        return {
+          label: mod,
+          data: coords.map(function(co){ return (coordMod[co]||{})[mod]||0; }),
+          backgroundColor: (MCOLS[mod]||'#8b949e')+'99',
+          borderColor:     MCOLS[mod]||'#8b949e',
+          borderWidth: 0, borderRadius: 3,
+        };
+      })
+    },
+    options: {
+      plugins: {
+        legend: { position:'bottom', labels:{ color:'#8b949e', font:{size:10}, boxWidth:12 } }
+      },
+      scales: {
+        x: { stacked:true, ticks:{ color:'#8b949e', font:{size:9}, maxRotation:35 }, grid:{ color:'#21262d' } },
+        y: { stacked:true, ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'#21262d' } }
+      }
+    }
+  });
+}
+
+
 function _gConflictosPara(progSel, coordDest, df) {
   var sesProg  = df.filter(function(r){ return r['PROGRAMA'] === progSel; });
   var sesCoord = df.filter(function(r){
@@ -10868,7 +10969,7 @@ function _gConflictosPara(progSel, coordDest, df) {
 
   function parseRango(str) {
     if (!str) return null;
-    var parts = String(str).split(/\s*[-–—]\s*/);
+    var parts = String(str).split(/\s*[-–—a]\s*/);
     var toMin = function(s){
       var m = String(s||'').match(/(\d{1,2}):(\d{2})/);
       return m ? parseInt(m[1])*60+parseInt(m[2]) : null;
@@ -10880,51 +10981,64 @@ function _gConflictosPara(progSel, coordDest, df) {
   }
   function solapan(a,b){ return a.ini < b.fin && b.ini < a.fin; }
   function solapMin(a,b){ return Math.max(0, Math.min(a.fin,b.fin) - Math.max(a.ini,b.ini)); }
+  function normSede(s){
+    return String(s||'').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .split(/[\s,\-\/]+/)[0].trim();
+  }
 
   var conflictos = [], visto = {};
+
   sesProg.forEach(function(sp){
-    var diaSP = sp['Dia_Semana']||'';
     var fechaSP = sp['DIAS/FECHAS'];
-    var horSP = parseRango(sp['HORARIO']);
-    var sedeSP = sp['SEDE']||'';
-    if (!diaSP && !fechaSP) return;
+    var horSP   = parseRango(sp['HORARIO']);
+    var sedeSP  = sp['SEDE']||'';
+
+    if (!(fechaSP instanceof Date)) return;
+
     sesCoord.forEach(function(sc){
-      var diaSC = sc['Dia_Semana']||'';
       var fechaSC = sc['DIAS/FECHAS'];
-      var horSC = parseRango(sc['HORARIO']);
-      var sedeSC = sc['SEDE']||'';
-      var mismaDia   = diaSP && diaSC && diaSP===diaSC;
-      var mismaFecha = fechaSP instanceof Date && fechaSC instanceof Date &&
-                       fechaSP.toDateString()===fechaSC.toDateString();
-      if (!mismaDia && !mismaFecha) return;
+      var horSC   = parseRango(sc['HORARIO']);
+      var sedeSC  = sc['SEDE']||'';
+
+      // REGLA: misma fecha exacta
+      if (!(fechaSC instanceof Date)) return;
+      if (fechaSP.toDateString() !== fechaSC.toDateString()) return;
+
+      // REGLA: horarios deben solaparse
       if (horSP && horSC && !solapan(horSP, horSC)) return;
-      var key = sc['PROGRAMA']+'||'+diaSP+'||'+(horSP?horSP.str:'');
+
+      // Deduplicar
+      var key = sc['PROGRAMA']+'||'+fechaSP.toDateString()+'||'+(horSP?horSP.str:'');
       if (visto[key]) return;
       visto[key] = true;
+
       var minS = (horSP&&horSC) ? solapMin(horSP, horSC) : 0;
-      var mismaSede = sedeSP && sedeSC &&
-                      sedeSP.toLowerCase().split(/[\s,\-]/)[0] === sedeSC.toLowerCase().split(/[\s,\-]/)[0];
+      var mismaSede = normSede(sedeSP) && normSede(sedeSC) && normSede(sedeSP) === normSede(sedeSC);
+
       conflictos.push({
-        progB: sc['PROGRAMA'], dia: diaSP||'',
-        horA: horSP?horSP.str:'', horB: horSC?horSC.str:'',
-        sedeA: sedeSP, sedeB: sedeSC,
-        asigA: sp['ASIGNATURA']||sp['Nombre']||'',
-        asigB: sc['ASIGNATURA']||sc['Nombre']||'',
-        modalA: sp['Modalidad_Calc']||sp['MODALIDAD']||'',
-        modalB: sc['Modalidad_Calc']||sc['MODALIDAD']||'',
-        minSolap: minS, mismaSede: mismaSede,
-        nivel: (mismaSede||minS>=60) ? 'alto' : 'medio',
+        progB:     sc['PROGRAMA'],
+        dia:       sp['Dia_Semana']||sc['Dia_Semana']||'',
+        horA:      horSP ? horSP.str : '',
+        horB:      horSC ? horSC.str : '',
+        sedeA:     sedeSP, sedeB: sedeSC,
+        asigA:     sp['ASIGNATURA']||sp['Nombre']||'',
+        asigB:     sc['ASIGNATURA']||sc['Nombre']||'',
+        modalA:    sp['Modalidad_Calc']||sp['MODALIDAD']||'',
+        modalB:    sc['Modalidad_Calc']||sc['MODALIDAD']||'',
+        fechaA:    fmtDate(fechaSP),
+        fechaB:    fmtDate(fechaSC),
+        minSolap:  minS,
+        mismaSede: mismaSede,
+        nivel:     minS >= 60 ? 'alto' : 'medio',
       });
     });
   });
+
   return conflictos;
 }
 
-/* ── Render del panel de conflictos dentro de la card ─────────── */
-/* ══════════════════════════════════════════════════════════════════
-   VISTA SIMULADA DETALLADA — Cómo quedaría cada coordinadora
-   después de aplicar las reasignaciones
-══════════════════════════════════════════════════════════════════ */
+
 function _gRenderVistaSim(dfC, cambios, progLoad) {
   var wrap = $('gVistaSimWrap');
   if(!wrap) return;
@@ -11227,6 +11341,8 @@ function _gRenderConflictoBadge(conflictos) {
         '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+
           '<span style="font-size:11px">⚠️</span>'+
           '<strong style="color:#f0f6ff;font-size:11px">'+esc(cf.progB)+'</strong>'+
+          (cf.fechaA ? '<span style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,.08);'+
+            'border-radius:4px;color:#e6edf3;font-weight:700">📅 '+esc(cf.fechaA)+'</span>' : '')+
           (cf.dia ? '<span style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,.06);'+
             'border-radius:4px;color:#8b949e">'+esc(cf.dia)+'</span>' : '')+
           (cf.horA ? '<span style="color:'+color+';font-weight:800;font-size:11px">'+esc(cf.horA)+'</span>' : '')+
@@ -11333,16 +11449,15 @@ function gValidarConflicto() {
       var horSC   = parseRango(sc['HORARIO']);
       var sedeSC  = sc['SEDE'] || '';
 
-      var mismaFecha = fechaSP && fechaSC &&
-        fechaSP instanceof Date && fechaSC instanceof Date &&
-        fechaSP.toDateString() === fechaSC.toDateString();
-      var mismoDia = diaSP && diaSC && diaSP === diaSC;
-      if (!mismaFecha && !mismoDia) return;
+      // REGLA: misma fecha exacta
+      if (!(fechaSP instanceof Date) || !(fechaSC instanceof Date)) return;
+      if (fechaSP.toDateString() !== fechaSC.toDateString()) return;
 
-      // Calcular nivel de conflicto
+      // REGLA: horarios deben solaparse
+      if (horSP && horSC && !solapan(horSP, horSC)) return;
+
       var tipoConflicto, minSolap = 0, nivel;
       if (horSP && horSC) {
-        if (!solapan(horSP, horSC)) return;  // mismo día pero horas distintas → OK
         minSolap = solapMinutos(horSP, horSC);
         tipoConflicto = 'Solapamiento de horario';
         nivel = minSolap >= 60 ? 'alto' : 'medio';
@@ -14025,32 +14140,57 @@ function phExportarCSV() {
 
 
 function renderCalendario() {
-  const df=getDF();
-  const now=new Date();
-  const years=uniq(df.filter(r=>r['DIAS/FECHAS']).map(r=>String(r['DIAS/FECHAS'].getFullYear())));
-  const cy=String(now.getFullYear());
-  const MLIST=['Todos',...Object.values(MESES)];
+  const df  = getDF();
+  const now = new Date();
 
-  $('page').innerHTML=`
-  <div class="page-title">Calendario Académico</div>
-  <div class="frow" style="flex-wrap:wrap;gap:6px;margin-bottom:8px" id="calFiltros2"></div>
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-    <button class="btn btn-ghost btn-sm" onclick="calPrevMes()">&#8249; Anterior</button>
-    <span id="calLabel" style="font-size:13px;font-weight:700;color:var(--t1);min-width:140px;text-align:center"></span>
-    <button class="btn btn-ghost btn-sm" onclick="calNextMes()">Siguiente &#8250;</button>
-    <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="calHoy()">Hoy</button>
-  </div>
-  <div id="calGrid"></div>`;
+  $('page').innerHTML =
+    '<div class="pg-title" style="margin-bottom:4px">Calendario Académico</div>' +
+    '<div style="font-size:12px;color:#8b949e;margin-bottom:16px">' +
+      'Visualización mensual de sesiones · hover sobre un evento para ver detalles' +
+    '</div>' +
 
-  var cf2=document.getElementById('calFiltros2');
-  if(cf2) cf2.innerHTML=
-    mkDF('calC','Coordinadora',uniq(df.map(r=>r['COORDINADORA RESPONSABLE'])),'updCalCascade()')+
-    mkDF('calP','Programa',    uniq(df.map(r=>r['PROGRAMA'])),'updCal()');
+    // Filtros
+    '<div id="calFiltros2" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;' +
+      'background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:12px 16px"></div>' +
 
-  // Inicializar estado del calendario
-  if(!window._calState) window._calState={year:now.getFullYear(),month:now.getMonth()};
+    // Navegación
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">' +
+      '<button onclick="calPrevMes()" style="padding:8px 16px;border:1px solid #21262d;' +
+        'background:#161b22;color:#e6edf3;border-radius:8px;cursor:pointer;font-size:13px;' +
+        'font-weight:700;transition:.15s" ' +
+        'onmouseover="this.style.background=\'#21262d\'" onmouseout="this.style.background=\'#161b22\'">'+
+        '← Anterior</button>' +
+      '<span id="calLabel" style="font-size:18px;font-weight:900;color:#f0f6ff;' +
+        'min-width:200px;text-align:center"></span>' +
+      '<button onclick="calNextMes()" style="padding:8px 16px;border:1px solid #21262d;' +
+        'background:#161b22;color:#e6edf3;border-radius:8px;cursor:pointer;font-size:13px;' +
+        'font-weight:700;transition:.15s" ' +
+        'onmouseover="this.style.background=\'#21262d\'" onmouseout="this.style.background=\'#161b22\'">'+
+        'Siguiente →</button>' +
+      '<button onclick="calHoy()" style="margin-left:auto;padding:8px 14px;' +
+        'border:1px solid rgba(56,139,253,.3);background:rgba(56,139,253,.1);' +
+        'color:#388bfd;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700">'+
+        '📅 Hoy</button>' +
+    '</div>' +
+
+    // Leyenda de programas
+    '<div id="calLegend" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"></div>' +
+
+    // Grid del calendario
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden;padding:14px">' +
+      '<div id="calGrid"></div>' +
+    '</div>';
+
+  var cf2 = document.getElementById('calFiltros2');
+  if(cf2) cf2.innerHTML =
+    mkDF('calC','Coordinadora', uniq(df.map(function(r){ return r['COORDINADORA RESPONSABLE']||''; }).filter(Boolean)), 'updCal()') +
+    mkDF('calP','Programa',     uniq(df.map(function(r){ return r['PROGRAMA']||''; }).filter(Boolean)),                  'updCal()');
+
+  if(!window._calState) window._calState = { year: now.getFullYear(), month: now.getMonth() };
   updCal();
 }
+
+
 function updCalCascade() {
   const df=getDF();
   const sc=getDF_sel('calC');
@@ -14067,148 +14207,281 @@ function updCalCascade() {
   }
   updCal();
 }
+function calPrevMes() {
+  if(!window._calState) return;
+  window._calState.month--;
+  if(window._calState.month < 0) { window._calState.month = 11; window._calState.year--; }
+  updCal();
+}
+function calNextMes() {
+  if(!window._calState) return;
+  window._calState.month++;
+  if(window._calState.month > 11) { window._calState.month = 0; window._calState.year++; }
+  updCal();
+}
+function calHoy() {
+  var now = new Date();
+  window._calState = { year: now.getFullYear(), month: now.getMonth() };
+  updCal();
+}
+
 function updCal() {
-  let df=getDF();
-  const ysel=$('calY')?.value;
-  const msel=parseInt($('calM')?.value||'0');
-  const sc=getDF_sel('calC'),sp=getDF_sel('calP');
-  if(ysel)df=df.filter(r=>r['DIAS/FECHAS']&&String(r['DIAS/FECHAS'].getFullYear())===ysel);
-  if(msel>0)df=df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS'].getMonth()+1===msel);
-  if(sc.length)df=df.filter(r=>sc.includes(r['COORDINADORA RESPONSABLE']));
-  if(sp.length)df=df.filter(r=>sp.includes(r['PROGRAMA']));
-  _calDf=df;
+  if(!window._calState) {
+    var now = new Date();
+    window._calState = { year: now.getFullYear(), month: now.getMonth() };
+  }
 
-  const now=new Date();
-  const ry=ysel?parseInt(ysel):now.getFullYear();
-  const rm=msel>0?msel:now.getMonth()+1;
+  var df = getDF();
+  var sc = getDF_sel('calC'), sp = getDF_sel('calP');
+  if(sc.length) df = df.filter(function(r){ return sc.includes(r['COORDINADORA RESPONSABLE']); });
+  if(sp.length) df = df.filter(function(r){ return sp.includes(r['PROGRAMA']); });
 
-  // Events map
-  const eMap={};
-  df.forEach(r=>{
-    if(!r['DIAS/FECHAS'])return;
-    const d=r['DIAS/FECHAS'];
-    if(d.getFullYear()!==ry||d.getMonth()+1!==rm)return;
-    const day=d.getDate();
-    if(!eMap[day])eMap[day]=[];
+  var ry = window._calState.year;
+  var rm = window._calState.month;
+
+  var MNAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var lbl = document.getElementById('calLabel');
+  if(lbl) lbl.textContent = MNAMES[rm] + ' ' + ry;
+
+  // Mapa de eventos por día
+  var eMap = {};
+  df.forEach(function(r){
+    if(!r['DIAS/FECHAS']) return;
+    var d = r['DIAS/FECHAS'];
+    if(d.getFullYear() !== ry || d.getMonth() !== rm) return;
+    var day = d.getDate();
+    if(!eMap[day]) eMap[day] = [];
     eMap[day].push(r);
   });
 
-  // Grid HTML
-  const first=new Date(ry,rm-1,1);
-  let dow=first.getDay(); // 0=Sun
-  // Convert to Mon-first: Mon=0,...,Sun=6
-  dow=dow===0?6:dow-1;
-  const dim=new Date(ry,rm,0).getDate();
+  // Paleta de colores por programa
+  var PROG_COLORS = [
+    '#388bfd','#3fb950','#f0b429','#a78bfa','#22d3ee',
+    '#f85149','#fb923c','#34d399','#60a5fa','#e879f9',
+    '#fbbf24','#10b981','#6366f1','#ec4899','#14b8a6'
+  ];
+  var progColorMap = {};
+  var progIdx = 0;
+  df.forEach(function(r){
+    var p = r['PROGRAMA']||'';
+    if(p && !progColorMap[p]) {
+      progColorMap[p] = PROG_COLORS[progIdx % PROG_COLORS.length];
+      progIdx++;
+    }
+  });
 
-  let html=`<div class="cal-wrap"><div class="cal-head">${DAYS_MON.map(d=>`<div class="cal-dow">${d}</div>`).join('')}</div><div class="cal-body">`;
-  for(let i=0;i<dow;i++) html+=`<div class="cal-cell empty"></div>`;
-  for(let day=1;day<=dim;day++){
-    const isTd=day===now.getDate()&&rm===now.getMonth()+1&&ry===now.getFullYear();
-    html+=`<div class="cal-cell${isTd?' today':''}">`;
-    html+=`<div class="cal-num">${isTd?`<span>${day}</span>`:day}</div><div class="cal-events">`;
-    const evts=eMap[day]||[];
-    const show=evts.slice(0,4);
-    show.forEach((r,i)=>{
-      if(i===3&&evts.length>3){html+=`<div class="ev-more">+${evts.length-3} más</div>`;return;}
-      const progName = r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],35);
-      const asig     = r['ASIGNATURA']||'';
-      const tema     = r['TEMA']||'';
-      const hora     = r['HORARIO']||'';
-      const sede     = r['SEDE']||'';
-      const sala     = (!r['SALA']||IGNORE_VALS.has(r['SALA'].toLowerCase()))?'':r['SALA'];
-      const prof     = (!r['PROFESOR']||IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))?'':r['PROFESOR'];
-      const coord    = r['COORDINADORA RESPONSABLE']||'';
-      const modal    = r['Modalidad_Calc']||'';
-      const horas    = r['HORAS']||'';
-
-      // Tarjeta compacta con sede visible
-      html+=`<div class="ev-card">
-        <div class="ev-time">${esc(hora)}</div>
-        <div class="ev-prog">${esc(abbr(progName,34))}</div>
-        <div class="ev-sub">${esc(abbr(asig,30))}</div>
-        ${sede?`<div class="ev-sede">&#9657; ${esc(sede)}${sala?' &nbsp;·&nbsp; '+esc(sala):''}</div>`:''}
-        ${prof?`<div class="ev-meta">&#128100; ${esc(abbr(prof,24))}</div>`:''}
-
-        <!-- TOOLTIP al hover -->
-        <div class="ev-tooltip">
-          <div class="tip-row">
-            <span class="tip-lbl">Horario</span>
-            <span class="tip-val blue">${esc(hora)}</span>
-          </div>
-          <div class="tip-div"></div>
-          <div class="tip-row">
-            <span class="tip-lbl">Programa</span>
-            <span class="tip-val">${esc(progName)}</span>
-          </div>
-          ${asig?`<div class="tip-row">
-            <span class="tip-lbl">Asignatura</span>
-            <span class="tip-val">${esc(asig)}</span>
-          </div>`:''}
-          ${tema?`<div class="tip-row">
-            <span class="tip-lbl">Tema</span>
-            <span class="tip-val">${esc(abbr(tema,60))}</span>
-          </div>`:''}
-          <div class="tip-div"></div>
-          ${sede?`<div class="tip-row">
-            <span class="tip-lbl">Sede</span>
-            <span class="tip-val orange">&#9657; ${esc(sede)}</span>
-          </div>`:''}
-          ${sala?`<div class="tip-row">
-            <span class="tip-lbl">Sala</span>
-            <span class="tip-val">${esc(sala)}</span>
-          </div>`:''}
-          ${modal?`<div class="tip-row">
-            <span class="tip-lbl">Modalidad</span>
-            <span class="tip-val">${esc(modal)}</span>
-          </div>`:''}
-          ${prof?`<div class="tip-div"></div><div class="tip-row">
-            <span class="tip-lbl">Profesor</span>
-            <span class="tip-val">${esc(prof)}</span>
-          </div>`:''}
-          ${coord?`<div class="tip-row">
-            <span class="tip-lbl">Coord.</span>
-            <span class="tip-val">${esc(abbr(coord,32))}</span>
-          </div>`:''}
-          ${horas?`<div class="tip-row">
-            <span class="tip-lbl">Horas</span>
-            <span class="tip-val">${esc(horas)} hrs</span>
-          </div>`:''}
-        </div>
-      </div>`;
-    });
-    html+=`</div></div>`;
+  function getModColor(mod) {
+    var m = String(mod||'').toLowerCase();
+    if(m.includes('online') || m.includes('virtual')) return '#22d3ee';
+    if(m.includes('híb') || m.includes('hib') || m.includes('blend')) return '#a78bfa';
+    return null; // presencial → color del programa
   }
-  const total=dow+dim;
-  for(let i=0;i<(total%7===0?0:7-total%7);i++) html+=`<div class="cal-cell empty"></div>`;
-  html+=`</div></div>`;
-  $('calGrid').innerHTML=html;
+  function getModLabel(mod) {
+    var m = String(mod||'').toLowerCase();
+    if(m.includes('online') || m.includes('virtual')) return 'VIRTUAL';
+    if(m.includes('híb') || m.includes('hib')) return 'HÍBRIDO';
+    return null;
+  }
 
-  const MLIST2=Object.values(MESES);
-  const ct=$('calTitle');if(ct)ct.textContent=`Agenda: ${MLIST2[rm-1]||''} ${ry}`;
-  const cd=$('calDetail');if(cd){
-    if(!df.length){cd.innerHTML='<div class="banner b-info">Sin clases en este período.</div>';return;}
-    const sorted=[...df].sort((a,b)=>(a['DIAS/FECHAS']||0)-(b['DIAS/FECHAS']||0));
-    cd.innerHTML=buildTable(sorted.map(r=>({
-      Fecha:        fmtDate(r['DIAS/FECHAS']),
-      Día:          r['Dia_Semana'],
-      Horario:      r['HORARIO'],
-      Programa:     r['NOMBRE ABREVIADO']||abbr(r['PROGRAMA'],36),
-      Asignatura:   abbr(r['ASIGNATURA'],30),
-      Tema:         abbr(r['TEMA']||'',28),
-      Profesor:     r['PROFESOR'],
-      Coordinadora: abbr(r['COORDINADORA RESPONSABLE'],22),
-      Sede:         r['SEDE'],
-      Sala:         r['SALA'],
-      Modalidad:    r['Modalidad_Calc'],
-      Horas:        r['HORAS']||'',
-    })),['Fecha','Día','Horario','Programa','Asignatura','Tema','Profesor','Coordinadora','Sede','Sala','Modalidad','Horas']);
+  // Calendario
+  var first = new Date(ry, rm, 1);
+  var dow = first.getDay();
+  dow = dow === 0 ? 6 : dow - 1; // Lun=0
+  var daysInMonth = new Date(ry, rm + 1, 0).getDate();
+  var today = new Date();
+
+  var html = '<div id="calTooltip" style="display:none;position:fixed;z-index:9998;' +
+    'background:#1c2128;border:1px solid #30363d;border-radius:12px;' +
+    'box-shadow:0 8px 32px rgba(0,0,0,.6);padding:16px;min-width:280px;max-width:340px;' +
+    'pointer-events:none"></div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
+  html += '<thead><tr>';
+  ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].forEach(function(d){
+    html += '<th style="padding:10px 6px;text-align:center;font-size:11px;font-weight:700;' +
+      'color:#8b949e;border-bottom:2px solid #21262d;text-transform:uppercase;letter-spacing:.5px">' +
+      d.substring(0,3)+'</th>';
+  });
+  html += '</tr></thead><tbody><tr>';
+
+  for(var i=0; i<dow; i++){
+    html += '<td style="border:1px solid #21262d;background:#0a0d12;vertical-align:top;' +
+      'height:130px;padding:6px"></td>';
+  }
+
+  for(var day=1; day<=daysInMonth; day++){
+    var evts = eMap[day] || [];
+    var isT = ry===today.getFullYear() && rm===today.getMonth() && day===today.getDate();
+    var hasSes = evts.length > 0;
+
+    var cellBg = isT ? 'rgba(56,139,253,.07)' : hasSes ? '#0d1117' : '#0a0d12';
+    var cellBorder = isT ? '#388bfd' : '#21262d';
+
+    html += '<td style="border:1px solid '+cellBorder+';background:'+cellBg+';' +
+      'vertical-align:top;height:130px;padding:6px;position:relative">';
+
+    // Número del día
+    html += '<div style="font-size:'+(isT?'14':'12')+'px;font-weight:'+(hasSes||isT?'900':'400')+';' +
+      'color:'+(isT?'#fff':'hasSes'?'#f0f6ff':'#30363d')+';margin-bottom:4px;' +
+      'width:24px;height:24px;display:flex;align-items:center;justify-content:center;' +
+      'border-radius:50%;background:'+(isT?'#388bfd':'transparent')+'">' +
+      day+'</div>';
+
+    // Eventos
+    var maxVisible = 3;
+    var shown = evts.slice(0, maxVisible);
+    shown.forEach(function(ev, ei){
+      var prog    = ev['PROGRAMA'] || '';
+      var abrev   = ev['Programa_Abrev'] || ev['NOMBRE ABREVIADO'] || abbr(prog, 12);
+      var hora    = ev['HORARIO'] || '';
+      var asig    = ev['ASIGNATURA'] || '';
+      var prof    = ev['PROFESOR'] || '';
+      var coord   = ev['COORDINADORA RESPONSABLE'] || '';
+      var sede    = ev['SEDE'] || '';
+      var sala    = ev['SALA'] || '';
+      var mod     = ev['Modalidad_Calc'] || ev['MODALIDAD'] || '';
+      var tema    = ev['TEMA'] || '';
+      var horas   = ev['HORAS'] || '';
+
+      var progColor = progColorMap[prog] || '#388bfd';
+      var modColor  = getModColor(mod);
+      var cardColor = modColor || progColor;
+      var modLbl    = getModLabel(mod);
+
+      // Construir data para tooltip
+      var tooltipData = JSON.stringify({
+        hora:hora, prog:prog, asig:asig, tema:tema,
+        mod:mod, modLbl:modLbl, sede:sede, sala:sala,
+        prof:prof, coord:coord, horas:horas, color:cardColor
+      }).replace(/"/g,'&quot;');
+
+      html += '<div onmouseenter="calShowTip(event,this)" onmouseleave="calHideTip()" '+
+        'data-tip="'+tooltipData+'" '+
+        'style="font-size:9px;padding:2px 5px 2px 7px;margin-bottom:2px;border-radius:3px;' +
+          'background:'+cardColor+'18;border-left:2px solid '+cardColor+';' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;' +
+          'line-height:1.4">';
+
+      html += '<div style="color:'+cardColor+';font-weight:800">'+esc(hora)+'</div>';
+      html += '<div style="color:#e6edf3;font-weight:700">'+esc(abrev)+'</div>';
+      html += '<div style="color:#8b949e">'+esc(abbr(asig,22))+'</div>';
+
+      if(modLbl){
+        html += '<div style="margin-top:1px"><span style="font-size:8px;padding:0 4px;border-radius:3px;' +
+          'background:'+cardColor+'30;color:'+cardColor+';font-weight:700">'+modLbl+'</span></div>';
+      } else if(sede) {
+        html += '<div style="color:#6e7681;font-size:8px">▸ '+esc(abbr(sede,14))+(sala?' · '+esc(sala):'')+'</div>';
+      }
+
+      if(prof){
+        html += '<div style="color:#6e7681;font-size:8px">👤 '+esc(abbr(prof,18))+'</div>';
+      }
+
+      html += '</div>';
+    });
+
+    if(evts.length > maxVisible){
+      html += '<div style="font-size:8px;color:#388bfd;text-align:center;margin-top:2px;cursor:pointer;'+
+        'font-weight:700">+' + (evts.length - maxVisible) + ' más</div>';
+    }
+
+    html += '</td>';
+
+    if((dow + day) % 7 === 0 && day < daysInMonth) html += '</tr><tr>';
+  }
+
+  // Celdas finales
+  var lastDow = (dow + daysInMonth) % 7;
+  if(lastDow > 0){
+    for(var i=lastDow; i<7; i++){
+      html += '<td style="border:1px solid #21262d;background:#0a0d12;' +
+        'vertical-align:top;height:130px;padding:6px"></td>';
+    }
+  }
+  html += '</tr></tbody></table>';
+
+  // Resumen del mes
+  var nSes  = Object.values(eMap).reduce(function(s,a){ return s+a.length; }, 0);
+  var nDias = Object.keys(eMap).length;
+  var nProg = Object.keys(Object.values(eMap).reduce(function(acc,evts){
+    evts.forEach(function(e){ acc[e['PROGRAMA']||'']= 1; }); return acc;
+  }, {})).filter(Boolean).length;
+
+  html += '<div style="display:flex;gap:20px;margin-top:14px;padding:10px 14px;' +
+    'background:#0d1117;border-radius:8px;border:1px solid #21262d;font-size:11px;color:#8b949e">' +
+    '<span>📚 <strong style="color:#e6edf3">'+nSes+'</strong> sesiones</span>' +
+    '<span>📅 <strong style="color:#e6edf3">'+nDias+'</strong> días activos</span>' +
+    '<span>🎓 <strong style="color:#e6edf3">'+nProg+'</strong> programas</span>' +
+    '</div>';
+
+  var grid = document.getElementById('calGrid');
+  if(grid) grid.innerHTML = html;
+
+  // Leyenda de colores
+  var legend = document.getElementById('calLegend');
+  if(legend) {
+    var progsThisMonth = [];
+    Object.values(eMap).forEach(function(evts){
+      evts.forEach(function(e){ if(e['PROGRAMA'] && progsThisMonth.indexOf(e['PROGRAMA'])<0) progsThisMonth.push(e['PROGRAMA']); });
+    });
+    legend.innerHTML = progsThisMonth.map(function(p){
+      var col = progColorMap[p] || '#388bfd';
+      var ab  = df.find(function(r){ return r['PROGRAMA']===p; });
+      var lbl = ab ? (ab['Programa_Abrev']||ab['NOMBRE ABREVIADO']||abbr(p,20)) : abbr(p,20);
+      return '<span style="display:inline-flex;align-items:center;gap:5px;' +
+        'font-size:10px;color:#e6edf3;padding:3px 8px;border-radius:6px;' +
+        'background:'+col+'15;border:1px solid '+col+'40">'+
+        '<span style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0"></span>'+
+        esc(lbl)+'</span>';
+    }).join('');
   }
 }
 
-/* ══════════════════════════════════════════════════════
-   RESERVAS TAB
-══════════════════════════════════════════════════════ */
-let _resDf=[];
+function calShowTip(ev, el) {
+  var tip = document.getElementById('calTooltip');
+  if(!tip) return;
+  try {
+    var d = JSON.parse(el.getAttribute('data-tip').replace(/&quot;/g,'"'));
+    var modIco = d.mod.toLowerCase().includes('online')||d.mod.toLowerCase().includes('virtual') ? '🌐 '
+               : d.mod.toLowerCase().includes('híb')||d.mod.toLowerCase().includes('hib') ? '📡 ' : '🏫 ';
+
+    tip.innerHTML =
+      '<div style="border-bottom:1px solid #21262d;padding-bottom:10px;margin-bottom:10px">' +
+        '<div style="font-size:11px;font-weight:900;color:'+d.color+';margin-bottom:2px">'+esc(d.hora)+'</div>' +
+        '<div style="font-size:13px;font-weight:800;color:#f0f6ff;margin-bottom:4px">'+esc(d.prog)+'</div>' +
+        (d.asig ? '<div style="font-size:11px;color:#8b949e">'+esc(d.asig)+'</div>' : '') +
+      '</div>' +
+      (d.tema ? '<div style="font-size:10px;color:#6e7681;margin-bottom:8px;font-style:italic">'+esc(abbr(d.tema,60))+'</div>' : '') +
+      '<div style="display:flex;flex-direction:column;gap:5px;font-size:11px">' +
+        '<div style="display:flex;gap:8px"><span style="color:#6e7681;min-width:70px">Modalidad</span>' +
+          '<span style="color:#e6edf3">'+modIco+esc(d.mod||'—')+'</span></div>' +
+        (d.sede ? '<div style="display:flex;gap:8px"><span style="color:#6e7681;min-width:70px">Sede</span>' +
+          '<span style="color:#e6edf3">📍 '+esc(d.sede)+(d.sala?' · '+esc(d.sala):'')+'</span></div>' : '') +
+        (d.prof ? '<div style="display:flex;gap:8px"><span style="color:#6e7681;min-width:70px">Profesor</span>' +
+          '<span style="color:#e6edf3">👤 '+esc(d.prof)+'</span></div>' : '') +
+        (d.coord ? '<div style="display:flex;gap:8px"><span style="color:#6e7681;min-width:70px">Coord.</span>' +
+          '<span style="color:#e6edf3">'+esc(d.coord)+'</span></div>' : '') +
+        (d.horas ? '<div style="display:flex;gap:8px"><span style="color:#6e7681;min-width:70px">Horas</span>' +
+          '<span style="color:#e6edf3">'+esc(d.horas)+' hrs</span></div>' : '') +
+        (d.modLbl ? '<div style="margin-top:6px"><span style="font-size:9px;padding:2px 8px;border-radius:6px;' +
+          'background:'+d.color+'20;color:'+d.color+';border:1px solid '+d.color+'40;font-weight:700">'+esc(d.modLbl)+'</span></div>' : '') +
+      '</div>';
+
+    tip.style.display = 'block';
+    var x = ev.clientX + 16, y = ev.clientY - 20;
+    if(x + 340 > window.innerWidth) x = ev.clientX - 356;
+    if(y + 300 > window.innerHeight) y = ev.clientY - 280;
+    tip.style.left = x + 'px';
+    tip.style.top  = y + 'px';
+  } catch(e) {}
+}
+function calHideTip() {
+  var tip = document.getElementById('calTooltip');
+  if(tip) tip.style.display = 'none';
+}
+
+
 function renderReservas() {
   if(!APP.dfRes.length){$('page').innerHTML='<div class="banner b-info" style="margin-top:20px">ℹ️ Carga un archivo de reservas en el panel lateral.</div>';return;}
   const now=new Date();
@@ -14544,6 +14817,24 @@ function showAdmin() {
       '<div style="overflow-x:auto;padding:16px"><div id="gestMatriz"></div></div>' +
     '</div>' +
 
+    // ── Gráficos Modalidad ──────────────────────────────────
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">' +
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden">' +
+        '<div style="padding:12px 18px;border-bottom:1px solid #21262d;background:#161b22">' +
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">🖥️ Distribución por Modalidad</div>' +
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Total de sesiones por tipo de clase</div>' +
+        '</div>' +
+        '<div style="padding:16px"><canvas id="chartModalidades" height="220"></canvas></div>' +
+      '</div>' +
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden">' +
+        '<div style="padding:12px 18px;border-bottom:1px solid #21262d;background:#161b22">' +
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">📊 Sesiones por Coordinadora</div>' +
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Barras apiladas por modalidad</div>' +
+        '</div>' +
+        '<div style="padding:16px"><canvas id="chartModalCoord" height="220"></canvas></div>' +
+      '</div>' +
+    '</div>' +
+
     // ── Vista Simulada Detallada ──────────────────────────────────
     '<div id="gVistaSimWrap" style="display:none;margin-top:20px"></div>';
 
@@ -14808,6 +15099,18 @@ function updAdmin() {
                   : '<div style="font-size:10px;color:#6e7681;margin-top:2px">sin ajuste de factores</div>') +
               '</div>' +
 
+              // Desglose fórmula
+              '<div style="grid-column:1/-1;padding:6px 16px;border-top:1px solid #21262d;'+
+                'font-size:9px;color:#6e7681;background:rgba(0,0,0,.15);text-align:center">' +
+              (function(){
+                var pRows = getDF().filter(function(r){return r['PROGRAMA']===prog;});
+                var sesN = pRows.length;
+                var alumN = pRows.reduce(function(m,r){return Math.max(m,parseInt(r['N_ALUMNOS'])||0);},0);
+                var fN = factorAlumnos(alumN);
+                return '📐 Cálculo: ('+sesN+' ses ÷ 4) × '+fN+' ('+alumN+' alumnos) = '+calcScore(sesN,alumN).toFixed(1)+' pts';
+              })() +
+              '</div>' +
+
               // Carga nueva coord DESPUÉS
               '<div style="padding:12px 16px;border-right:1px solid #21262d;text-align:center">' +
                 '<div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;' +
@@ -14926,6 +15229,9 @@ function updAdmin() {
     }
   }
 
+  // ── Gráfico de Modalidades ──────────────────────────────
+  _gRenderModalidades(dfC);
+
   // Vista simulada detallada
   _gRenderVistaSim(dfC, cambios, progLoad);
 
@@ -14997,294 +15303,191 @@ function _gQuitarCambio(prog) {
 
 /* ── Exportar simulación ────────────────────────────────────────── */
 function _gExportarSimulacion() {
-  try {
-  // Usar APP.df completo para que ningún filtro de UI excluya programas
+  console.log('_gExportarSimulacion llamada, cambios:', Object.keys(APP.simCambios||{}).length);
+  if(!Object.keys(APP.simCambios||{}).length) { showToast('Sin cambios para exportar','err'); return; }
+  if(typeof XLSX === 'undefined') { showToast('Librería XLSX no cargada','err'); return; }
+
   var df      = APP.df || [];
   var mes     = $('gM') ? $('gM').value : '';
-  // Solo aplicar filtro de mes si está activo; ignorar APP.globalFilter
   var dfC     = mes ? df.filter(function(r){ return r['Mes']===mes; }) : df;
   var cambios = Object.entries(APP.simCambios||{});
+  var umbral  = parseFloat(($('gUmbral')||{value:'60'}).value) || 60;
 
-  var progLoad = computeLoadByProgInDf(dfC);
-  var umbral   = parseFloat($('gUmbral') ? $('gUmbral').value : 60) || 60;
-
-  // ── Carga simulada (con cambios aplicados) ───────────────────
-  var loadSim  = computeLoadWithChanges(dfC, APP.simCambios);
-  var loadAct  = computeLoadByCoord(dfC);
-
-  // Mapa carga actual por coordinadora
+  // ── Carga ACTUAL (sin cambios) ────────────────────────────────
+  // Usar misma función que el gráfico para garantizar consistencia
+  var dfAct = dfC.slice(); // sin cambios
+  var loadAct = computeLoadByCoord(dfAct);
   var mapActual = {};
-  loadAct.forEach(function(r){ mapActual[r.coord] = r.puntaje; });
-  var mapSimul  = {};
-  loadSim.forEach(function(r){ mapSimul[r.coord]  = r.puntaje; });
+  loadAct.forEach(function(e){ mapActual[e.coord] = e.puntaje; });
 
-  // ── HOJA 1: Resumen de Reasignaciones ───────────────────────
-  var hoja1 = cambios.map(function(e, i) {
-    var prog = e[0], nc = e[1];
-    var orig = progLoad.find(function(p){ return p.prog===prog; });
-    var coordOrig = orig ? orig.coord : '—';
+  // ── Carga SIMULADA — usar computeLoadSim (igual que el gráfico) ────
+  var loadSim = computeLoadSim(dfC);
+  var mapSimul = {};
+  loadSim.forEach(function(e){ mapSimul[e.coord] = e.puntaje; });
 
-    // Sesiones del programa
-    var sesProg = dfC.filter(function(r){ return r['PROGRAMA']===prog; });
-    var diasProg = [...new Set(sesProg.map(function(r){ return r['Dia_Semana']||''; }).filter(Boolean))].join(' / ');
-    var horProg  = [...new Set(sesProg.map(function(r){ return r['HORARIO']||''; }).filter(Boolean))].slice(0,2).join(' / ');
-    var sedeProg = sesProg.length ? (sesProg[0]['SEDE']||'—') : '—';
+  // ── progLoad ORIGINAL (sin cambios) ──────────────────────────
+  var progLoadOrig = computeLoadByProgInDf(dfC);
+  var mapProgOrig = {};
+  progLoadOrig.forEach(function(p){ mapProgOrig[p.prog] = p; });
 
-    // Conflictos con la nueva coordinadora
-    var conflictos = _gConflictosPara(prog, nc, dfC);
-    var hayConflicto = conflictos.length > 0;
-    var fProg2 = (APP.simFactores&&APP.simFactores[prog])||{};
-    var conflictoResumen = conflictos.map(function(cf){
-      var linea = cf.progB;
-      if (cf.dia)      linea += ' | ' + cf.dia;
-      if (cf.horA)     linea += ' | ' + cf.horA;
-      if (cf.minSolap) linea += ' | ' + cf.minSolap + ' min solapado';
-      if (cf.mismaSede) linea += ' | ⚠️ MISMA SEDE';
-      return linea;
-    }).join('\n');
-
-    // Cargas
-    var cargaActOrig = (mapActual[coordOrig]||0).toFixed(1);
-    var cargaActDest = (mapActual[nc]||0).toFixed(1);
-    var cargaSimOrig = (mapSimul[coordOrig]||0).toFixed(1);
-    var cargaSimDest = (mapSimul[nc]||0).toFixed(1);
-
-    return {
-      '#':                    i+1,
-      'Programa':             prog,
-      'Coord. Actual':        coordOrig,
-      'Nueva Coordinadora':   nc,
-      'Sesiones':             orig ? orig.ses : 0,
-      'Alumnos':              orig ? orig.alum : 0,
-      'Puntaje Carga':        orig ? parseFloat(orig.puntaje.toFixed(1)) : 0,
-      'Días de Clase':        diasProg || '—',
-      'Horario':              horProg  || '—',
-      'Sede':                 sedeProg,
-      'Carga Actual Coord. Original':  parseFloat(cargaActOrig),
-      'Carga Actual Coord. Destino':   parseFloat(cargaActDest),
-      'Carga Simulada Coord. Original':parseFloat(cargaSimOrig),
-      'Carga Simulada Coord. Destino': parseFloat(cargaSimDest),
-      'Online (-0.5)':        fProg2.online?'Sí':'No',
-      'Multi-Sede (+1)':      fProg2.sedes?'Sí':'No',
-      'Topes (+1)':           fProg2.topes?'Sí':'No',
-      'Viajes (+1)':          fProg2.viajes?'Sí':'No',
-      'Δ Factores':           getFactoresDelta(prog).toFixed(1),
-      'Puntaje Ajustado':     Math.max(0,(orig?orig.puntaje:0)+getFactoresDelta(prog)).toFixed(1),
-      'Tope de Horario':      hayConflicto ? 'SÍ ⚠️' : 'No',
-      'N° Conflictos':        conflictos.length,
-      'Detalle Topes':        conflictoResumen || '—',
-    };
+  // ── progLoad SIMULADO — mismo dfSim que usa computeLoadSim ──────
+  var dfSim = dfC.map(function(r){
+    var sim = APP.simCambios && APP.simCambios[r['PROGRAMA']];
+    if(sim) return Object.assign({}, r, {'COORDINADORA RESPONSABLE': sim});
+    return r;
   });
+  var progLoadSim = computeLoadByProgInDf(dfSim);
+  var mapProgSim = {};
+  progLoadSim.forEach(function(p){ mapProgSim[p.prog] = p; });
 
-  // ── HOJA 2: Carga por Coordinadora (Actual vs Simulada) ──────
-  var todasCoords = [...new Set(
-    Object.keys(mapActual).concat(Object.keys(mapSimul))
-  )].sort();
+  try {
+    // ════════════════════════════════════════════════════════════
+    // HOJA 1 — Reasignaciones
+    // ════════════════════════════════════════════════════════════
+    var hoja1 = cambios.map(function(e){
+      var prog     = e[0];
+      var coordNew = e[1];
+      var orig     = mapProgOrig[prog];
+      var sim      = mapProgSim[prog];
+      var coordOrig = orig ? orig.coord : '—';
+      var conflictos = _gConflictosPara(prog, coordNew, dfC);
+      return {
+        'N°':                       cambios.indexOf(e)+1,
+        'Programa':                 prog,
+        'Coord. Original':          coordOrig,
+        'Coord. Nueva (Simulada)':  coordNew,
+        'Sesiones':                 orig ? orig.ses : 0,
+        'Alumnos':                  orig ? orig.alum : 0,
+        'Factor Alumnos':           orig ? factorAlumnos(orig.alum) : 1,
+        'Puntaje Programa':         orig ? parseFloat(orig.puntaje.toFixed(1)) : 0,
+        'Carga Orig. antes':        parseFloat((mapActual[coordOrig]||0).toFixed(1)),
+        'Carga Orig. después':      parseFloat((mapSimul[coordOrig]||0).toFixed(1)),
+        'Carga Nueva antes':        parseFloat((mapActual[coordNew]||0).toFixed(1)),
+        'Carga Nueva después':      parseFloat((mapSimul[coordNew]||0).toFixed(1)),
+        'Conflictos Detectados':    conflictos.length,
+        'Estado':                   (mapSimul[coordNew]||0) >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
+      };
+    });
 
-  var hoja2 = todasCoords.map(function(co) {
-    var act  = mapActual[co] || 0;
-    var sim  = mapSimul[co]  || 0;
-    var diff = sim - act;
-    var progAsig  = dfC.filter(function(r){ return r['COORDINADORA RESPONSABLE']===co; })
-                        .map(function(r){ return r['PROGRAMA']; });
-    var progUniq  = [...new Set(progAsig)];
-    // Programas reasignados desde esta coord (saliente)
-    var salientes = cambios.filter(function(e){
-      var orig = progLoad.find(function(p){ return p.prog===e[0]; });
-      return orig && orig.coord===co;
-    }).map(function(e){ return e[0]; });
-    // Programas reasignados hacia esta coord (entrantes)
-    var entrantes = cambios.filter(function(e){ return e[1]===co; }).map(function(e){ return e[0]; });
+    // ════════════════════════════════════════════════════════════
+    // HOJA 2 — Carga por Coordinadora (Actual vs Simulada)
+    // ════════════════════════════════════════════════════════════
+    var todasCoords = Array.from(new Set(
+      loadAct.map(function(e){ return e.coord; })
+      .concat(loadSim.map(function(e){ return e.coord; }))
+    )).sort();
 
-    return {
-      'Coordinadora':            co,
-      'N° Programas Actuales':   progUniq.length,
-      'Carga Actual (puntaje)':  parseFloat(act.toFixed(1)),
-      'Estado Actual':           act>=umbral ? 'SOBRECARGADA' : act>=umbral*0.75 ? 'ATENCIÓN' : 'Normal',
-      'Carga Simulada (puntaje)':parseFloat(sim.toFixed(1)),
-      'Estado Simulado':         sim>=umbral ? 'SOBRECARGADA' : sim>=umbral*0.75 ? 'ATENCIÓN' : 'Normal',
-      'Δ Variación':             parseFloat(diff.toFixed(1)),
-      'Mejora/Empeora':          Math.abs(diff)<0.1 ? 'Sin cambio' : diff<0 ? 'Mejora ↓' : 'Aumenta ↑',
-      'Programas que salen':     salientes.join(', ') || '—',
-      'Programas que entran':    entrantes.join(', ') || '—',
-    };
-  });
+    var hoja2 = todasCoords.map(function(co){
+      var act  = mapActual[co] || 0;
+      var sim2 = mapSimul[co] || 0;
+      var delta = sim2 - act;
+      // Programas bajo esta coord en la simulación
+      var progsSim = progLoadSim.filter(function(p){ return p.coord === co; });
+      return {
+        'Coordinadora':              co,
+        'Puntaje Actual':            parseFloat(act.toFixed(1)),
+        'Puntaje Simulado':          parseFloat(sim2.toFixed(1)),
+        'Variación':                 parseFloat(delta.toFixed(1)),
+        'Variación %':               act > 0 ? parseFloat((delta/act*100).toFixed(1)) : 0,
+        'N° Programas Actual':       progLoadOrig.filter(function(p){ return p.coord===co; }).length,
+        'N° Programas Simulado':     progsSim.length,
+        'Estado Simulado':           sim2 >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
+        'Programas (Simulado)':      progsSim.map(function(p){ return p.prog; }).join(' | '),
+      };
+    });
 
-  // ── HOJA 3: Detalle de Topes de Horario ─────────────────────
-  var hoja3 = [];
-  cambios.forEach(function(e) {
-    var prog = e[0], nc = e[1];
-    var conflictos = _gConflictosPara(prog, nc, dfC);
-    var orig = progLoad.find(function(p){ return p.prog===prog; });
-
-    // Siempre agregar una fila por programa aunque no tenga topes
-    if (!conflictos.length) {
-      hoja3.push({
-        'Programa Reasignado':   prog,
-        'Coord. Actual':         orig ? orig.coord : '—',
-        'Nueva Coordinadora':    nc,
-        'Programa en Conflicto': '—',
-        'Día del Tope':          '—',
-        'Horario Prog. Nuevo':   '—',
-        'Horario Prog. Existente':'—',
-        'Minutos Solapado':      0,
-        'Sede Prog. Nuevo':      '—',
-        'Sede Prog. Existente':  '—',
-        'Misma Sede':            '—',
-        'Nivel Riesgo':          '✅ Sin conflicto',
-        'Acción Recomendada':    'Reasignación segura',
-      });
-    } else {
-      conflictos.forEach(function(cf) {
-        var nivel = cf.nivel==='alto' ? '🔴 CRÍTICO' : '🟡 MODERADO';
-        var accion = cf.nivel==='alto'
-          ? 'Cambiar horario o sede antes de confirmar'
-          : 'Verificar disponibilidad con coordinadora';
+    // ════════════════════════════════════════════════════════════
+    // HOJA 3 — Topes de Horario (en la simulación)
+    // ════════════════════════════════════════════════════════════
+    var hoja3 = [];
+    cambios.forEach(function(e){
+      var prog     = e[0];
+      var coordNew = e[1];
+      var conflictos = _gConflictosPara(prog, coordNew, dfC);
+      conflictos.forEach(function(cf){
         hoja3.push({
-          'Programa Reasignado':   prog,
-          'Coord. Actual':         orig ? orig.coord : '—',
-          'Nueva Coordinadora':    nc,
+          'Programa Reasignado':  prog,
+          'Coord. Destino':       coordNew,
           'Programa en Conflicto': cf.progB,
-          'Día del Tope':          cf.dia || '—',
-          'Horario Prog. Nuevo':   cf.horA || '—',
-          'Horario Prog. Existente':cf.horB || '—',
-          'Minutos Solapado':      cf.minSolap || 0,
-          'Sede Prog. Nuevo':      cf.sedeA || '—',
-          'Sede Prog. Existente':  cf.sedeB || '—',
-          'Misma Sede':            cf.mismaSede ? 'SÍ ⚠️' : 'No',
-          'Nivel Riesgo':          nivel,
-          'Acción Recomendada':    accion,
+          'Fecha':                cf.fechaA,
+          'Día':                  cf.dia,
+          'Horario (nuevo)':      cf.horA,
+          'Horario (existente)':  cf.horB,
+          'Min. Solapados':       cf.minSolap,
+          'Sede (nuevo)':         cf.sedeA,
+          'Sede (existente)':     cf.sedeB,
+          'Asignatura (nuevo)':   cf.asigA,
+          'Asignatura (existente)': cf.asigB,
+          'Modalidad (nuevo)':    cf.modalA,
+          'Modalidad (existente)': cf.modalB,
+          'Nivel':                cf.nivel,
         });
       });
-    }
-  });
-
-  // ── HOJA 4: Detalle completo — programas bajo la coord. SIMULADA ─
-  // Los programas reasignados aparecen bajo la NUEVA coordinadora (no la original)
-  // Los que no cambian aparecen bajo su coordinadora actual
-  var hoja4 = [];
-
-  // Construir vista simulada: qué programas tiene cada coord después de los cambios
-  // Partir desde progLoad (carga actual) y aplicar los cambios
-  var simProgMap = {}; // coord → [programas]
-
-  progLoad.forEach(function(p) {
-    // ¿Este programa fue reasignado?
-    var coordFinal = APP.simCambios[p.prog] || p.coord;
-    if (!simProgMap[coordFinal]) simProgMap[coordFinal] = [];
-    simProgMap[coordFinal].push({
-      prog:       p.prog,
-      coordOrig:  p.coord,
-      coordFinal: coordFinal,
-      esCambiado: !!APP.simCambios[p.prog],
-      ses:        p.ses,
-      alum:       p.alum,
-      puntaje:    p.puntaje,
     });
-  });
+    if(!hoja3.length) hoja3 = [{'Resultado': 'Sin conflictos de horario detectados en la simulación'}];
 
-  // Ordenar coordinadoras alfabéticamente
-  var coordsSimuladas = Object.keys(simProgMap).sort();
+    // ════════════════════════════════════════════════════════════
+    // HOJA 4 — Detalle completo SIMULADO por coordinadora
+    // ════════════════════════════════════════════════════════════
+    var hoja4 = [];
+    var coordsOrden = Array.from(new Set(progLoadSim.map(function(p){ return p.coord; }))).sort();
+    coordsOrden.forEach(function(co){
+      var progsCo = progLoadSim.filter(function(p){ return p.coord === co; })
+        .sort(function(a,b){ return b.puntaje - a.puntaje; });
+      var totalCo = mapSimul[co] || 0;
 
-  coordsSimuladas.forEach(function(co) {
-    var progsDeEstaCoord = simProgMap[co].sort(function(a,b){ return b.puntaje-a.puntaje; });
-    var cargaSimCoord    = mapSimul[co] || 0;
-    var cargaActCoord    = mapActual[co] || 0;
-
-    progsDeEstaCoord.forEach(function(p) {
-      // Sesiones del programa
-      var sesProg  = dfC.filter(function(r){ return r['PROGRAMA']===p.prog; });
-      var dias     = [...new Set(sesProg.map(function(r){ return r['Dia_Semana']||''; }).filter(Boolean))].join(' / ');
-      var horario  = [...new Set(sesProg.map(function(r){ return r['HORARIO']||''; }).filter(Boolean))].slice(0,2).join(' / ');
-      var sede     = sesProg.length ? (sesProg[0]['SEDE']||'—') : '—';
-      var fechaMin = sesProg.reduce(function(m,r){
-        var f=r['DIAS/FECHAS']; return (f instanceof Date&&(!m||f<m))?f:m;
-      }, null);
-      var fechaMax = sesProg.reduce(function(m,r){
-        var f=r['DIAS/FECHAS']; return (f instanceof Date&&(!m||f>m))?f:m;
-      }, null);
-      var fmtF = function(d){ return d ? d.toLocaleDateString('es-CL') : '—'; };
-
-      // Topes (solo si fue reasignado — verificar contra otros programas de la nueva coord)
-      var topeStr = '—';
-      if (p.esCambiado) {
-        var cfs = _gConflictosPara(p.prog, co, dfC);
-        topeStr = cfs.length
-          ? cfs.map(function(cf){
-              return cf.progB +
-                (cf.dia      ? ' | ' + cf.dia      : '') +
-                (cf.horA     ? ' | ' + cf.horA     : '') +
-                (cf.minSolap ? ' | ' + cf.minSolap + ' min' : '') +
-                (cf.mismaSede ? ' | ⚠️ MISMA SEDE' : '');
-            }).join(' // ')
-          : 'Sin topes';
-      }
-
-      hoja4.push({
-        'Coordinadora (Simulada)':   co,
-        'Carga Simulada Total':      parseFloat(cargaSimCoord.toFixed(1)),
-        'Estado Simulado':           cargaSimCoord>=umbral ? 'SOBRECARGADA' : cargaSimCoord>=umbral*0.75 ? 'ATENCIÓN' : 'Normal',
-        'Carga Actual Coord.':       parseFloat(cargaActCoord.toFixed(1)),
-        'Estado Actual':             cargaActCoord>=umbral ? 'SOBRECARGADA' : cargaActCoord>=umbral*0.75 ? 'ATENCIÓN' : 'Normal',
-        'Programa':                  p.prog,
-        'Procedencia':               p.esCambiado ? '↙ Reasignado desde ' + p.coordOrig : '✓ Asignación original',
-        'Sesiones':                  p.ses,
-        'Alumnos':                   p.alum,
-        'Puntaje Carga Prog.':       parseFloat(p.puntaje.toFixed(1)),
-        'Días de Clase':             dias    || '—',
-        'Horario':                   horario || '—',
-        'Sede':                      sede,
-        'Fecha Inicio':              fmtF(fechaMin),
-        'Fecha Término':             fmtF(fechaMax),
-        'Topes de Horario':          topeStr,
+      progsCo.forEach(function(p, idx){
+        var esCambiado = !!APP.simCambios[p.prog];
+        var coordOrigP = esCambiado ? (mapProgOrig[p.prog]||{}).coord||'—' : co;
+        hoja4.push({
+          'Coordinadora (Simulada)': co,
+          'Carga Total Simulada':    parseFloat(totalCo.toFixed(1)),
+          'Estado':                  totalCo >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
+          'Programa':                p.prog,
+          'Reasignado':              esCambiado ? 'Sí (desde '+coordOrigP+')' : 'No (original)',
+          'Sesiones':                p.ses,
+          'Alumnos':                 p.alum,
+          'Factor':                  factorAlumnos(p.alum),
+          'Puntaje Programa':        parseFloat(p.puntaje.toFixed(1)),
+          'Fórmula':                 '('+p.ses+'÷4)×'+factorAlumnos(p.alum)+' = '+p.puntaje.toFixed(1),
+        });
       });
+      // Fila separadora
+      if(coordsOrden.indexOf(co) < coordsOrden.length-1) {
+        hoja4.push({'Coordinadora (Simulada)':'————','Carga Total Simulada':'','Estado':'',
+          'Programa':'','Reasignado':'','Sesiones':'','Alumnos':'','Factor':'',
+          'Puntaje Programa':'','Fórmula':''});
+      }
     });
-  });
 
-
-  // ── Generar Excel con 4 hojas ────────────────────────────────
+    // ── Construir y descargar ─────────────────────────────────
     var wb = XLSX.utils.book_new();
-
-    // Hoja 1 — Reasignaciones
     var ws1 = XLSX.utils.json_to_sheet(hoja1);
-    ws1['!cols'] = [
-      {wch:4},{wch:40},{wch:24},{wch:24},{wch:9},{wch:9},{wch:12},
-      {wch:18},{wch:22},{wch:16},{wch:16},{wch:16},{wch:16},{wch:16},
-      {wch:14},{wch:12},{wch:60},
-    ];
+    ws1['!cols'] = [{wch:4},{wch:42},{wch:26},{wch:26},{wch:10},{wch:10},{wch:8},{wch:12},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:12}];
     XLSX.utils.book_append_sheet(wb, ws1, '1. Reasignaciones');
 
-    // Hoja 2 — Carga por Coordinadora
     var ws2 = XLSX.utils.json_to_sheet(hoja2);
-    ws2['!cols'] = [
-      {wch:28},{wch:16},{wch:18},{wch:14},{wch:18},{wch:14},{wch:12},{wch:14},{wch:40},{wch:40},
-    ];
+    ws2['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:10},{wch:12},{wch:14},{wch:14},{wch:14},{wch:60}];
     XLSX.utils.book_append_sheet(wb, ws2, '2. Carga por Coordinadora');
 
-    // Hoja 3 — Topes
     var ws3 = XLSX.utils.json_to_sheet(hoja3);
-    ws3['!cols'] = [
-      {wch:40},{wch:24},{wch:24},{wch:40},{wch:14},{wch:22},{wch:22},
-      {wch:14},{wch:18},{wch:18},{wch:10},{wch:14},{wch:38},
-    ];
-    XLSX.utils.book_append_sheet(wb, ws3, '3. Topes de Horario');
+    ws3['!cols'] = [{wch:40},{wch:26},{wch:40},{wch:12},{wch:10},{wch:16},{wch:16},{wch:12},{wch:16},{wch:16},{wch:32},{wch:32},{wch:14},{wch:14},{wch:8}];
+    XLSX.utils.book_append_sheet(wb, ws3, '3. Topes Detectados');
 
-    // Hoja 4 — Detalle completo
     var ws4 = XLSX.utils.json_to_sheet(hoja4);
-    ws4['!cols'] = [
-      {wch:26},{wch:14},{wch:14},{wch:42},{wch:9},{wch:9},
-      {wch:18},{wch:22},{wch:16},{wch:14},{wch:14},{wch:14},
-      {wch:28},{wch:14},{wch:14},{wch:55},
-    ];
-    XLSX.utils.book_append_sheet(wb, ws4, '4. Detalle Carga Actual');
+    ws4['!cols'] = [{wch:28},{wch:14},{wch:12},{wch:42},{wch:28},{wch:10},{wch:10},{wch:8},{wch:12},{wch:24}];
+    XLSX.utils.book_append_sheet(wb, ws4, '4. Detalle Simulado');
 
-    XLSX.writeFile(wb, 'Simulacion_Carga_Laboral.xlsx');
-    showToast('Excel exportado con 4 hojas','ok');
+    var fecha = new Date().toISOString().substring(0,10);
+    XLSX.writeFile(wb, 'Simulacion_Reasignacion_'+fecha+'.xlsx');
+    showToast('Excel exportado — '+cambios.length+' reasignación(es) · 4 hojas','ok');
+
   } catch(err) {
-    alert('ERROR: ' + err.message);
+    alert('ERROR al exportar: ' + err.message);
     console.error(err);
   }
 }
+
 
 function computeLoadByProgInDf(df) {
   var map = {};
@@ -17811,4 +18014,3 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
-
