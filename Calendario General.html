@@ -1926,7 +1926,7 @@ function processMain(rawRows, fileName) {
       'PROFESOR':                 getVal(r, profCol),
       'ASIGNATURA':               getVal(r, asigCol),
       'SALA':                     getVal(r, salaCol),
-      'N_ALUMNOS':                parseFloat(alumCol ? r[normalizeKey(alumCol)] : 0)||0,
+      'N_ALUMNOS':                parseFloat(alumCol ? (r[alumCol]!==undefined ? r[alumCol] : r[normalizeKey(alumCol)]) : 0)||0,
       // ── Campos calculados / derivados ────────────────────────────────
       'Modalidad_Calc':           modalidad,
       'Dia_Semana':               diaSemana,
@@ -2675,7 +2675,38 @@ function deepMerge(target, src) {
 function factorAlumnos(n) {
   if (n>=50) return 2.0; if (n>=40) return 1.7; if (n>=30) return 1.4; if (n>=20) return 1.2; return 1.0;
 }
-function calcScore(sesiones, alumnos) { return (sesiones/4)*factorAlumnos(alumnos); }
+function calcScore(sesiones, alumnos) {
+  // Fórmula legacy (sin desglose mensual) — se usa cuando no hay fechas
+  return (sesiones/4)*factorAlumnos(alumnos);
+}
+
+/* ── Nueva fórmula: promedio mensual de carga ─────────────────
+   1. Agrupar sesiones por mes
+   2. Cada mes: (sesiones_mes ÷ 4 semanas) × factor_alumnos
+   3. Sumar todos los totales mensuales
+   4. Dividir por la cantidad de meses activos = promedio global
+──────────────────────────────────────────────────────────── */
+function calcScoreMensual(sesiones_por_mes, alumnos) {
+  // sesiones_por_mes = {{'2026-06':6, '2026-07':7, ...}}
+  var meses = Object.keys(sesiones_por_mes);
+  if (!meses.length) return {promedio:0, sumaMensual:0, nMeses:0, detalle:{}};
+  var factor = factorAlumnos(alumnos);
+  var sumaMensual = 0;
+  var detalle = {};
+  meses.forEach(function(m){
+    var ses = sesiones_por_mes[m];
+    var cargaMes = (ses / 4) * factor;
+    detalle[m] = {ses: ses, carga: cargaMes};
+    sumaMensual += cargaMes;
+  });
+  return {
+    promedio:    Math.round((sumaMensual / meses.length)*100)/100,
+    sumaMensual: Math.round(sumaMensual*100)/100,
+    nMeses:      meses.length,
+    factor:      factor,
+    detalle:     detalle,
+  };
+}
 
 function getFactoresDelta(prog) {
   var f=(APP.simFactores&&APP.simFactores[prog])||{};
@@ -2704,26 +2735,63 @@ function hexToRgb_g(hex){
 }
 
 function computeLoadByCoord(df) {
-  var map={};
+  // Paso 1: agrupar por coord → programa → mes
+  var coordProgs = {};
   df.forEach(function(r){
-    var k=r['COORDINADORA RESPONSABLE']+'|||'+r['PROGRAMA'];
-    if (!map[k]) map[k]={coord:r['COORDINADORA RESPONSABLE'],prog:r['PROGRAMA'],ses:0,alum:0};
-    map[k].ses++; map[k].alum=Math.max(map[k].alum,r['N_ALUMNOS']||0);
+    var coord = r['COORDINADORA RESPONSABLE'];
+    var prog  = r['PROGRAMA'];
+    var alum  = r['N_ALUMNOS']||0;
+    var fecha = r['DIAS/FECHAS'];
+    if(!coord || !prog) return;
+    if(!coordProgs[coord]) coordProgs[coord] = {};
+    if(!coordProgs[coord][prog]) coordProgs[coord][prog] = {alum:0, meses:{}};
+    coordProgs[coord][prog].alum = Math.max(coordProgs[coord][prog].alum, alum);
+    if(fecha instanceof Date){
+      var mesKey = fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0');
+      coordProgs[coord][prog].meses[mesKey] = (coordProgs[coord][prog].meses[mesKey]||0) + 1;
+    }
   });
-  var byCoord={};
-  Object.values(map).forEach(function(p){
-    var coord=p.coord, prog=p.prog, ses=p.ses, alum=p.alum;
-    if (!byCoord[coord]) byCoord[coord]=0;
-    // ← Usa factores de ajuste si están activos para este programa
-    byCoord[coord] += calcScoreConFactores(ses, alum, prog);
-  });
-  return Object.entries(byCoord).sort(function(a,b){return b[1]-a[1];})
-    .map(function(e){return {coord:e[0], puntaje:e[1]};});
-}
 
-/* ══════════════════════════════════════════════════════
-   HTML BUILDERS
-══════════════════════════════════════════════════════ */
+  // Paso 2: por coordinadora, calcular carga mensual ponderada
+  var result = [];
+  Object.entries(coordProgs).forEach(function(e){
+    var coord = e[0], progs = e[1];
+    // Recopilar TODOS los meses activos de esta coordinadora
+    var mesesSet = {};
+    Object.values(progs).forEach(function(p){
+      Object.keys(p.meses).forEach(function(m){ mesesSet[m]=true; });
+    });
+    var mesesArr = Object.keys(mesesSet).sort();
+    if(!mesesArr.length){ result.push({coord:coord, puntaje:0}); return; }
+
+    // Para cada mes: sumar (ses_prog_mes / 4) × factor_alumnos_prog
+    var sumaMensual = 0;
+    mesesArr.forEach(function(mes){
+      var cargaMes = 0;
+      Object.values(progs).forEach(function(p){
+        var sesMes = p.meses[mes] || 0;
+        if(sesMes > 0){
+          cargaMes += (sesMes / 4) * factorAlumnos(p.alum);
+        }
+      });
+      // Aplicar factores toggle delta por programa
+      Object.entries(progs).forEach(function(pe){
+        var progName = pe[0], p = pe[1];
+        var sesMes = p.meses[mes] || 0;
+        if(sesMes > 0){
+          var delta = getFactoresDelta(progName);
+          if(delta !== 0) cargaMes += delta * (sesMes > 0 ? 1 : 0);
+        }
+      });
+      sumaMensual += cargaMes;
+    });
+
+    var promedio = sumaMensual / mesesArr.length;
+    result.push({coord:coord, puntaje: Math.round(promedio*100)/100});
+  });
+
+  return result.sort(function(a,b){ return b.puntaje - a.puntaje; });
+}
 function buildTable(rows, cols, maxH=true) {
   if (!rows.length) return '<div class="banner b-info">No hay datos.</div>';
   const useCols = cols || Object.keys(rows[0]);
@@ -15993,10 +16061,17 @@ function updAdmin() {
                 'font-size:9px;color:#6e7681;background:rgba(0,0,0,.15);text-align:center">' +
               (function(){
                 var pRows = getDF().filter(function(r){return r['PROGRAMA']===prog;});
-                var sesN = pRows.length;
                 var alumN = pRows.reduce(function(m,r){return Math.max(m,parseInt(r['N_ALUMNOS'])||0);},0);
                 var fN = factorAlumnos(alumN);
-                return '📐 Cálculo: ('+sesN+' ses ÷ 4) × '+fN+' ('+alumN+' alumnos) = '+calcScore(sesN,alumN).toFixed(1)+' pts';
+                var meses={};
+                pRows.forEach(function(r){
+                  var f=r['DIAS/FECHAS'];
+                  if(f instanceof Date){var k=f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0'); meses[k]=(meses[k]||0)+1;}
+                });
+                var mArr=Object.keys(meses);
+                var suma=mArr.reduce(function(s,m){return s+(meses[m]/4)*fN;},0);
+                var prom=mArr.length>0?suma/mArr.length:0;
+                return '📐 Σ[(ses÷4)×'+fN+'] = '+suma.toFixed(1)+' ÷ '+mArr.length+' meses = '+prom.toFixed(2)+' pts ('+alumN+' alum)';
               })() +
               '</div>' +
 
@@ -16388,22 +16463,39 @@ function computeLoadByProgInDf(df) {
   var map = {};
   df.forEach(function(r){
     var k = r['PROGRAMA'];
-    if (!map[k]) map[k] = {prog:k, coord:r['COORDINADORA RESPONSABLE'], ses:0, alum:0};
+    if(!map[k]) map[k] = {prog:k, coord:r['COORDINADORA RESPONSABLE'], ses:0, alum:0, meses:{}};
     map[k].ses++;
     map[k].alum = Math.max(map[k].alum, r['N_ALUMNOS']||0);
+    var fecha = r['DIAS/FECHAS'];
+    if(fecha instanceof Date){
+      var mesKey = fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0');
+      map[k].meses[mesKey] = (map[k].meses[mesKey]||0) + 1;
+    }
   });
   return Object.values(map).map(function(d){
-    // Puntaje base + factores activos para este programa
-    var puntajeBase = calcScore(d.ses, d.alum);
-    var puntajeAjust = calcScoreConFactores(d.ses, d.alum, d.prog);
+    var factor = factorAlumnos(d.alum);
+    var mesesArr = Object.keys(d.meses).sort();
+    var sumaMensual = 0;
+    var detalle = {};
+    mesesArr.forEach(function(m){
+      var sesMes = d.meses[m];
+      var cargaMes = (sesMes / 4) * factor;
+      detalle[m] = {ses: sesMes, carga: cargaMes};
+      sumaMensual += cargaMes;
+    });
+    var promedio = mesesArr.length > 0 ? sumaMensual / mesesArr.length : 0;
+    var delta = getFactoresDelta(d.prog);
     return Object.assign({}, d, {
-      puntaje:      puntajeAjust,
-      puntajeBase:  puntajeBase,
-      deltaFactores:getFactoresDelta(d.prog),
+      puntaje:       Math.max(0, Math.round((promedio + delta)*100)/100),
+      puntajeBase:   Math.round(promedio*100)/100,
+      deltaFactores: delta,
+      nMeses:        mesesArr.length,
+      sumaMensual:   Math.round(sumaMensual*100)/100,
+      detalleMeses:  detalle,
+      factor:        factor,
     });
   });
 }
-
 function _gToggleExcl(coord) {
   if (!APP.simExcl) APP.simExcl = new Set();
   if (APP.simExcl.has(coord)) APP.simExcl.delete(coord);
@@ -18925,3 +19017,4 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
+
