@@ -1125,7 +1125,7 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 var APP = {
   cat: 'dashboard', tab: 'home',
   df: [], dfRes: [], globalFilter: [], charts: {},
-  simCambios: {}, simExcl: new Set(), propuesta: null, adminOk: false,
+  simCambios: {}, simDesasig: {}, simExcl: new Set(), propuesta: null, adminOk: false,
   simFactores: {},
   plan_cursos: (function(){ try{ return JSON.parse(localStorage.getItem('plan_cursos')||'[]'); }catch(e){ return []; } })(),
 };
@@ -1359,7 +1359,7 @@ function _buildTooltip(cardEl, nombre, info, rcfg) {
     '</div>'+
 
     // KPIs rápidos
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;'+
       'border-bottom:1px solid #30363d">'+
     [
       {ico:'📚',lbl:'Sesiones',   val:nSes,         c:'#a78bfa'},
@@ -1523,7 +1523,7 @@ const CATS = {
   programas:    ['resumen','calidad','cronograma'],
   calendarios:  ['calendario','reservas'],
   planificador: ['plancursos','malla','planreporte','propuestas','horario'],
-  admin:        ['gestion','turnos','validaciones','auditoria'],
+  admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
   control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce'],
   ayuda:        ['manual','faqs'],
 };
@@ -1548,6 +1548,7 @@ const TAB_LABELS = {
   calendario:   'Calendario',
   reservas:     'Reservas',
   gestion:      'Gestión',
+  cargaprog:    '📊 Carga por Programa',
   turnos:       'Turnos',
   validaciones: 'Validaciones',
   auditoria:    'Auditoría',
@@ -2611,6 +2612,7 @@ function refreshView() {
     calendario:   renderCalendario,
     reservas:     renderReservas,
     gestion:      renderGestion,
+    cargaprog:    showCargaProg,
     turnos:       renderTurnos,
     validaciones: renderValidaciones,
     auditoria:    renderAuditoria,
@@ -3325,6 +3327,10 @@ function renderGlobal() {
         '</div>'+
       '</div>'+
     '</div>'+
+
+
+
+    '<div id="pptAlerta"></div>'+
 
     // ── Filtros ───────────────────────────────────────────────────
     '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;'+
@@ -4316,7 +4322,7 @@ function renderComparativa() {
     '<div id="compKPIs" style="margin-bottom:20px"></div>'+
 
     // Fila principal: Ranking + Heatmap
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px">'+
 
       // Ranking
       '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden">'+
@@ -8199,7 +8205,7 @@ function _dvTabAnalisis(){
     }).join('')+
     '</div>'+
 
-    // Gráficos
+  // Gráficos
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">'+
       '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
         '<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)">'+
@@ -8481,7 +8487,15 @@ function ctUpdVista() {
     return;
   }
 
-  var html = '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+  // Asegurar popup existe en el body
+  if(!document.getElementById('gCalSimPop')){
+    var _pop = document.createElement('div');
+    _pop.id = 'gCalSimPop';
+    _pop.style.cssText = 'display:none;position:fixed;z-index:9999;background:#1c2128;border:1px solid #388bfd;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.7);padding:0;min-width:320px;max-width:400px;max-height:400px;overflow-y:auto';
+    document.body.appendChild(_pop);
+  }
+
+  var html = '<table style=""width:100%;border-collapse:collapse;font-size:11px">'+
     '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">'+
     ['Docente','Programa','CC','Mes Ini.','Mes Fin.','Estado Contrato','Hrs Decl.','Hrs Obl.','💵 Valor Contrato','💰 Total Declarado','⚖️ Diferencia','Estado Cruce'].map(function(h){
       return '<th style="padding:9px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+h+'</th>';
@@ -10378,7 +10392,8 @@ function renderPresupuesto() {
         '📝 Reporte de Declaraciones',
         hasDecl ? '✅ '+_ppt.declRows.length+' registros — '+esc(_ppt.declFilename) : 'Columnas: Programa · movimiento_horas_lv · movimiento_monto',
         '#3fb950')+
-    '</div>'+
+    
+'</div>'+
 
     // ── Filtros + KPIs + Charts + Tabla ───────────────────────
     '<div id="pptFiltros" style="display:'+(hasPPT?'flex':'none')+';flex-wrap:wrap;gap:10px;'+
@@ -10444,7 +10459,7 @@ function pptCargarFile(file) {
       var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
       rows.forEach(function(r){
         r._horas     = parseFloat(r['Horas'])||0;
-        r._horasAsig = (r['Horas_Asignadas']!==''&&r['Horas_Asignadas']!=null)?parseFloat(r['Horas_Asignadas'])||0:r._horas;
+        r._horasAsig = (r['Horas_Asignadas']!==''&&r['Horas_Asignadas']!=null)?parseFloat(r['Horas_Asignadas'])||0:0;
       });
       _ppt.rows=rows; _ppt.filename=file.name;
       showToast(rows.length+' actividades PPT cargadas','ok');
@@ -10453,6 +10468,26 @@ function pptCargarFile(file) {
   };
   reader.readAsArrayBuffer(file);
 }
+
+function pptCargarSoloPPT(file) {
+  if(typeof XLSX==='undefined'){showToast('XLSX no disponible','err');return;}
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      rows.forEach(function(r){
+        r._horas     = parseFloat(r['Horas'])||0;
+        r._horasAsig = 0; // Solo PPT, sin Real
+      });
+      _ppt.rows=rows; _ppt.filename=file.name;
+      showToast(rows.length+' actividades PPT cargadas (solo planificado)','ok');
+      renderPresupuesto();
+    }catch(err){showToast('Error: '+err.message,'err');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 
 function pptCargarDecl(file) {
   if(typeof XLSX==='undefined'){showToast('XLSX no disponible','err');return;}
@@ -10585,13 +10620,14 @@ function updPresupuesto() {
   rows.forEach(function(r){
     var p=r['Programa']||'(sin)';
     if(!progMap[p])progMap[p]={programa:p,cc:r['centro_costo']||'',plan:0,real:0,acts:[]};
-    progMap[p].plan+=r._horas;progMap[p].real+=r._horasAsig;
+    progMap[p].plan+=r._horas;
     progMap[p].acts.push(r);
-    totPlan+=r._horas;totReal+=r._horasAsig;
+    totPlan+=r._horas;
   });
   var progArr=Object.values(progMap).map(function(p){
     var dp=declByProg[p.programa];
-    p.decl=dp?dp.hrs:0;p.monto=dp?dp.monto:0;
+    p.real=dp?dp.hrs:0;p.decl=dp?dp.hrs:0;p.monto=dp?dp.monto:0;
+    totReal+=p.real;
     p.declByCodigo=dp?dp.byCodigo||{}:{};
     totDecl+=p.decl;totMonto+=p.monto;
     return p;
@@ -10599,6 +10635,8 @@ function updPresupuesto() {
 
   // Guardar para lazy expand
   window._pptProgData=progArr;
+
+
 
   var nP=progArr.length;
   var dvPR=totReal-totPlan,dvPD=totDecl-totPlan;
@@ -10609,7 +10647,7 @@ function updPresupuesto() {
   if(kEl) kEl.innerHTML=[
     {ico:'🎓',lbl:'Programas',val:nP,c:'#a78bfa'},
     {ico:'📐',lbl:'PPT Planif.',val:totPlan.toFixed(0)+'h',c:'#388bfd'},
-    {ico:'⚙️',lbl:'Real Asign.',val:totReal.toFixed(0)+'h',c:'#f0b429'},
+    {ico:'⚙️',lbl:'Real (Declarado)',val:totReal.toFixed(0)+'h',c:'#f0b429'},
     {ico:'📝',lbl:'Declarado',val:totDecl.toFixed(0)+'h',c:'#3fb950'},
     {ico:'💲',lbl:'Monto Decl.',val:'$'+Math.round(totMonto/1e6)+'M',c:'#22d3ee'},
     {ico:dvPD>=0?'📈':'📉',lbl:'Desv PPT↔Decl',
@@ -11897,6 +11935,301 @@ function _gRenderModalidades(df) {
 }
 
 
+/* ══════════════════════════════════════════════════════════════
+   DESASIGNAR PROGRAMAS — Quitar un programa de una coordinadora
+   El programa queda "sin asignar" en la simulación
+══════════════════════════════════════════════════════════════ */
+
+function _gDesUpdProgs() {
+  var sel = document.getElementById('gDesProg');
+  var coordSel = (document.getElementById('gDesCoord')||{value:''}).value;
+  if(!sel) return;
+  if(!coordSel) {
+    sel.innerHTML = '<option value="">Seleccionar coordinadora primero</option>';
+    return;
+  }
+  // Programas actuales de esta coordinadora (excluyendo ya desasignados)
+  var dfLoad = getDF();
+  var progs = {};
+  dfLoad.forEach(function(r){
+    var coordReal = APP.simCambios[r['PROGRAMA']] || r['COORDINADORA RESPONSABLE'];
+    if(coordReal !== coordSel) return;
+    if(APP.simDesasig[r['PROGRAMA']]) return; // ya desasignado
+    progs[r['PROGRAMA']] = true;
+  });
+  var arr = Object.keys(progs).sort();
+  sel.innerHTML = '<option value="">Seleccionar programa...</option>' +
+    arr.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
+}
+
+function _gDesasignar() {
+  var coord = (document.getElementById('gDesCoord')||{value:''}).value;
+  var prog  = (document.getElementById('gDesProg')||{value:''}).value;
+  if(!coord || !prog) { showToast('Selecciona coordinadora y programa','err'); return; }
+
+  APP.simDesasig[prog] = coord; // guardar coord original para poder revertir
+  showToast('✓ '+abbr(prog,30)+' desasignado de '+abbr(coord,20), 'ok');
+
+  // Actualizar selectores y re-renderizar
+  _gDesUpdProgs();
+  updAdmin();
+}
+
+function _gDesRevertir(prog) {
+  delete APP.simDesasig[prog];
+  showToast('↩ '+abbr(prog,30)+' restaurado', 'ok');
+  updAdmin();
+}
+
+function _gDesRenderLista() {
+  var el = document.getElementById('gDesLista');
+  var cnt = document.getElementById('gDesasigCount');
+  if(!el) return;
+  var items = Object.entries(APP.simDesasig||{});
+  if(cnt) cnt.textContent = items.length ? items.length + ' desasignado(s)' : '';
+  if(!items.length) {
+    el.innerHTML = '<div style="font-size:10px;color:#6e7681;text-align:center;padding:8px">Sin programas desasignados</div>';
+    return;
+  }
+  el.innerHTML = items.map(function(e){
+    var prog = e[0], coordOrig = e[1];
+    var dfLoad = getDF();
+    var sesCount = dfLoad.filter(function(r){ return r['PROGRAMA']===prog; }).length;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;'+
+      'background:#161b22;border:1px solid rgba(248,81,73,.2);border-radius:8px;border-left:3px solid #f85149">'+
+      '<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">'+
+        '<span style="font-size:10px;padding:2px 8px;background:rgba(248,81,73,.12);color:#f85149;'+
+          'border-radius:4px;font-weight:700;flex-shrink:0">DESASIGNADO</span>'+
+        '<div style="min-width:0">'+
+          '<div style="font-size:11px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;'+
+            'text-overflow:ellipsis" title="'+esc(prog)+'">'+esc(abbr(prog,40))+'</div>'+
+          '<div style="font-size:9px;color:#8b949e;margin-top:1px">'+
+            'Coord. original: '+esc(coordOrig)+' · '+sesCount+' sesiones'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<button onclick="_gDesRevertir(\''+esc(prog).replace(/'/g,"\\'")+'\')" '+
+        'style="padding:4px 12px;border:1px solid #21262d;background:#0d1117;color:#8b949e;'+
+        'border-radius:6px;cursor:pointer;font-size:10px;font-weight:700;flex-shrink:0">↩ Restaurar</button>'+
+    '</div>';
+  }).join('');
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   CALENDARIO SIMULADO — Replica el calendario con reasignaciones
+══════════════════════════════════════════════════════════════ */
+var _gCalSimState = null;
+
+function _gCalSimPrev() {
+  if(!_gCalSimState) return;
+  _gCalSimState.month--;
+  if(_gCalSimState.month < 0) { _gCalSimState.month = 11; _gCalSimState.year--; }
+  _gRenderCalSim(getDF());
+}
+function _gCalSimNext() {
+  if(!_gCalSimState) return;
+  _gCalSimState.month++;
+  if(_gCalSimState.month > 11) { _gCalSimState.month = 0; _gCalSimState.year++; }
+  _gRenderCalSim(getDF());
+}
+
+/* ── Popup detalle del día en calendario simulado ── */
+var _gCalSimEMap = {};
+
+function _gCalSimShowPop(ev, day, month, year) {
+  ev.stopPropagation();
+  var key = year+'-'+month+'-'+day;
+  var evts = _gCalSimEMap[key] || [];
+  if(!evts.length) return;
+
+  // Crear/obtener modal overlay
+  var overlay = document.getElementById('gCalSimOverlay');
+  if(!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'gCalSimOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center';
+    overlay.onclick = function(e){ if(e.target===overlay) overlay.style.display='none'; };
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+
+  var MNAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  var fecha = new Date(year, month, day);
+  var CCOLS = ['#388bfd','#3fb950','#f0b429','#a78bfa','#22d3ee','#f85149','#fb923c','#60a5fa'];
+  var cmap = {}; var ci=0;
+  evts.forEach(function(e){ var c=e['COORDINADORA RESPONSABLE']||''; if(c&&!cmap[c]){cmap[c]=CCOLS[ci%CCOLS.length];ci++;} });
+
+  var h = '<div style="background:#161b22;border:1px solid #388bfd;border-radius:14px;width:440px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.8)">';
+
+  // Header
+  h += '<div style="padding:16px 20px;background:#0d1117;border-bottom:1px solid #21262d;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center">';
+  h += '<div><div style="font-size:15px;font-weight:900;color:#f0f6ff">'+dias[fecha.getDay()]+' '+day+' '+MNAMES[month]+' '+year+'</div>';
+  h += '<div style="font-size:11px;color:#8b949e;margin-top:2px">'+evts.length+' sesiones</div></div>';
+  h += '<div onclick="document.getElementById(\'gCalSimOverlay\').style.display=\'none\'" style="cursor:pointer;font-size:18px;color:#8b949e;padding:4px 8px;border-radius:6px;background:#21262d">✕</div>';
+  h += '</div>';
+
+  // Eventos
+  h += '<div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">';
+  evts.forEach(function(r){
+    var coord = r['COORDINADORA RESPONSABLE']||'';
+    var color = cmap[coord]||'#8b949e';
+    var prog = r['PROGRAMA']||'';
+    var hora = r['HORARIO']||'';
+    var asig = r['ASIGNATURA']||'';
+    var mod = r['Modalidad_Calc']||r['MODALIDAD']||'';
+    var sede = r['SEDE']||'';
+    var sala = r['SALA']||'';
+    var prof = r['PROFESOR']||'';
+    var horas = r['HORAS']||'';
+    var esCambiado = !!(APP.simCambios&&APP.simCambios[prog]);
+
+    h += '<div style="padding:10px 12px;background:#0d1117;border-radius:10px;border-left:3px solid '+color+(esCambiado?';border-right:3px solid #f0b429':'')+'">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    h += '<span style="font-size:12px;font-weight:800;color:'+color+'">'+esc(hora)+'</span>';
+    if(esCambiado) h += '<span style="font-size:8px;padding:2px 8px;background:rgba(240,180,41,.15);color:#f0b429;border-radius:4px;font-weight:700">REASIGNADO</span>';
+    h += '</div>';
+    h += '<div style="font-size:12px;font-weight:700;color:#e6edf3;margin-bottom:3px">'+esc(prog)+'</div>';
+    if(asig) h += '<div style="font-size:11px;color:#8b949e;margin-bottom:4px">'+esc(asig)+'</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:#6e7681">';
+    if(mod) h += '<span>'+esc(mod)+'</span>';
+    if(sede) h += '<span>📍 '+esc(sede)+(sala?' · '+esc(sala):'')+'</span>';
+    if(prof) h += '<span>👤 '+esc(prof)+'</span>';
+    if(horas) h += '<span>⏱ '+esc(horas)+'h</span>';
+    h += '</div>';
+    h += '<div style="font-size:9px;color:'+color+';margin-top:3px;font-weight:700">'+esc(coord)+'</div>';
+    h += '</div>';
+  });
+  h += '</div></div>';
+
+  overlay.innerHTML = h;
+}
+
+function _gCalSimHidePop() {
+  var ov = document.getElementById('gCalSimOverlay');
+  if(ov) ov.style.display = 'none';
+}
+
+
+function _gRenderCalSim(df) {
+  var wrap = document.getElementById('gCalSimWrap');
+  if(!wrap) return;
+
+  var hasSim = Object.keys(APP.simCambios||{}).length > 0 || Object.keys(APP.simDesasig||{}).length > 0;
+  if(!hasSim || !df.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  if(!_gCalSimState) {
+    var now = new Date();
+    _gCalSimState = { year: now.getFullYear(), month: now.getMonth() };
+  }
+
+  var ry = _gCalSimState.year, rm = _gCalSimState.month;
+  var MNAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var lbl = document.getElementById('gCalSimLabel');
+  if(lbl) lbl.textContent = MNAMES[rm] + ' ' + ry;
+
+  // Aplicar simulación al df
+  var dfSim = df.filter(function(r){
+    return !(APP.simDesasig && APP.simDesasig[r['PROGRAMA']]);
+  }).map(function(r){
+    var sim = APP.simCambios && APP.simCambios[r['PROGRAMA']];
+    if(sim) return Object.assign({}, r, {'COORDINADORA RESPONSABLE': sim});
+    return r;
+  });
+
+  // Eventos del mes
+  var eMap = {}; _gCalSimEMap = {};
+  dfSim.forEach(function(r){
+    if(!r['DIAS/FECHAS'] || !(r['DIAS/FECHAS'] instanceof Date)) return;
+    var d = r['DIAS/FECHAS'];
+    if(d.getFullYear() !== ry || d.getMonth() !== rm) return;
+    var day = d.getDate();
+    if(!eMap[day]) eMap[day] = [];
+    eMap[day].push(r); _gCalSimEMap[ry+'-'+rm+'-'+day] = eMap[day];  });
+
+  // Colores por coordinadora
+  var CCOLS = ['#388bfd','#3fb950','#f0b429','#a78bfa','#22d3ee','#f85149','#fb923c','#60a5fa','#e879f9','#14b8a6','#fbbf24','#6366f1'];
+  var coordColorMap = {};
+  var ci = 0;
+  dfSim.forEach(function(r){
+    var c = r['COORDINADORA RESPONSABLE']||'';
+    if(c && !coordColorMap[c]) { coordColorMap[c] = CCOLS[ci % CCOLS.length]; ci++; }
+  });
+
+  var first = new Date(ry, rm, 1);
+  var dow = first.getDay();
+  dow = dow === 0 ? 6 : dow - 1;
+  var daysInMonth = new Date(ry, rm + 1, 0).getDate();
+  var today = new Date();
+
+  var html = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px"><thead><tr>';
+  ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].forEach(function(d){
+    html += '<th style="padding:8px 4px;text-align:center;font-size:10px;font-weight:700;color:#8b949e;border-bottom:2px solid #21262d">'+d+'</th>';
+  });
+  html += '</tr></thead><tbody><tr>';
+
+  for(var i=0; i<dow; i++) html += '<td style="border:1px solid #21262d;background:#0a0d12;height:110px;vertical-align:top;padding:4px"></td>';
+
+  for(var day=1; day<=daysInMonth; day++){
+    var evts = eMap[day] || [];
+    var isT = ry===today.getFullYear() && rm===today.getMonth() && day===today.getDate();
+    html += '<td style="border:1px solid '+(isT?'#388bfd':'#21262d')+';background:'+(isT?'rgba(56,139,253,.07)':evts.length?'#0d1117':'#0a0d12')+';height:110px;vertical-align:top;padding:5px;position:relative;cursor:'+(evts.length>3?'pointer':'default')+'" '+
+      (evts.length>3 ? 'onclick="_gCalSimShowPop(event,'+day+','+rm+','+ry+')"' : '')+'>';
+
+    html += '<div style="font-size:11px;font-weight:'+(isT||evts.length?'800':'400')+';color:'+(isT?'#fff':evts.length?'#f0f6ff':'#30363d')+';margin-bottom:3px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:'+(isT?'#388bfd':'transparent')+'">'+day+'</div>';
+
+    evts.slice(0,3).forEach(function(ev){
+      var coord = ev['COORDINADORA RESPONSABLE']||'';
+      var prog = ev['Programa_Abrev'] || ev['NOMBRE ABREVIADO'] || abbr(ev['PROGRAMA']||'',12);
+      var hora = ev['HORARIO']||'';
+      var mod = ev['Modalidad_Calc']||ev['MODALIDAD']||'';
+      var color = coordColorMap[coord] || '#8b949e';
+      var esCambiado = !!(APP.simCambios && APP.simCambios[ev['PROGRAMA']]);
+      var modIco = mod.toLowerCase().includes('online')||mod.toLowerCase().includes('virtual') ? '🌐'
+                 : mod.toLowerCase().includes('híb')||mod.toLowerCase().includes('hib') ? '📡' : '🏫';
+
+      html += '<div style="font-size:8px;padding:2px 4px;margin-bottom:2px;border-radius:3px;background:'+color+'18;border-left:2px solid '+color+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default'+(esCambiado?';border-right:2px solid #f0b429':'')+'" '+
+        'title="'+esc(ev['PROGRAMA']||'')+' · '+esc(coord)+' · '+esc(hora)+' · '+esc(mod)+(esCambiado?' [REASIGNADO]':'')+'">';
+      html += '<div style="color:'+color+';font-weight:800">'+esc(hora)+'</div>';
+      html += '<div style="color:#e6edf3;font-weight:700">'+modIco+' '+esc(prog)+'</div>';
+      html += '<div style="color:#8b949e;font-size:7px">'+esc(abbr(coord,14))+(esCambiado?' <span style="color:#f0b429">★</span>':'')+'</div>';
+      html += '</div>';
+    });
+
+    if(evts.length > 3) html += '<div style="font-size:8px;color:#388bfd;text-align:center;font-weight:700;padding:3px;background:rgba(56,139,253,.1);border-radius:4px;margin-top:2px;cursor:pointer;border:1px solid rgba(56,139,253,.2)" onclick="event.stopPropagation();_gCalSimShowPop(event,'+day+','+rm+','+ry+')">📋 +'+(evts.length-3)+' ver todo</div>';
+    html += '</td>';
+    if((dow + day) % 7 === 0 && day < daysInMonth) html += '</tr><tr>';
+  }
+
+  var lastDow = (dow + daysInMonth) % 7;
+  if(lastDow > 0) for(var i=lastDow; i<7; i++) html += '<td style="border:1px solid #21262d;background:#0a0d12;height:110px;vertical-align:top;padding:4px"></td>';
+  html += '</tr></tbody></table>';
+
+  // Leyenda coordinadoras
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">';
+  Object.entries(coordColorMap).forEach(function(e){
+    html += '<span style="display:inline-flex;align-items:center;gap:4px;font-size:9px;color:#e6edf3;padding:3px 8px;border-radius:6px;background:'+e[1]+'15;border:1px solid '+e[1]+'40">' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:'+e[1]+';flex-shrink:0"></span>' +
+      esc(abbr(e[0],18))+'</span>';
+  });
+  html += '</div>';
+
+  // Resumen
+  var nSes = Object.values(eMap).reduce(function(s,a){return s+a.length;},0);
+  var nDias = Object.keys(eMap).length;
+  html += '<div style="display:flex;gap:16px;margin-top:8px;font-size:10px;color:#8b949e">' +
+    '<span>📚 <strong style="color:#e6edf3">'+nSes+'</strong> sesiones</span>' +
+    '<span>📅 <strong style="color:#e6edf3">'+nDias+'</strong> días</span>' +
+    '<span>★ <strong style="color:#f0b429">Borde amarillo = reasignado</strong></span>' +
+  '</div>';
+
+  var grid = document.getElementById('gCalSimGrid');
+  if(grid) grid.innerHTML = html;
+}
+
+
 function _gConflictosPara(progSel, coordDest, df) {
   var sesProg  = df.filter(function(r){ return r['PROGRAMA'] === progSel; });
   var sesCoord = df.filter(function(r){
@@ -11986,6 +12319,10 @@ function _gRenderVistaSim(dfC, cambios, progLoad) {
   }
   wrap.style.display = 'block';
 
+  // Calcular puntaje por coordinadora usando la misma función que el gráfico
+  var _gSimPuntajeCoord = {};
+  computeLoadSim(dfC).forEach(function(e){ _gSimPuntajeCoord[e.coord] = e.puntaje; });
+
   // Construir mapa simulado: coord → programas
   var simMap = {};
   progLoad.forEach(function(p){
@@ -12023,10 +12360,11 @@ function _gRenderVistaSim(dfC, cambios, progLoad) {
 
   coordsOrden.forEach(function(co){
     var progs  = simMap[co].sort(function(a,b){ return b.puntaje - a.puntaje; });
-    var totalPts = progs.reduce(function(s,p){ return s + p.puntaje; }, 0);
+    // Usar el puntaje del gráfico (computeLoadSim) para consistencia
+    var totalPts = _gSimPuntajeCoord[co] || progs.reduce(function(s,p){ return s + p.puntaje; }, 0);
     var totalSes = progs.reduce(function(s,p){ return s + p.ses; }, 0);
     var tieneNuevos = progs.some(function(p){ return p.esCambiado; });
-    var umbral  = parseFloat(($('gUmbral')||{value:60}).value) || 60;
+    var umbral  = parseFloat(($('gUmbral')||{value:20}).value) || 20;
     var estado  = totalPts >= umbral ? {c:'#f85149',lbl:'SOBRECARGADA',ico:'🔴'}
                 : totalPts >= umbral*0.75 ? {c:'#f0b429',lbl:'ATENCIÓN',ico:'🟡'}
                 : {c:'#3fb950',lbl:'NORMAL',ico:'🟢'};
@@ -12322,7 +12660,10 @@ function gValidarConflicto() {
   var coordSel = $('simNew')  ? $('simNew').value  : '';
   if (!progSel || !coordSel) { zona.innerHTML = ''; return; }
 
+  // Usar misma lógica de filtro de año que updAdmin
   var df = getDF();
+  var _gvSy = getDF_sel('gY');
+  if(_gvSy.length) df = df.filter(function(r){ return r['DIAS/FECHAS'] && _gvSy.includes(String(r['DIAS/FECHAS'].getFullYear())); });
   var sesProg  = df.filter(function(r){ return r['PROGRAMA'] === progSel; });
   var sesCoord = df.filter(function(r){
     return r['COORDINADORA RESPONSABLE'] === coordSel && r['PROGRAMA'] !== progSel;
@@ -15199,7 +15540,7 @@ function updCal() {
   if(lbl) lbl.textContent = MNAMES[rm] + ' ' + ry;
 
   // Mapa de eventos por día
-  var eMap = {};
+  var eMap = {}; _gCalSimEMap = {};
   df.forEach(function(r){
     if(!r['DIAS/FECHAS']) return;
     var d = r['DIAS/FECHAS'];
@@ -15544,6 +15885,240 @@ function chkAdmin() {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   CARGA POR PROGRAMA — Vista de todos los programas con su
+   puntaje de carga, sin necesidad de seleccionar coordinadora
+══════════════════════════════════════════════════════════════ */
+function showCargaProg() {
+  var df = getDF();
+  var cpAnioVal = ($('cpAnio')||{value:''}).value;
+  if(cpAnioVal) df = df.filter(function(r){ return r['DIAS/FECHAS'] && String(r['DIAS/FECHAS'].getFullYear()) === cpAnioVal; });
+  if(!df.length) {
+    $('page').innerHTML = '<div class="pg-title">📊 Carga por Programa</div>' +
+      '<div style="text-align:center;padding:60px;color:#8b949e">' +
+        '<div style="font-size:40px;margin-bottom:12px">📊</div>' +
+        '<div style="font-size:14px;font-weight:700">Carga el archivo del Calendario Académico</div>' +
+      '</div>';
+    return;
+  }
+
+  var progLoad = computeLoadByProgInDf(df);
+  progLoad.sort(function(a,b){ return b.puntaje - a.puntaje; });
+  var loadCoord = computeLoadByCoord(df);
+  var loadSimulada = computeLoadSim(df);
+  var mapSim = {}; loadSimulada.forEach(function(e){ mapSim[e.coord] = e.puntaje; });
+
+  var totalSes = progLoad.reduce(function(s,p){ return s+p.ses; }, 0);
+  var avgPts = loadCoord.length ? loadCoord.reduce(function(s,r){return s+r.puntaje;},0) / loadCoord.length : 0;
+  var maxPts = loadCoord[0] ? loadCoord[0].puntaje : 0;
+
+  var years = {};
+  df.forEach(function(r){ if(r['DIAS/FECHAS'] instanceof Date) years[r['DIAS/FECHAS'].getFullYear()] = true; });
+  var yArr = Object.keys(years).sort();
+  var hasSim = Object.keys(APP.simCambios||{}).length > 0 || Object.keys(APP.simDesasig||{}).length > 0;
+
+  $('page').innerHTML =
+    '<div class="pg-title" style="margin-bottom:4px">📊 Carga por Programa</div>' +
+    '<div style="font-size:11px;color:#8b949e;margin-bottom:14px">' +
+      'Puntaje de carga de cada programa · Fórmula: Σ[(sesiones_mes ÷ 4) × factor_alumnos] ÷ meses_activos' +
+    '</div>' +
+
+    // Filtro año
+    '<div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">' +
+      '<select id="cpAnio" onchange="showCargaProg()" ' +
+        'style="padding:7px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:11px">' +
+        '<option value="">Todos los años</option>' +
+        yArr.map(function(y){ return '<option value="'+y+'"'+(cpAnioVal===y?' selected':'')+'>'+y+'</option>'; }).join('') +
+      '</select>' +
+    '</div>' +
+
+    // KPIs
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
+    [
+      {ico:'🎓', lbl:'Programas',      val:progLoad.length, c:'#388bfd', sub:'en el período'},
+      {ico:'📚', lbl:'Total Sesiones', val:totalSes,        c:'#3fb950', sub:'clases programadas'},
+      {ico:'📐', lbl:'Carga Promedio', val:avgPts.toFixed(2),c:'#a78bfa', sub:'pts/programa'},
+      {ico:'🔥', lbl:'Carga Máxima',  val:maxPts.toFixed(2),c:'#f85149', sub:loadCoord[0]?abbr(loadCoord[0].coord,20):'—'},
+    ].map(function(k){
+      return '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px;border-left:3px solid '+k.c+'">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">' +
+          '<span style="font-size:16px">'+k.ico+'</span>' +
+          '<span style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">'+k.lbl+'</span>' +
+        '</div>' +
+        '<div style="font-size:22px;font-weight:900;color:'+k.c+'">'+k.val+'</div>' +
+        '<div style="font-size:9px;color:#6e7681;margin-top:3px">'+k.sub+'</div>' +
+      '</div>';
+    }).join('') +
+    '</div>' +
+
+    // Gráficos
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">' +
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden">' +
+        '<div style="padding:12px 16px;border-bottom:1px solid #21262d;background:#161b22">' +
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">📊 Ranking de Carga (Top 15)</div>' +
+          '<div style="font-size:10px;color:#8b949e">Puntaje promedio mensual por programa</div>' +
+        '</div>' +
+        '<div style="padding:14px"><canvas id="cpRankChart" height="320"></canvas></div>' +
+      '</div>' +
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden">' +
+        '<div style="padding:12px 16px;border-bottom:1px solid #21262d;background:#161b22">' +
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">👥 Distribución por Coordinadora</div>' +
+          '<div style="font-size:10px;color:#8b949e">' +
+            (hasSim ? 'Carga actual vs simulada' : 'Cantidad de programas y carga total') +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:14px"><canvas id="cpCoordChart" height="320"></canvas></div>' +
+      '</div>' +
+    '</div>' +
+
+    // Buscador + tabla
+    '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center">' +
+      '<input id="cpBuscar" type="text" placeholder="🔍 Buscar programa, coordinadora..." ' +
+        'oninput="_cpFiltrar()" style="padding:8px 14px;border:1px solid #21262d;border-radius:8px;' +
+        'background:#161b22;color:#e6edf3;font-size:11px;min-width:280px">' +
+      '<span id="cpCount" style="font-size:10px;color:#6e7681"></span>' +
+    '</div>' +
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden">' +
+      '<div id="cpTabla" style="overflow-x:auto;max-height:600px;overflow-y:auto"></div>' +
+    '</div>';
+
+  window._cpData = progLoad;
+  window._cpMaxCoord = maxPts;
+
+  // ═══ Gráfico Ranking Top 15 ═══
+  var top15 = progLoad.slice(0,15);
+  makeChart('cpRankChart', {
+    type: 'bar',
+    data: {
+      labels: top15.map(function(p){ return abbr(p.prog,22); }),
+      datasets: [{
+        label: 'Puntaje',
+        data: top15.map(function(p){ return parseFloat(p.puntaje.toFixed(2)); }),
+        backgroundColor: top15.map(function(p){
+          return p.puntaje >= avgPts*1.5 ? '#f85149bb'
+               : p.puntaje >= avgPts     ? '#f0b429bb'
+               : '#3fb950bb';
+        }),
+        borderRadius: 4, borderWidth: 0,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: {
+        legend: {display:false},
+        tooltip: {callbacks:{
+          label: function(ctx){
+            var p=top15[ctx.dataIndex];
+            return ' '+ctx.parsed.x+' pts ('+p.ses+' ses, '+p.alum+' alum, ×'+p.factor+', '+p.nMeses+' meses)';
+          }
+        }}
+      },
+      scales: {
+        x: {ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}},
+        y: {ticks:{color:'#e6edf3',font:{size:9}},grid:{display:false}}
+      }
+    }
+  });
+
+  // ═══ Gráfico Distribución por Coordinadora ═══
+  var coordArr = loadCoord.slice().sort(function(a,b){ return b.puntaje - a.puntaje; });
+  var CCOLS = ['#388bfd','#3fb950','#f0b429','#a78bfa','#22d3ee','#f85149','#fb923c','#60a5fa','#e879f9','#14b8a6'];
+  var coordMap = {};
+  progLoad.forEach(function(p){
+    if(!coordMap[p.coord]) coordMap[p.coord] = 0;
+    coordMap[p.coord]++;
+  });
+
+  var datasets = [
+    {label:'Programas', data:coordArr.map(function(e){return coordMap[e.coord]||0;}),
+     backgroundColor:CCOLS.map(function(c){return c+'99';}), borderRadius:3, borderWidth:0, yAxisID:'y'},
+    {label:'Carga actual', data:coordArr.map(function(e){return parseFloat(e.puntaje.toFixed(2));}),
+     type:'line', borderColor:'#f85149', backgroundColor:'#f8514933', pointBackgroundColor:'#f85149',
+     pointRadius:4, borderWidth:2, tension:0.3, yAxisID:'y1'},
+  ];
+  if(hasSim){
+    datasets.push(
+      {label:'Carga simulada', data:coordArr.map(function(e){return parseFloat((mapSim[e.coord]||0).toFixed(2));}),
+       type:'line', borderColor:'#3fb950', backgroundColor:'#3fb95033', pointBackgroundColor:'#3fb950',
+       pointRadius:4, borderWidth:2, tension:0.3, borderDash:[5,3], yAxisID:'y1'}
+    );
+  }
+
+  makeChart('cpCoordChart', {
+    type: 'bar',
+    data: {
+      labels: coordArr.map(function(e){ return abbr(e.coord,16); }),
+      datasets: datasets
+    },
+    options: {
+      plugins: {legend:{position:'bottom',labels:{color:'#8b949e',font:{size:10},boxWidth:12}}},
+      scales: {
+        x: {ticks:{color:'#8b949e',font:{size:9},maxRotation:35},grid:{color:'#21262d'}},
+        y: {position:'left',ticks:{color:'#388bfd',font:{size:10}},grid:{color:'#21262d'},
+            title:{display:true,text:'Programas',color:'#6e7681',font:{size:9}}},
+        y1:{position:'right',ticks:{color:'#f85149',font:{size:10}},grid:{display:false},
+            title:{display:true,text:'Carga (pts)',color:'#6e7681',font:{size:9}}},
+      }
+    }
+  });
+
+  _cpFiltrar();
+}
+
+
+function _cpFiltrar() {
+  var el = document.getElementById('cpTabla');
+  var cnt = document.getElementById('cpCount');
+  if(!el || !window._cpData) return;
+  var q = ((document.getElementById('cpBuscar')||{value:''}).value||'').toLowerCase();
+  var data = window._cpData.filter(function(p){
+    if(!q) return true;
+    return p.prog.toLowerCase().includes(q) || p.coord.toLowerCase().includes(q);
+  });
+  if(cnt) cnt.textContent = data.length + ' de ' + window._cpData.length + ' programas';
+
+  var maxPts = window._cpMaxCoord || 1;
+
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+    '<thead style="position:sticky;top:0;z-index:1"><tr style="background:#161b22;border-bottom:2px solid #21262d">' +
+    ['#','Programa','Coordinadora','Sesiones','Alumnos','Factor','Meses','Suma Mensual','Puntaje','Carga'].map(function(h){
+      return '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:#6e7681;' +
+        'text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+h+'</th>';
+    }).join('') + '</tr></thead><tbody>';
+
+  data.forEach(function(p, i){
+    var pct = p.puntaje > 0 && maxPts > 0 ? (p.puntaje / maxPts * 100) : 0;
+    var c = p.puntajeCoord >= 20 ? '#f85149'
+          : p.puntajeCoord >= 15 ? '#f0b429'
+          : '#3fb950';
+    var bg = i%2 ? 'transparent' : 'rgba(255,255,255,.012)';
+
+    html += '<tr style="border-bottom:1px solid #21262d;background:'+bg+'" title="'+esc(p.prog)+'">' +
+      '<td style="padding:7px 10px;color:#6e7681;font-weight:700">'+(i+1)+'</td>' +
+      '<td style="padding:7px 10px;font-weight:700;color:#e6edf3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.prog)+'</td>' +
+      '<td style="padding:7px 10px;color:#8b949e;font-size:10px">'+esc(abbr(p.coord,22))+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#e6edf3;font-weight:700">'+p.ses+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#e6edf3">'+p.alum+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#a78bfa;font-weight:700">\u00d7'+p.factor+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#8b949e">'+p.nMeses+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#22d3ee;font-weight:700">'+p.sumaMensual.toFixed(2)+'</td>' +
+      '<td style="padding:7px 10px;text-align:right;font-weight:900;color:'+c+';font-size:12px">'+p.puntaje.toFixed(2)+'</td>' +
+      '<td style="padding:7px 10px;width:120px">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<div style="flex:1;height:6px;background:#21262d;border-radius:3px;overflow:hidden">' +
+            '<div style="width:'+pct.toFixed(0)+'%;height:100%;background:'+c+';border-radius:3px"></div>' +
+          '</div>' +
+          '<span style="color:'+c+';font-size:9px;font-weight:700;min-width:30px">'+pct.toFixed(0)+'%</span>' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+
 function showAdmin() {
   var df    = getDF();
   var years = uniq(df.filter(function(r){ return r['DIAS/FECHAS']; })
@@ -15602,7 +16177,7 @@ function showAdmin() {
         '<label style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase">Umbral carga alta</label>' +
         '<div style="display:flex;align-items:center;gap:6px;background:#161b22;' +
           'border:1px solid #30363d;border-radius:8px;padding:6px 12px;height:34px;box-sizing:border-box">' +
-          '<input id="gUmbral" type="number" value="60" min="1" max="200" step="1" ' +
+          '<input id="gUmbral" type="number" value="20" min="1" max="200" step="1" ' +
             'onchange="updAdmin()" ' +
             'style="width:50px;background:transparent;border:none;color:#f0b429;' +
               'font-size:13px;font-weight:800;text-align:center;outline:none">' +
@@ -15614,7 +16189,7 @@ function showAdmin() {
       '<div style="flex:1"></div>' +
 
       // Botones de reset
-      '<button onclick="APP.simCambios={};APP.propuesta=null;updAdmin()" ' +
+      '<button onclick="APP.simCambios={};APP.simDesasig={};APP.propuesta=null;updAdmin()" ' +
         'style="padding:8px 14px;border:1px solid #21262d;background:#161b22;' +
           'color:#8b949e;border-radius:8px;cursor:pointer;font-size:11px;' +
           'font-weight:700;align-self:flex-end;height:34px">' +
@@ -15790,7 +16365,63 @@ function showAdmin() {
     '</div>' +
 
     // ── Vista Simulada Detallada ──────────────────────────────────
-    '<div id="gVistaSimWrap" style="display:none;margin-top:20px"></div>';
+    '<div id="gVistaSimWrap" style="display:none;margin-top:20px"></div>' +
+
+    // ── Calendario Simulado ─────────────────────────────────
+    '<div id="gCalSimWrap" style="display:none;margin-top:20px">' +
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden;border-top:3px solid #22d3ee">' +
+        '<div style="padding:14px 20px;background:#161b22;border-bottom:1px solid #21262d;display:flex;align-items:center;justify-content:space-between">' +
+          '<div>' +
+            '<div style="font-size:14px;font-weight:900;color:#f0f6ff">📅 Calendario Simulado</div>' +
+            '<div style="font-size:10px;color:#8b949e;margin-top:2px">Así quedaría el calendario después de las reasignaciones</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;align-items:center">' +
+            '<button onclick="_gCalSimPrev()" style="padding:6px 12px;border:1px solid #21262d;background:#161b22;color:#e6edf3;border-radius:6px;cursor:pointer;font-size:12px">←</button>' +
+            '<span id="gCalSimLabel" style="font-size:14px;font-weight:800;color:#f0f6ff;min-width:140px;text-align:center"></span>' +
+            '<button onclick="_gCalSimNext()" style="padding:6px 12px;border:1px solid #21262d;background:#161b22;color:#e6edf3;border-radius:6px;cursor:pointer;font-size:12px">→</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="gCalSimGrid" style="padding:14px"></div>' +
+      '</div>' +
+    '</div>' +
+
+    // ── Panel Desasignar Programas ──────────────────────────
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden;' +
+      'margin-top:20px;border-top:3px solid #f85149">'+
+      '<div style="padding:14px 20px;background:#161b22;border-bottom:1px solid #21262d;' +
+        'display:flex;align-items:center;justify-content:space-between">'+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:900;color:#f0f6ff">🚫 Desasignar Programas</div>'+
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">'+
+            'Quita programas de una coordinadora para simular la carga sin ellos'+
+          '</div>'+
+        '</div>'+
+        '<span id="gDesasigCount" style="font-size:10px;padding:4px 12px;background:rgba(248,81,73,.12);' +
+          'color:#f85149;border-radius:8px;border:1px solid rgba(248,81,73,.3);font-weight:700"></span>'+
+      '</div>'+
+      '<div style="padding:16px">'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:14px">'+
+          '<div style="display:flex;flex-direction:column;gap:4px">'+
+            '<label style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase">Coordinadora</label>'+
+            '<select id="gDesCoord" onchange="_gDesUpdProgs()" '+
+              'style="padding:8px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:11px">'+
+              '<option value="">Seleccionar...</option>'+
+            '</select>'+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:4px">'+
+            '<label style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase">Programa a desasignar</label>'+
+            '<select id="gDesProg" '+
+              'style="padding:8px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:11px">'+
+              '<option value="">Seleccionar coordinadora primero</option>'+
+            '</select>'+
+          '</div>'+
+          '<button onclick="_gDesasignar()" '+
+            'style="padding:8px 20px;background:#f85149;color:#fff;border:none;border-radius:8px;' +
+            'font-size:12px;font-weight:700;cursor:pointer;height:36px">− Quitar</button>'+
+        '</div>'+
+        '<div id="gDesLista" style="display:flex;flex-direction:column;gap:6px"></div>'+
+      '</div>'+
+    '</div>';
 
   updAdmin();
 }
@@ -15799,17 +16430,18 @@ function showAdmin() {
 function updAdmin() {
   var df = getDF();
   var sy = getDF_sel('gY'), mes = $('gM') ? $('gM').value : '';
-  var umbral = parseFloat($('gUmbral') ? $('gUmbral').value : 60) || 60;
+
+  var umbral = parseFloat($('gUmbral') ? $('gUmbral').value : 20) || 20;
 
   if (sy.length) df = df.filter(function(r){ return r['DIAS/FECHAS'] && sy.includes(String(r['DIAS/FECHAS'].getFullYear())); });
   var dfC = mes ? df.filter(function(r){ return r['Mes'] === mes; }) : df;
-  // Para cálculo de CARGA: filtrar por AÑO pero NO por mes
-  // El puntaje es la carga anual completa, no del mes
-  var dfLoad = df; // df ya está filtrado por año (sy) pero NO por mes
+  var dfLoad = df;
+
 
   // ── KPIs globales ─────────────────────────────────────
   var load    = computeLoadByCoord(dfLoad);
   var loadSim = computeLoadSim(dfLoad);
+
   var pMax = load[0] ? load[0].puntaje : 0;
   var pMin = load.length ? load[load.length-1].puntaje : 0;
   var avg  = load.length ? load.reduce(function(s,r){return s+r.puntaje;},0)/load.length : 0;
@@ -16060,7 +16692,11 @@ function updAdmin() {
               '<div style="grid-column:1/-1;padding:6px 16px;border-top:1px solid #21262d;'+
                 'font-size:9px;color:#6e7681;background:rgba(0,0,0,.15);text-align:center">' +
               (function(){
-                var pRows = getDF().filter(function(r){return r['PROGRAMA']===prog;});
+                var pRows = (function(){
+                  var _d=getDF(), _s=getDF_sel('gY');
+                  if(_s.length) _d=_d.filter(function(r){return r['DIAS/FECHAS']&&_s.includes(String(r['DIAS/FECHAS'].getFullYear()));});
+                  return _d.filter(function(r){return r['PROGRAMA']===prog;});
+                })();
                 var alumN = pRows.reduce(function(m,r){return Math.max(m,parseInt(r['N_ALUMNOS'])||0);},0);
                 var fN = factorAlumnos(alumN);
                 var meses={};
@@ -16199,6 +16835,16 @@ function updAdmin() {
   // Vista simulada detallada
   _gRenderVistaSim(dfLoad, cambios, progLoad);
 
+  // Desasignar: populate coord select y lista
+  var gDesCoordEl = document.getElementById('gDesCoord');
+  if(gDesCoordEl) {
+    var coordsAll = uniq(dfLoad.map(function(r){ return r['COORDINADORA RESPONSABLE']||''; }).filter(Boolean)).sort();
+    gDesCoordEl.innerHTML = '<option value="">Seleccionar...</option>' +
+      coordsAll.map(function(co){ return '<option value="'+esc(co)+'">'+esc(co)+'</option>'; }).join('');
+  }
+  _gDesRenderLista();
+  _gRenderCalSim(dfLoad);
+
   // Show propuesta balanceo
   if (APP.propuesta) renderPropuesta(APP.propuesta, load, progLoad);
 }
@@ -16239,8 +16885,11 @@ function _gBuildBars(load, umbral, isSim) {
 
 /* ── Carga con simulación aplicada ──────────────────────────────── */
 function computeLoadSim(df) {
-  // Aplicar APP.simCambios al df virtual
-  var dfSim = df.map(function(r){
+  // Aplicar APP.simCambios y APP.simDesasig al df virtual
+  var dfSim = df.filter(function(r){
+    // Excluir programas desasignados
+    return !(APP.simDesasig && APP.simDesasig[r['PROGRAMA']]);
+  }).map(function(r){
     var sim = APP.simCambios && APP.simCambios[r['PROGRAMA']];
     if (sim) return Object.assign({}, r, {'COORDINADORA RESPONSABLE': sim});
     return r;
@@ -16267,12 +16916,13 @@ function _gQuitarCambio(prog) {
 
 /* ── Exportar simulación ────────────────────────────────────────── */
 function _gExportarSimulacion() {
-  console.log('_gExportarSimulacion llamada, cambios:', Object.keys(APP.simCambios||{}).length);
-  if(!Object.keys(APP.simCambios||{}).length) { showToast('Sin cambios para exportar','err'); return; }
-  if(typeof XLSX === 'undefined') { showToast('Librería XLSX no cargada','err'); return; }
+  var hasCambios = Object.keys(APP.simCambios||{}).length > 0;
+  var hasDesasig = Object.keys(APP.simDesasig||{}).length > 0;
+  if(!hasCambios && !hasDesasig) { showToast('Sin cambios para exportar','err'); return; }
+  if(typeof XLSX === 'undefined') { showToast('XLSX no cargado','err'); return; }
 
-  // Usar misma lógica que updAdmin: filtrar por año seleccionado pero no por mes
-  var dfC = (function(){
+  // ── Datos base: mismo dfLoad que usa updAdmin ─────────────────
+  var dfLoad = (function(){
     var _df = getDF();
     var _sy = getDF_sel('gY');
     if(_sy.length) _df = _df.filter(function(r){
@@ -16280,222 +16930,286 @@ function _gExportarSimulacion() {
     });
     return _df;
   })();
-  var cambios = Object.entries(APP.simCambios||{});
-  var umbral  = parseFloat(($('gUmbral')||{value:'60'}).value) || 60;
 
-  // ── Carga ACTUAL (sin cambios) ────────────────────────────────
-  // Usar misma función que el gráfico para garantizar consistencia
-  var dfAct = dfC.slice(); // sin cambios
-  var loadAct = computeLoadByCoord(dfAct);
-  var mapActual = {};
-  loadAct.forEach(function(e){ mapActual[e.coord] = e.puntaje; });
+  var umbral = parseFloat(($('gUmbral')||{value:'20'}).value) || 20;
 
-  // ── Carga SIMULADA — usar computeLoadSim (igual que el gráfico) ────
-  var loadSim = computeLoadSim(dfC);
-  var mapSimul = {};
-  loadSim.forEach(function(e){ mapSimul[e.coord] = e.puntaje; });
+  // ── Carga ACTUAL y SIMULADA usando las mismas funciones del gráfico ──
+  var loadAct = computeLoadByCoord(dfLoad);
+  var loadSim = computeLoadSim(dfLoad);  // con simCambios + simDesasig
+  var mapActual = {}; loadAct.forEach(function(e){ mapActual[e.coord] = e.puntaje; });
+  var mapSimul = {}; loadSim.forEach(function(e){ mapSimul[e.coord] = e.puntaje; });
 
-  // ── progLoad ORIGINAL (sin cambios) ──────────────────────────
-  var progLoadOrig = computeLoadByProgInDf(dfC);
-  var mapProgOrig = {};
-  progLoadOrig.forEach(function(p){ mapProgOrig[p.prog] = p; });
-
-  // ── progLoad SIMULADO — mismo dfSim que usa computeLoadSim ──────
-  var dfSim = dfC.map(function(r){
-    var sim = APP.simCambios && APP.simCambios[r['PROGRAMA']];
-    if(sim) return Object.assign({}, r, {'COORDINADORA RESPONSABLE': sim});
-    return r;
+  // ── Programas por coord: ACTUAL ──
+  var progsPorCoordAct = {};
+  dfLoad.forEach(function(r){
+    var co = r['COORDINADORA RESPONSABLE']||'';
+    var pr = r['PROGRAMA']||'';
+    if(!co||!pr) return;
+    if(!progsPorCoordAct[co]) progsPorCoordAct[co] = new Set();
+    progsPorCoordAct[co].add(pr);
   });
-  var progLoadSim = computeLoadByProgInDf(dfSim);
-  var mapProgSim = {};
-  progLoadSim.forEach(function(p){ mapProgSim[p.prog] = p; });
+
+  // ── Programas por coord: SIMULADO ──
+  var progsPorCoordSim = {};
+  dfLoad.forEach(function(r){
+    var pr = r['PROGRAMA']||'';
+    if(!pr) return;
+    if(APP.simDesasig && APP.simDesasig[pr]) return; // desasignado
+    var co = (APP.simCambios && APP.simCambios[pr]) || r['COORDINADORA RESPONSABLE']||'';
+    if(!co) return;
+    if(!progsPorCoordSim[co]) progsPorCoordSim[co] = new Set();
+    progsPorCoordSim[co].add(pr);
+  });
 
   try {
     // ════════════════════════════════════════════════════════════
-    // HOJA 1 — Reasignaciones
+    // HOJA 1 — Cambios realizados (reasignaciones + desasignaciones)
     // ════════════════════════════════════════════════════════════
-    var hoja1 = cambios.map(function(e){
-      var prog     = e[0];
-      var coordNew = e[1];
-      var orig     = mapProgOrig[prog];
-      var sim      = mapProgSim[prog];
-      var coordOrig = orig ? orig.coord : '—';
-      var conflictos = _gConflictosPara(prog, coordNew, dfC);
-      return {
-        'N°':                       cambios.indexOf(e)+1,
-        'Programa':                 prog,
-        'Coord. Original':          coordOrig,
-        'Coord. Nueva (Simulada)':  coordNew,
-        'Sesiones':                 orig ? orig.ses : 0,
-        'Alumnos':                  orig ? orig.alum : 0,
-        'Factor Alumnos':           orig ? factorAlumnos(orig.alum) : 1,
-        'Puntaje Programa':         orig ? parseFloat(orig.puntaje.toFixed(1)) : 0,
-        'Carga Orig. antes':        parseFloat((mapActual[coordOrig]||0).toFixed(1)),
-        'Carga Orig. después':      parseFloat((mapSimul[coordOrig]||0).toFixed(1)),
-        'Carga Nueva antes':        parseFloat((mapActual[coordNew]||0).toFixed(1)),
-        'Carga Nueva después':      parseFloat((mapSimul[coordNew]||0).toFixed(1)),
-        'Conflictos Detectados':    conflictos.length,
-        'Estado':                   (mapSimul[coordNew]||0) >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
-      };
+    var hoja1 = [];
+    var n = 0;
+    Object.entries(APP.simCambios||{}).forEach(function(e){
+      n++;
+      var prog = e[0], coordNew = e[1];
+      var coordOrig = '';
+      dfLoad.some(function(r){ if(r['PROGRAMA']===prog){ coordOrig=r['COORDINADORA RESPONSABLE']; return true; } });
+      hoja1.push({
+        'N°': n, 'Tipo': 'Reasignación',
+        'Programa': prog,
+        'Coord. Original': coordOrig,
+        'Coord. Nueva': coordNew,
+        'Carga Orig. antes': parseFloat((mapActual[coordOrig]||0).toFixed(2)),
+        'Carga Orig. después': parseFloat((mapSimul[coordOrig]||0).toFixed(2)),
+        'Carga Nueva antes': parseFloat((mapActual[coordNew]||0).toFixed(2)),
+        'Carga Nueva después': parseFloat((mapSimul[coordNew]||0).toFixed(2)),
+      });
+    });
+    Object.entries(APP.simDesasig||{}).forEach(function(e){
+      n++;
+      hoja1.push({
+        'N°': n, 'Tipo': 'Desasignación',
+        'Programa': e[0],
+        'Coord. Original': e[1],
+        'Coord. Nueva': '(sin asignar)',
+        'Carga Orig. antes': parseFloat((mapActual[e[1]]||0).toFixed(2)),
+        'Carga Orig. después': parseFloat((mapSimul[e[1]]||0).toFixed(2)),
+        'Carga Nueva antes': '',
+        'Carga Nueva después': '',
+      });
     });
 
     // ════════════════════════════════════════════════════════════
     // HOJA 2 — Carga por Coordinadora (Actual vs Simulada)
     // ════════════════════════════════════════════════════════════
     var todasCoords = Array.from(new Set(
-      loadAct.map(function(e){ return e.coord; })
-      .concat(loadSim.map(function(e){ return e.coord; }))
+      loadAct.map(function(e){return e.coord;})
+        .concat(loadSim.map(function(e){return e.coord;}))
     )).sort();
 
     var hoja2 = todasCoords.map(function(co){
-      var act  = mapActual[co] || 0;
-      var sim2 = mapSimul[co] || 0;
-      var delta = sim2 - act;
-      // Programas bajo esta coord en la simulación
-      var progsSim = progLoadSim.filter(function(p){ return p.coord === co; });
+      var act = mapActual[co] || 0;
+      var sim = mapSimul[co] || 0;
+      var delta = sim - act;
+      var progsAct = progsPorCoordAct[co] ? [...progsPorCoordAct[co]] : [];
+      var progsSim = progsPorCoordSim[co] ? [...progsPorCoordSim[co]] : [];
       return {
-        'Coordinadora':              co,
-        'Puntaje Actual':            parseFloat(act.toFixed(1)),
-        'Puntaje Simulado':          parseFloat(sim2.toFixed(1)),
-        'Variación':                 parseFloat(delta.toFixed(1)),
-        'Variación %':               act > 0 ? parseFloat((delta/act*100).toFixed(1)) : 0,
-        'N° Programas Actual':       progLoadOrig.filter(function(p){ return p.coord===co; }).length,
-        'N° Programas Simulado':     progsSim.length,
-        'Estado Simulado':           sim2 >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
-        'Programas (Simulado)':      progsSim.map(function(p){ return p.prog; }).join(' | '),
+        'Coordinadora':          co,
+        'Puntaje Actual':        parseFloat(act.toFixed(2)),
+        'Puntaje Simulado':      parseFloat(sim.toFixed(2)),
+        'Variación':             parseFloat(delta.toFixed(2)),
+        'Variación %':           act > 0 ? parseFloat((delta/act*100).toFixed(1)) : 0,
+        'N° Progs Actual':       progsAct.length,
+        'N° Progs Simulado':     progsSim.length,
+        'Estado':                sim >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
+        'Programas (Actual)':    progsAct.sort().join(' | '),
+        'Programas (Simulado)':  progsSim.sort().join(' | '),
       };
     });
 
     // ════════════════════════════════════════════════════════════
-    // HOJA 3 — Topes de Horario (en la simulación)
+    // HOJA 3 — Topes de Horario detectados en la simulación
     // ════════════════════════════════════════════════════════════
     var hoja3 = [];
-    cambios.forEach(function(e){
-      var prog     = e[0];
-      var coordNew = e[1];
-      var conflictos = _gConflictosPara(prog, coordNew, dfC);
+    Object.entries(APP.simCambios||{}).forEach(function(e){
+      var prog = e[0], coordNew = e[1];
+      var conflictos = _gConflictosPara(prog, coordNew, dfLoad);
       conflictos.forEach(function(cf){
         hoja3.push({
-          'Programa Reasignado':  prog,
-          'Coord. Destino':       coordNew,
+          'Programa Reasignado': prog,
+          'Coord. Destino': coordNew,
           'Programa en Conflicto': cf.progB,
-          'Fecha':                cf.fechaA,
-          'Día':                  cf.dia,
-          'Horario (nuevo)':      cf.horA,
-          'Horario (existente)':  cf.horB,
-          'Min. Solapados':       cf.minSolap,
-          'Sede (nuevo)':         cf.sedeA,
-          'Sede (existente)':     cf.sedeB,
-          'Asignatura (nuevo)':   cf.asigA,
-          'Asignatura (existente)': cf.asigB,
-          'Modalidad (nuevo)':    cf.modalA,
-          'Modalidad (existente)': cf.modalB,
-          'Nivel':                cf.nivel,
+          'Fecha': cf.fechaA,
+          'Día': cf.dia,
+          'Horario (nuevo)': cf.horA,
+          'Horario (existente)': cf.horB,
+          'Min. Solapados': cf.minSolap,
+          'Sede A': cf.sedeA,
+          'Sede B': cf.sedeB,
         });
       });
     });
-    if(!hoja3.length) hoja3 = [{'Resultado': 'Sin conflictos de horario detectados en la simulación'}];
+    if(!hoja3.length) hoja3 = [{'Resultado': 'Sin conflictos detectados'}];
 
     // ════════════════════════════════════════════════════════════
-    // HOJA 4 — Detalle completo SIMULADO por coordinadora
+    // HOJA 4 — Detalle completo SIMULADO
     // ════════════════════════════════════════════════════════════
     var hoja4 = [];
-    var coordsOrden = Array.from(new Set(progLoadSim.map(function(p){ return p.coord; }))).sort();
-    coordsOrden.forEach(function(co){
-      var progsCo = progLoadSim.filter(function(p){ return p.coord === co; })
-        .sort(function(a,b){ return b.puntaje - a.puntaje; });
+    todasCoords.forEach(function(co){
+      var progsCo = progsPorCoordSim[co] ? [...progsPorCoordSim[co]].sort() : [];
       var totalCo = mapSimul[co] || 0;
-
-      progsCo.forEach(function(p, idx){
-        var esCambiado = !!APP.simCambios[p.prog];
-        var coordOrigP = esCambiado ? (mapProgOrig[p.prog]||{}).coord||'—' : co;
+      progsCo.forEach(function(prog){
+        var esCambiado = !!(APP.simCambios && APP.simCambios[prog]);
+        var coordOrig = '';
+        if(esCambiado){
+          dfLoad.some(function(r){ if(r['PROGRAMA']===prog){ coordOrig=r['COORDINADORA RESPONSABLE']; return true; } });
+        }
+        // Contar sesiones y alumnos de este programa
+        var sesP = 0, alumP = 0;
+        dfLoad.forEach(function(r){
+          if(r['PROGRAMA']!==prog) return;
+          sesP++; alumP = Math.max(alumP, r['N_ALUMNOS']||0);
+        });
         hoja4.push({
           'Coordinadora (Simulada)': co,
-          'Carga Total Simulada':    parseFloat(totalCo.toFixed(1)),
-          'Estado':                  totalCo >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
-          'Programa':                p.prog,
-          'Reasignado':              esCambiado ? 'Sí (desde '+coordOrigP+')' : 'No (original)',
-          'Sesiones':                p.ses,
-          'Alumnos':                 p.alum,
-          'Factor':                  factorAlumnos(p.alum),
-          'Puntaje Programa':        parseFloat(p.puntaje.toFixed(1)),
-          'Fórmula':                 '('+p.ses+'÷4)×'+factorAlumnos(p.alum)+' = '+p.puntaje.toFixed(1),
+          'Carga Total Coord.': parseFloat(totalCo.toFixed(2)),
+          'Estado': totalCo >= umbral ? '⚠️ Sobre umbral' : '✅ OK',
+          'Programa': prog,
+          'Reasignado': esCambiado ? 'Sí (desde '+coordOrig+')' : 'No (original)',
+          'Sesiones': sesP,
+          'Alumnos': alumP,
+          'Factor': factorAlumnos(alumP),
         });
       });
-      // Fila separadora
-      if(coordsOrden.indexOf(co) < coordsOrden.length-1) {
-        hoja4.push({'Coordinadora (Simulada)':'————','Carga Total Simulada':'','Estado':'',
-          'Programa':'','Reasignado':'','Sesiones':'','Alumnos':'','Factor':'',
-          'Puntaje Programa':'','Fórmula':''});
-      }
     });
 
-    // ── Construir y descargar ─────────────────────────────────
+    // ── Desasignados
+    Object.entries(APP.simDesasig||{}).forEach(function(e){
+      var prog = e[0], coordOrig = e[1];
+      var sesP = 0, alumP = 0;
+      dfLoad.forEach(function(r){
+        if(r['PROGRAMA']!==prog) return;
+        sesP++; alumP = Math.max(alumP, r['N_ALUMNOS']||0);
+      });
+      hoja4.push({
+        'Coordinadora (Simulada)': '(DESASIGNADO)',
+        'Carga Total Coord.': '',
+        'Estado': '🚫 Desasignado',
+        'Programa': prog,
+        'Reasignado': 'Desasignado de '+coordOrig,
+        'Sesiones': sesP,
+        'Alumnos': alumP,
+        'Factor': factorAlumnos(alumP),
+      });
+    });
+
+    // ── Generar Excel ─────────────────────────────────────────
     var wb = XLSX.utils.book_new();
+
     var ws1 = XLSX.utils.json_to_sheet(hoja1);
-    ws1['!cols'] = [{wch:4},{wch:42},{wch:26},{wch:26},{wch:10},{wch:10},{wch:8},{wch:12},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12},{wch:12}];
-    XLSX.utils.book_append_sheet(wb, ws1, '1. Reasignaciones');
+    ws1['!cols'] = [{wch:4},{wch:14},{wch:44},{wch:28},{wch:28},{wch:14},{wch:14},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws1, '1. Cambios');
 
     var ws2 = XLSX.utils.json_to_sheet(hoja2);
-    ws2['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:10},{wch:12},{wch:14},{wch:14},{wch:14},{wch:60}];
+    ws2['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:60},{wch:60}];
     XLSX.utils.book_append_sheet(wb, ws2, '2. Carga por Coordinadora');
 
     var ws3 = XLSX.utils.json_to_sheet(hoja3);
-    ws3['!cols'] = [{wch:40},{wch:26},{wch:40},{wch:12},{wch:10},{wch:16},{wch:16},{wch:12},{wch:16},{wch:16},{wch:32},{wch:32},{wch:14},{wch:14},{wch:8}];
+    ws3['!cols'] = [{wch:44},{wch:28},{wch:44},{wch:12},{wch:10},{wch:16},{wch:16},{wch:12},{wch:16},{wch:16}];
     XLSX.utils.book_append_sheet(wb, ws3, '3. Topes Detectados');
 
     var ws4 = XLSX.utils.json_to_sheet(hoja4);
-    ws4['!cols'] = [{wch:28},{wch:14},{wch:12},{wch:42},{wch:28},{wch:10},{wch:10},{wch:8},{wch:12},{wch:24}];
+    ws4['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:44},{wch:28},{wch:10},{wch:10},{wch:8}];
     XLSX.utils.book_append_sheet(wb, ws4, '4. Detalle Simulado');
 
     var fecha = new Date().toISOString().substring(0,10);
-    XLSX.writeFile(wb, 'Simulacion_Reasignacion_'+fecha+'.xlsx');
-    showToast('Excel exportado — '+cambios.length+' reasignación(es) · 4 hojas','ok');
+    XLSX.writeFile(wb, 'Simulacion_'+fecha+'.xlsx');
+    showToast('Exportado · '+n+' cambio(s) · 4 hojas','ok');
 
   } catch(err) {
-    alert('ERROR al exportar: ' + err.message);
+    alert('Error al exportar: '+err.message);
     console.error(err);
   }
 }
 
 
 function computeLoadByProgInDf(df) {
-  var map = {};
+  // Paso 1: agrupar por coord → prog → meses (igual que computeLoadByCoord)
+  var coordProgs = {};
   df.forEach(function(r){
-    var k = r['PROGRAMA'];
-    if(!map[k]) map[k] = {prog:k, coord:r['COORDINADORA RESPONSABLE'], ses:0, alum:0, meses:{}};
-    map[k].ses++;
-    map[k].alum = Math.max(map[k].alum, r['N_ALUMNOS']||0);
+    var coord = r['COORDINADORA RESPONSABLE']||'';
+    var prog  = r['PROGRAMA']||'';
+    var alum  = r['N_ALUMNOS']||0;
     var fecha = r['DIAS/FECHAS'];
+    if(!coord||!prog) return;
+    if(!coordProgs[coord]) coordProgs[coord] = {};
+    if(!coordProgs[coord][prog]) coordProgs[coord][prog] = {alum:0, meses:{}, ses:0};
+    coordProgs[coord][prog].ses++;
+    coordProgs[coord][prog].alum = Math.max(coordProgs[coord][prog].alum, alum);
     if(fecha instanceof Date){
       var mesKey = fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0');
-      map[k].meses[mesKey] = (map[k].meses[mesKey]||0) + 1;
+      coordProgs[coord][prog].meses[mesKey] = (coordProgs[coord][prog].meses[mesKey]||0) + 1;
     }
   });
-  return Object.values(map).map(function(d){
-    var factor = factorAlumnos(d.alum);
-    var mesesArr = Object.keys(d.meses).sort();
-    var sumaMensual = 0;
-    var detalle = {};
-    mesesArr.forEach(function(m){
-      var sesMes = d.meses[m];
-      var cargaMes = (sesMes / 4) * factor;
-      detalle[m] = {ses: sesMes, carga: cargaMes};
-      sumaMensual += cargaMes;
+
+  // Paso 2: para cada coordinadora, calcular total y contribución de cada programa
+  var result = [];
+  Object.entries(coordProgs).forEach(function(ce){
+    var coord = ce[0], progs = ce[1];
+
+    // Meses activos de TODA la coordinadora
+    var mesesSet = {};
+    Object.values(progs).forEach(function(p){
+      Object.keys(p.meses).forEach(function(m){ mesesSet[m]=true; });
     });
-    var promedio = mesesArr.length > 0 ? sumaMensual / mesesArr.length : 0;
-    var delta = getFactoresDelta(d.prog);
-    return Object.assign({}, d, {
-      puntaje:       Math.max(0, Math.round((promedio + delta)*100)/100),
-      puntajeBase:   Math.round(promedio*100)/100,
-      deltaFactores: delta,
-      nMeses:        mesesArr.length,
-      sumaMensual:   Math.round(sumaMensual*100)/100,
-      detalleMeses:  detalle,
-      factor:        factor,
+    var mesesCoord = Object.keys(mesesSet).sort();
+    var nMesesCoord = mesesCoord.length || 1;
+
+    // Total de la coordinadora (mismo cálculo que computeLoadByCoord)
+    var sumCoord = 0;
+    mesesCoord.forEach(function(mes){
+      Object.values(progs).forEach(function(p){
+        var sesMes = p.meses[mes]||0;
+        if(sesMes>0) sumCoord += (sesMes/4)*factorAlumnos(p.alum);
+      });
+    });
+    var puntajeCoord = sumCoord / nMesesCoord;
+
+    // Contribución de cada programa = su parte del total
+    Object.entries(progs).forEach(function(pe){
+      var prog = pe[0], p = pe[1];
+      var factor = factorAlumnos(p.alum);
+      var nMesesProg = Object.keys(p.meses).length;
+
+      // Suma de carga de este programa en todos sus meses
+      var sumaProg = Object.values(p.meses).reduce(function(s,sesMes){
+        return s + (sesMes/4)*factor;
+      }, 0);
+
+      // Contribución = sumaProg / meses de la COORDINADORA (no del programa)
+      var contribucion = sumaProg / nMesesCoord;
+
+      var delta = getFactoresDelta(prog);
+
+      result.push({
+        prog: prog,
+        coord: coord,
+        ses: p.ses,
+        alum: p.alum,
+        factor: factor,
+        nMeses: nMesesProg,
+        nMesesCoord: nMesesCoord,
+        sumaMensual: Math.round(sumaProg*100)/100,
+        puntaje: Math.round((contribucion + delta)*100)/100,
+        puntajeBase: Math.round(contribucion*100)/100,
+        puntajeCoord: Math.round(puntajeCoord*100)/100,
+        deltaFactores: delta,
+      });
     });
   });
+
+  return result;
 }
+
+
 function _gToggleExcl(coord) {
   if (!APP.simExcl) APP.simExcl = new Set();
   if (APP.simExcl.has(coord)) APP.simExcl.delete(coord);
@@ -16590,7 +17304,7 @@ function genBalanceo() {
 
 function renderPropuesta(changes, load, progLoad) {
   var el = $('propWrap'); if (!el) return;
-  var umbral = parseFloat($('gUmbral') ? $('gUmbral').value : 60) || 60;
+  var umbral = parseFloat($('gUmbral') ? $('gUmbral').value : 20) || 20;
   // CORRECCIÓN: simular con los cambios de la PROPUESTA, no APP.simCambios
   var loadSim = computeLoadWithChanges(getDF(), changes);
   var pMaxSim = loadSim[0] ? loadSim[0].puntaje : 0;
@@ -19017,4 +19731,3 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
-
