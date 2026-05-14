@@ -8043,15 +8043,15 @@ function _dvRenderCruceTabla2(){
 
       return '<tr style="border-bottom:1px solid var(--border);background:'+bg+'">'+
         '<td style="padding:8px 10px;font-weight:700;color:var(--t1)">'+esc(abbr(r.docente||'—',28))+'</td>'+
-        '<td style="padding:8px 10px;color:var(--t3);font-size:10px">'+esc(abbr(r.programa||'—',32))+'</td>'+
+        '<td style="padding:6px 8px;color:var(--t3);font-size:10px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.programa||'—')+'</td>'+
         '<td style="padding:8px 10px;color:var(--t3);font-weight:700">'+esc(String(r.cc||'—'))+'</td>'+
         '<td style="padding:8px 10px;color:var(--t3);font-size:10px;white-space:nowrap">'+esc(r.mesIni||'—')+'</td>'+
         '<td style="padding:8px 10px;color:var(--t3);font-size:10px;white-space:nowrap">'+esc(r.mesFin||'—')+'</td>'+
-        '<td style="padding:8px 10px;text-align:right;color:#388bfd;font-weight:800">'+
+        '<td style="padding:6px 8px;text-align:right;color:#388bfd;font-weight:700;font-size:10px">'+
           (r.monto>0?'$'+Math.round(r.monto).toLocaleString('es-CL'):'—')+'</td>'+
-        '<td style="padding:8px 10px;text-align:right;color:#3fb950;font-weight:800">'+
+        '<td style="padding:6px 8px;text-align:right;color:#3fb950;font-weight:700;font-size:10px">'+
           (r.montoDecl>0?'$'+Math.round(r.montoDecl).toLocaleString('es-CL'):'—')+'</td>'+
-        '<td style="padding:8px 10px;text-align:right;font-weight:800;color:'+c+'">'+
+        '<td style="padding:6px 8px;text-align:right;font-weight:700;font-size:10px;color:'+c+'">'+
           (r.brecha!==0?(r.brecha>0?'+':'')+Math.round(r.brecha).toLocaleString('es-CL'):'$0')+'</td>'+
         '<td style="padding:8px 10px;text-align:right">'+
           '<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+
@@ -8471,11 +8471,13 @@ function ctUpdVista() {
   }
 
   var fest = (document.getElementById('ctFEst')||{value:''}).value;
+  var festCont = (document.getElementById('ctFEstCont')||{value:''}).value;
   var fcc  = (document.getElementById('ctFCC')||{value:''}).value;
   var q    = ((document.getElementById('ctBuscar')||{value:''}).value||'').toLowerCase();
 
   var rows = _ctData.filter(function(r){
     if(fest && r.brechaTipo !== fest) return false;
+    if(festCont && String(r.estado||'') !== festCont) return false;
     if(fcc  && String(r.cc||'') !== fcc) return false;
     if(q && !String(r.docente||'').toLowerCase().includes(q) &&
             !String(r.programa||'').toLowerCase().includes(q)) return false;
@@ -8483,86 +8485,75 @@ function ctUpdVista() {
   }).sort(function(a,b){ return Math.abs(b.brecha)-Math.abs(a.brecha); });
 
   if(!rows.length){
-    el.innerHTML = '<div style="padding:30px;text-align:center;color:var(--t3);font-size:11px">Sin resultados con los filtros aplicados</div>';
+    el.innerHTML = '<div style="padding:30px;text-align:center;color:var(--t3);font-size:11px">Sin resultados</div>';
     return;
   }
 
-  // Asegurar popup existe en el body
-  if(!document.getElementById('gCalSimPop')){
-    var _pop = document.createElement('div');
-    _pop.id = 'gCalSimPop';
-    _pop.style.cssText = 'display:none;position:fixed;z-index:9999;background:#1c2128;border:1px solid #388bfd;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.7);padding:0;min-width:320px;max-width:400px;max-height:400px;overflow-y:auto';
-    document.body.appendChild(_pop);
-  }
+  var S = 'font-size:10px;padding:7px 8px;';
+  var SH = 'font-size:9px;padding:7px 8px;text-align:left;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;';
 
-  var html = '<table style=""width:100%;border-collapse:collapse;font-size:11px">'+
-    '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">'+
-    ['Docente','Programa','CC','Mes Ini.','Mes Fin.','Estado Contrato','Hrs Decl.','Hrs Obl.','💵 Valor Contrato','💰 Total Declarado','⚖️ Diferencia','Estado Cruce'].map(function(h){
-      return '<th style="padding:9px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+h+'</th>';
-    }).join('')+'</tr></thead><tbody>'+
+  var html = '<table style="width:100%;border-collapse:collapse">' +
+    '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">' +
+    ['Docente','Programa','CC','Mes Ini.','Mes Fin.','Estado Contrato','Hrs Decl.','Hrs Obl.','Valor Contrato','Total Declarado','Diferencia','Estado Cruce'].map(function(h){
+      return '<th style="'+SH+'">'+h+'</th>';
+    }).join('') + '</tr></thead><tbody>';
 
-    rows.map(function(r,i){
-      var c = r.brechaTipo==='ok' ? '#3fb950'
-            : r.brechaTipo==='mayor_contrato' ? '#f0b429'
-            : r.brechaTipo==='mayor_declarado' ? '#388bfd'
-            : '#f85149';
-      var lbl = r.brechaTipo==='ok' ? '✅ Cuadra'
-              : r.brechaTipo==='mayor_contrato' ? '⚠️ Brecha'
-              : r.brechaTipo==='mayor_declarado' ? '📈 Excede'
-              : '❌ Sin declarar';
-      var bg = i%2 ? 'transparent' : 'rgba(255,255,255,.012)';
+  rows.forEach(function(r,i){
+    var c = r.brechaTipo==='ok' ? '#3fb950'
+          : r.brechaTipo==='mayor_contrato' ? '#f0b429'
+          : r.brechaTipo==='mayor_declarado' ? '#388bfd'
+          : '#f85149';
+    var lbl = r.brechaTipo==='ok' ? 'OK'
+            : r.brechaTipo==='mayor_contrato' ? 'Brecha'
+            : r.brechaTipo==='mayor_declarado' ? 'Excede'
+            : 'Sin declarar';
+    var bg = i%2 ? 'transparent' : 'rgba(255,255,255,.012)';
 
-      return '<tr style="border-bottom:1px solid var(--border);background:'+bg+'">'+
-        '<td style="padding:8px 10px;font-weight:700;color:var(--t1)">'+esc(abbr(r.docente||'—',26))+'</td>'+
-        '<td style="padding:8px 10px;color:var(--t3);font-size:10px">'+esc(abbr(r.programa||'—',32))+'</td>'+
-        '<td style="padding:8px 10px;color:var(--t3);font-weight:700">'+esc(String(r.cc||'—'))+'</td>'+
-        '<td style="padding:8px 10px;color:var(--t3);font-size:10px">'+esc(r.mesIni||'—')+'</td>'+
-        '<td style="padding:8px 10px;color:var(--t3);font-size:10px">'+esc(r.mesFin||'—')+'</td>'+
-        '<td style="padding:8px 10px">'+
-          (r.estado ? (function(){
-            var ecLow=r.estado.toLowerCase();
-            var ecC = ecLow.includes('aprob') || ecLow.includes('firm') || ecLow.includes('emit') ? '#3fb950'
-                    : ecLow.includes('pend') || ecLow.includes('proce') ? '#f0b429'
-                    : ecLow.includes('rech') || ecLow.includes('anul') || ecLow.includes('cance') ? '#f85149'
-                    : '#8b949e';
-            return '<span style="font-size:10px;padding:3px 8px;border-radius:7px;background:'+ecC+'20;color:'+ecC+';border:1px solid '+ecC+'40;font-weight:700;white-space:nowrap">'+esc(r.estado)+'</span>';
-          })() : '<span style="font-size:10px;color:var(--t3)">—</span>')+
-        '</td>'+
-        '<td style="padding:8px 10px;text-align:right;color:var(--t2);font-weight:700">'+(r.hrDec||0).toFixed(1)+'h</td>'+
-        '<td style="padding:8px 10px;text-align:right;color:var(--t2);font-weight:700">'+(r.hrObl||0).toFixed(1)+'h</td>'+
-        '<td style="padding:8px 10px;text-align:right;color:#388bfd;font-weight:800">'+
-          (r.monto>0?'$'+Math.round(r.monto).toLocaleString('es-CL'):'—')+'</td>'+
-        '<td style="padding:8px 10px;text-align:right;color:#3fb950;font-weight:800">'+
-          (r.montoDecl>0?'$'+Math.round(r.montoDecl).toLocaleString('es-CL'):'—')+'</td>'+
-        '<td style="padding:8px 10px;text-align:right;font-weight:800;color:'+c+'">'+
-          (r.brecha!==0?(r.brecha>0?'+':'')+Math.round(r.brecha).toLocaleString('es-CL'):'$0')+'</td>'+
-        '<td style="padding:8px 10px"><span style="font-size:10px;padding:3px 8px;border-radius:7px;background:'+c+'20;color:'+c+';border:1px solid '+c+'40;font-weight:700;white-space:nowrap">'+lbl+'</span></td>'+
-      '</tr>';
-    }).join('')+
+    // Estado contrato badge
+    var ecBadge = '—';
+    if(r.estado){
+      var ecL = r.estado.toLowerCase();
+      var ecC = ecL.includes('valid')||ecL.includes('aprob')||ecL.includes('firm') ? '#3fb950'
+              : ecL.includes('pend')||ecL.includes('proce') ? '#f0b429'
+              : ecL.includes('anul')||ecL.includes('rech')||ecL.includes('cancel') ? '#f85149'
+              : '#8b949e';
+      ecBadge = '<span style="font-size:9px;padding:2px 6px;border-radius:5px;background:'+ecC+'18;color:'+ecC+';border:1px solid '+ecC+'40;font-weight:600;white-space:nowrap">'+esc(r.estado)+'</span>';
+    }
 
-    // Totales
-    '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border);font-weight:900;position:sticky;bottom:0">'+
-      '<td colspan="6" style="padding:10px;font-size:10px;color:var(--t3)">TOTAL ('+rows.length+' registros)</td>'+
-      '<td style="padding:10px;text-align:right;color:var(--t1)">'+rows.reduce(function(s,r){return s+(r.hrDec||0);},0).toFixed(0)+'h</td>'+
-      '<td style="padding:10px;text-align:right;color:var(--t1)">'+rows.reduce(function(s,r){return s+(r.hrObl||0);},0).toFixed(0)+'h</td>'+
-      '<td style="padding:10px;text-align:right;color:#388bfd">$'+
-        Math.round(rows.reduce(function(s,r){return s+(r.monto||0);},0)).toLocaleString('es-CL')+'</td>'+
-      '<td style="padding:10px;text-align:right;color:#3fb950">$'+
-        Math.round(rows.reduce(function(s,r){return s+(r.montoDecl||0);},0)).toLocaleString('es-CL')+'</td>'+
-      '<td style="padding:10px;text-align:right;color:var(--t1)">$'+
-        Math.round(rows.reduce(function(s,r){return s+(r.brecha||0);},0)).toLocaleString('es-CL')+'</td>'+
-      '<td></td>'+
-    '</tr></tfoot>'+
-    '</table>';
+    html += '<tr style="border-bottom:1px solid var(--border);background:'+bg+'">' +
+      '<td style="'+S+'font-weight:600;color:var(--t1);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.docente||'—')+'</td>' +
+      '<td style="'+S+'color:var(--t3);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.programa||'—')+'</td>' +
+      '<td style="'+S+'color:var(--t3)">'+esc(String(r.cc||'—'))+'</td>' +
+      '<td style="'+S+'color:var(--t3)">'+esc(r.mesIni||'—')+'</td>' +
+      '<td style="'+S+'color:var(--t3)">'+esc(r.mesFin||'—')+'</td>' +
+      '<td style="'+S+'">'+ecBadge+'</td>' +
+      '<td style="'+S+'text-align:right;color:var(--t2)">'+(r.hrDec||0).toFixed(1)+'</td>' +
+      '<td style="'+S+'text-align:right;color:var(--t2)">'+(r.hrObl||0).toFixed(1)+'</td>' +
+      '<td style="'+S+'text-align:right;color:#388bfd;font-weight:600">'+(r.monto>0?'$'+Math.round(r.monto).toLocaleString('es-CL'):'—')+'</td>' +
+      '<td style="'+S+'text-align:right;color:#3fb950;font-weight:600">'+(r.montoDecl>0?'$'+Math.round(r.montoDecl).toLocaleString('es-CL'):'—')+'</td>' +
+      '<td style="'+S+'text-align:right;color:'+c+';font-weight:600">'+(r.brecha!==0?(r.brecha>0?'+':'')+Math.round(r.brecha).toLocaleString('es-CL'):'$0')+'</td>' +
+      '<td style="'+S+'"><span style="font-size:9px;padding:2px 6px;border-radius:5px;background:'+c+'18;color:'+c+';border:1px solid '+c+'40;font-weight:600;white-space:nowrap">'+lbl+'</span></td>' +
+    '</tr>';
+  });
+
+  // Totales
+  html += '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border);font-weight:600;position:sticky;bottom:0">' +
+    '<td colspan="6" style="'+S+'color:var(--t3)">TOTAL ('+rows.length+')</td>' +
+    '<td style="'+S+'text-align:right;color:var(--t1)">'+rows.reduce(function(s,r){return s+(r.hrDec||0);},0).toFixed(0)+'</td>' +
+    '<td style="'+S+'text-align:right;color:var(--t1)">'+rows.reduce(function(s,r){return s+(r.hrObl||0);},0).toFixed(0)+'</td>' +
+    '<td style="'+S+'text-align:right;color:#388bfd">$'+Math.round(rows.reduce(function(s,r){return s+(r.monto||0);},0)).toLocaleString('es-CL')+'</td>' +
+    '<td style="'+S+'text-align:right;color:#3fb950">$'+Math.round(rows.reduce(function(s,r){return s+(r.montoDecl||0);},0)).toLocaleString('es-CL')+'</td>' +
+    '<td style="'+S+'text-align:right;color:var(--t1)">$'+Math.round(rows.reduce(function(s,r){return s+(r.brecha||0);},0)).toLocaleString('es-CL')+'</td>' +
+    '<td></td>' +
+  '</tr></tfoot></table>';
 
   el.innerHTML = html;
 
-  // Conteo en paginación
   var pag = document.getElementById('ctPag');
-  if(pag) pag.innerHTML = '<span style="font-size:10px;color:var(--t3)">'+rows.length+' de '+_ctData.length+' contratos</span>';
+  if(pag) pag.innerHTML = '<span style="font-size:10px;color:var(--t3)">'+rows.length+' de '+_ctData.length+'</span>';
 }
 
-/* ── Exportar tabla del tab Contratos ── */
+
 function ctExportar() {
   if(!_ctData.length){ showToast('Sin datos para exportar','err'); return; }
   if(typeof XLSX==='undefined') return;
