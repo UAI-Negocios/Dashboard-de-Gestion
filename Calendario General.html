@@ -10356,7 +10356,7 @@ function _adDrawPhoraChart(periodos) {
    Lee Excel con cols: Codigo, Nombre, Programa, Horas, Horas_Asignadas,
    centro_costo, TIPO, SUBTIPO, area_nombre, FechaInicio, etc.
 ══════════════════════════════════════════════════════════════════ */
-var _ppt = { rows: [], declRows: [], filename: '', declFilename: '', loadedAt: null };
+var _ppt = { rows: [], realRows: [], declRows: [], filename: '', realFilename: '', declFilename: '', loadedAt: null };
 
 function renderPresupuesto() {
   var pg = $('page'); if(!pg) return;
@@ -10370,7 +10370,7 @@ function renderPresupuesto() {
     '</div>'+
 
     // ── Zona de carga dual ────────────────────────────────────
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px">'+
 
       // PPT
       _pptDropCard('fiPpt','pptCargarFile',hasPPT,
@@ -10384,6 +10384,12 @@ function renderPresupuesto() {
         hasDecl ? '✅ '+_ppt.declRows.length+' registros — '+esc(_ppt.declFilename) : 'Columnas: Programa · movimiento_horas_lv · movimiento_monto',
         '#3fb950')+
     
+
+
+      // Real (segundo archivo)
+      _pptDropCard('fiReal','pptCargarReal',_ppt.realRows.length>0,
+        '📊 Reporte Real',
+        _ppt.realRows.length>0 ? '✅ '+_ppt.realFilename+' ('+_ppt.realRows.length+' act.)' : 'Arrastra el reporte Real (.xlsx)')+
 '</div>'+
 
     // ── Filtros + KPIs + Charts + Tabla ───────────────────────
@@ -10453,7 +10459,8 @@ function pptCargarFile(file) {
         r._horasAsig = (r['Horas_Asignadas']!==''&&r['Horas_Asignadas']!=null)?parseFloat(r['Horas_Asignadas'])||0:0;
       });
       _ppt.rows=rows; _ppt.filename=file.name;
-      showToast(rows.length+' actividades PPT cargadas','ok');
+      var _totH=rows.reduce(function(s,r){return s+r._horas;},0);
+      showToast(rows.length+' actividades PPT · '+_totH.toFixed(0)+'h planificadas','ok');
       renderPresupuesto();
     }catch(err){showToast('Error: '+err.message,'err');}
   };
@@ -10473,6 +10480,26 @@ function pptCargarSoloPPT(file) {
       });
       _ppt.rows=rows; _ppt.filename=file.name;
       showToast(rows.length+' actividades PPT cargadas (solo planificado)','ok');
+      renderPresupuesto();
+    }catch(err){showToast('Error: '+err.message,'err');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+function pptCargarReal(file) {
+  if(typeof XLSX==='undefined'){showToast('XLSX no disponible','err');return;}
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      rows.forEach(function(r){
+        r._horas = parseFloat(r['Horas'])||0;
+      });
+      _ppt.realRows=rows; _ppt.realFilename=file.name;
+      var tot=rows.reduce(function(s,r){return s+r._horas;},0);
+      showToast(rows.length+' actividades Real cargadas · '+tot.toFixed(0)+'h','ok');
       renderPresupuesto();
     }catch(err){showToast('Error: '+err.message,'err');}
   };
@@ -10615,10 +10642,26 @@ function updPresupuesto() {
     progMap[p].acts.push(r);
     totPlan+=r._horas;
   });
+  // Cruzar con archivo Real
+  if(_ppt.realRows.length) {
+    var realByProg = {};
+    _ppt.realRows.forEach(function(r){
+      var p = r['Programa']||'(sin)';
+      if(!realByProg[p]) realByProg[p] = {hrs:0, byNombre:{}};
+      realByProg[p].hrs += r._horas;
+      var nom = r['Nombre']||r['Codigo']||'';
+      realByProg[p].byNombre[nom] = (realByProg[p].byNombre[nom]||0) + r._horas;
+    });
+    Object.values(progMap).forEach(function(p){
+      var rp = realByProg[p.programa];
+      p.real = rp ? rp.hrs : 0;
+      totReal += p.real;
+    });
+  }
+
   var progArr=Object.values(progMap).map(function(p){
     var dp=declByProg[p.programa];
-    p.real=dp?dp.hrs:0;p.decl=dp?dp.hrs:0;p.monto=dp?dp.monto:0;
-    totReal+=p.real;
+    p.decl=dp?dp.hrs:0;p.monto=dp?dp.monto:0;
     p.declByCodigo=dp?dp.byCodigo||{}:{};
     totDecl+=p.decl;totMonto+=p.monto;
     return p;
@@ -10638,7 +10681,7 @@ function updPresupuesto() {
   if(kEl) kEl.innerHTML=[
     {ico:'🎓',lbl:'Programas',val:nP,c:'#a78bfa'},
     {ico:'📐',lbl:'PPT Planif.',val:totPlan.toFixed(0)+'h',c:'#388bfd'},
-    {ico:'⚙️',lbl:'Real (Declarado)',val:totReal.toFixed(0)+'h',c:'#f0b429'},
+    {ico:'⚙️',lbl:'Real',val:totReal.toFixed(0)+'h',c:'#f0b429'},
     {ico:'📝',lbl:'Declarado',val:totDecl.toFixed(0)+'h',c:'#3fb950'},
     {ico:'💲',lbl:'Monto Decl.',val:'$'+Math.round(totMonto/1e6)+'M',c:'#22d3ee'},
     {ico:dvPD>=0?'📈':'📉',lbl:'Desv PPT↔Decl',
@@ -10657,7 +10700,7 @@ function updPresupuesto() {
     labels:top10.map(function(p){return abbr(p.programa,16);}),
     datasets:[
       {label:'PPT Planif.',data:top10.map(function(p){return p.plan;}),backgroundColor:'#388bfdbb',borderRadius:3,borderWidth:0},
-      {label:'Real Asign.',data:top10.map(function(p){return p.real;}),backgroundColor:'#f0b429bb',borderRadius:3,borderWidth:0},
+      {label:'Real',data:top10.map(function(p){return p.real;}),backgroundColor:'#f0b429bb',borderRadius:3,borderWidth:0},
       {label:'Declarado',data:top10.map(function(p){return p.decl;}),backgroundColor:'#3fb950bb',borderRadius:3,borderWidth:0},
     ]},options:{plugins:{legend:{position:'bottom',labels:{color:'#8b949e',font:{size:10}}}},
       scales:{x:{ticks:{color:'#8b949e',font:{size:9},maxRotation:50},grid:{color:'#21262d'}},
@@ -10740,12 +10783,24 @@ function _pptExpandProg(pi) {
   }
 
   // Generar cursos agrupados
+  // Construir mapa de horas Reales desde el segundo archivo
+  var realByCodigo = {};
+  if(_ppt.realRows.length) {
+    _ppt.realRows.forEach(function(r){
+      var prog = r['Programa']||'';
+      if(prog !== p.programa) return;
+      var ck = r['Codigo']||'—';
+      realByCodigo[ck] = (realByCodigo[ck]||0) + (parseFloat(r['Horas'])||0);
+    });
+  }
+
   var cursoMap = {};
   p.acts.forEach(function(r){
     var ck = (r['Codigo']||'—');
     if(!cursoMap[ck]) cursoMap[ck] = {codigo:ck, nombre:r['Nombre']||'—', tipo:r['TIPO']||'', plan:0, real:0, acts:[]};
     cursoMap[ck].plan += r._horas;
-    cursoMap[ck].real += r._horasAsig;
+    // Real viene del segundo archivo, no de _horasAsig
+    cursoMap[ck].real = realByCodigo[ck] || 0;
     cursoMap[ck].acts.push(r);
   });
   var cursos = Object.values(cursoMap).sort(function(a,b){ return b.plan - a.plan; });
@@ -19722,4 +19777,3 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
-
