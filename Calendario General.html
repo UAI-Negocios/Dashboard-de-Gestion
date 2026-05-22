@@ -1709,7 +1709,7 @@ function coordGetInfo(nombre) {
 
 const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
-  programas:    ['resumen','calidad','cronograma'],
+  programas:    ['resumen','calidad','cronograma','docentes'],
   calendarios:  ['calendario','reservas'],
   planificador: ['plancursos','malla','planreporte','propuestas','horario'],
   admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
@@ -1728,6 +1728,7 @@ const TAB_LABELS = {
   resumen:      'Resumen',
   calidad:      'Calidad & Sede',
   cronograma:   '📅 Cronograma',
+  docentes:     '👨‍🏫 Asignación Docente',
   declaracion:  'Declaración de Horas',
   anualdecl:    'Declarado por Año',
   presupuesto:  '💰 Presupuesto vs Real',
@@ -2793,6 +2794,7 @@ function refreshView() {
     resumen:      renderResumen,
     calidad:      renderCalidad,
     cronograma:   renderCronograma,
+    docentes:     renderDocentes,
     declaracion:  renderDeclaracion,
     anualdecl:    renderAnualDecl,
     presupuesto:  renderPresupuesto,
@@ -4904,6 +4906,355 @@ function updCarga() {
    PROGRAMAS RESUMEN
 ══════════════════════════════════════════════════════ */
 let _lastStats=[];
+/* ══════════════════════════════════════════════════════════════
+   ASIGNACIÓN DOCENTE — Subitem de Programas
+══════════════════════════════════════════════════════════════ */
+var _docState = { prog:'', docente:'', sede:'', modalidad:'', buscar:'' };
+
+function renderDocentes() {
+  var pg = $('page'); if(!pg) return;
+  var df = getDF();
+  if(!df.length){
+    pg.innerHTML='<div class="pg-title">👨‍🏫 Asignación Docente</div>'+
+      '<div style="text-align:center;padding:60px;color:var(--t3)">Carga el archivo del Calendario Académico</div>';
+    return;
+  }
+
+  // Años disponibles
+  var years={};df.forEach(function(r){if(r['DIAS/FECHAS']instanceof Date)years[r['DIAS/FECHAS'].getFullYear()]=true;});
+  var yArr=Object.keys(years).sort();
+  var sy=getDF_sel('docY');
+  var dfF=sy.length?df.filter(function(r){return r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear()));}):df;
+
+  // Datos para filtros
+  var progs   =[...new Set(dfF.map(function(r){return r['PROGRAMA']||'';}).filter(Boolean))].sort();
+  var docentes=[...new Set(dfF.map(function(r){return r['PROFESOR']||'';}).filter(Boolean))].sort();
+  var sedes   =[...new Set(dfF.map(function(r){return r['SEDE']||'';}).filter(Boolean))].sort();
+  var mods    =[...new Set(dfF.map(function(r){return r['Modalidad_Calc']||'';}).filter(Boolean))].sort();
+
+  pg.innerHTML=
+    '<div class="pg-title" style="margin-bottom:4px">👨‍🏫 Asignación Docente</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:16px">Distribución de carga horaria y conflictos por docente y programa</div>'+
+
+    // Barra de filtros
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'+
+      _docMkSel('docY','Año',yArr.map(function(y){return{v:y,l:y};}), sy.length?sy[0]:'','_docUpd()')+
+      _docMkSel('docFProg','Programa',progs.map(function(p){return{v:p,l:abbr(p,35)};}), _docState.prog,'_docState.prog=this.value;_docUpd()')+
+      _docMkSel('docFDoc','Docente',docentes.map(function(d){return{v:d,l:abbr(d,30)};}), _docState.docente,'_docState.docente=this.value;_docUpd()')+
+      _docMkSel('docFSede','Sede',sedes.map(function(s){return{v:s,l:s};}), _docState.sede,'_docState.sede=this.value;_docUpd()')+
+      _docMkSel('docFMod','Modalidad',mods.map(function(m){return{v:m,l:m};}), _docState.modalidad,'_docState.modalidad=this.value;_docUpd()')+
+      '<div style="display:flex;flex-direction:column;gap:3px">'+
+        '<label style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Buscar</label>'+
+        '<input id="docBuscar" type="text" placeholder="Nombre docente..." value="'+esc(_docState.buscar)+'"'+
+          ' oninput="_docState.buscar=this.value;_docUpd()"'+
+          ' style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--t1);font-size:11px;min-width:200px">'+
+      '</div>'+
+      '<button onclick="_docExportar()" style="padding:7px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;margin-left:auto">📊 Exportar</button>'+
+    '</div>'+
+
+    '<div id="docTabla" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden"></div>';
+
+  _docUpd();
+}
+
+function _docMkSel(id,lbl,opts,cur,onch){
+  return '<div style="display:flex;flex-direction:column;gap:3px">'+
+    '<label style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+lbl+'</label>'+
+    '<select id="'+id+'" onchange="'+onch+'" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--t1);font-size:11px;max-width:220px">'+
+      '<option value="">Todos</option>'+
+      opts.map(function(o){return '<option value="'+esc(o.v)+'"'+(o.v===cur?' selected':'')+'>'+esc(o.l)+'</option>';}).join('')+
+    '</select></div>';
+}
+
+function _docGetDf(){
+  var df=getDF();
+  var sy=getDF_sel('docY');
+  if(sy.length) df=df.filter(function(r){return r['DIAS/FECHAS']&&sy.includes(String(r['DIAS/FECHAS'].getFullYear()));});
+  if(_docState.prog)     df=df.filter(function(r){return r['PROGRAMA']===_docState.prog;});
+  if(_docState.docente)  df=df.filter(function(r){return r['PROFESOR']===_docState.docente;});
+  if(_docState.sede)     df=df.filter(function(r){return r['SEDE']===_docState.sede;});
+  if(_docState.modalidad)df=df.filter(function(r){return r['Modalidad_Calc']===_docState.modalidad;});
+  if(_docState.buscar)   df=df.filter(function(r){return String(r['PROFESOR']||'').toLowerCase().includes(_docState.buscar.toLowerCase());});
+  return df;
+}
+
+function _docUpd(){
+  var el=document.getElementById('docTabla'); if(!el) return;
+  var df=_docGetDf();
+  if(!df.length){
+    el.innerHTML='<div style="padding:30px;text-align:center;color:var(--t3);font-size:11px">Sin datos con los filtros aplicados</div>';
+    return;
+  }
+
+  var DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var dfAll=getDF();
+
+  // ── Agrupar TODO por Docente ──────────────────────────────
+  var docMap={};
+  df.forEach(function(r){
+    var doc=r['PROFESOR']||'(Sin asignar)';
+    var prog=r['PROGRAMA']||'';
+    var horas=parseFloat(r['HORAS'])||0;
+    var fecha=r['DIAS/FECHAS'];
+    var dia=fecha instanceof Date?DIAS[fecha.getDay()]:'';
+    var mod=r['Modalidad_Calc']||'';
+    var sede=r['SEDE']||'';
+    var hor=r['HORARIO']||'';
+    var asig=r['ASIGNATURA']||'';
+
+    if(!docMap[doc]) docMap[doc]={
+      doc:doc, totalHoras:0, totalSes:0,
+      progs:new Set(), dias:{}, mods:new Set(), sedes:new Set(), sesiones:[]
+    };
+    var d=docMap[doc];
+    d.totalHoras+=horas; d.totalSes++;
+    d.progs.add(prog);
+    if(!d.abrevMap) d.abrevMap={};
+    d.abrevMap[prog]=r['Programa_Abrev']||'';
+    if(mod) d.mods.add(mod);
+    if(sede) d.sedes.add(sede);
+    if(dia) d.dias[dia]=(d.dias[dia]||0)+1;
+    var abrev=r['Programa_Abrev']||abbr(prog,20);
+    d.sesiones.push({fecha:fecha,dia:dia,hora:horas,horario:hor,mod:mod,sede:sede,prog:prog,abrev:abrev,asig:asig});
+  });
+
+  // ── Detectar conflictos ───────────────────────────────────
+  function detectarConflictos(doc){
+    var ses=dfAll.filter(function(r){return r['PROFESOR']===doc&&r['DIAS/FECHAS'] instanceof Date;});
+    var conf=[];
+    for(var i=0;i<ses.length;i++){
+      for(var j=i+1;j<ses.length;j++){
+        var a=ses[i],b=ses[j];
+        if(a['DIAS/FECHAS'].toDateString()!==b['DIAS/FECHAS'].toDateString()) continue;
+        if(a['PROGRAMA']===b['PROGRAMA']) continue;
+        var hA=_docParseHorario(a['HORARIO']),hB=_docParseHorario(b['HORARIO']);
+        if(hA&&hB&&hA.fin>hB.ini&&hB.fin>hA.ini)
+          conf.push({fecha:a['DIAS/FECHAS'],progA:a['PROGRAMA'],progB:b['PROGRAMA'],horA:a['HORARIO'],horB:b['HORARIO']});
+      }
+    }
+    return conf;
+  }
+
+  var docArr=Object.values(docMap).sort(function(a,b){return b.totalHoras-a.totalHoras;});
+
+  // ── Tabla consolidada por docente ─────────────────────────
+  var html='<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">'+
+    ['Docente','Programas','Sesiones','Horas','Días','Modalidad','Sede(s)','Conflictos','Detalle'].map(function(h){
+      return '<th style="padding:9px 12px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;white-space:nowrap">'+h+'</th>';
+    }).join('')+'</tr></thead><tbody>';
+
+  docArr.forEach(function(d,di){
+    var conf=detectarConflictos(d.doc);
+    var hasConf=conf.length>0;
+    var bg=di%2?'transparent':'rgba(255,255,255,.012)';
+    var detId='docdet_'+di;
+
+    // Fila principal consolidada
+    html+='<tr style="border-bottom:1px solid var(--border);background:'+bg+'">'+
+
+      // Docente
+      '<td style="padding:10px 12px;vertical-align:middle">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--t1)">'+esc(d.doc)+'</div>'+
+      '</td>'+
+
+      // Programas
+      '<td style="padding:10px 12px;vertical-align:middle">'+
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+        [...d.progs].slice(0,3).map(function(p){
+          var ab=(d.abrevMap&&d.abrevMap[p])?d.abrevMap[p]:abbr(p,22);
+          return '<span style="font-size:9px;color:var(--t3)" title="'+esc(p)+'">• <strong style="color:var(--t2)">'+esc(ab)+'</strong></span>';
+        }).join('')+
+        (d.progs.size>3?'<span style="font-size:9px;color:#388bfd">+' +(d.progs.size-3)+' más</span>':'')+
+        '</div>'+
+      '</td>'+
+
+      // Sesiones
+      '<td style="padding:10px 12px;text-align:center;font-weight:800;font-size:14px;color:var(--t1)">'+d.totalSes+'</td>'+
+
+      // Horas
+      '<td style="padding:10px 12px;text-align:right;font-weight:800;font-size:14px;color:#388bfd">'+d.totalHoras.toFixed(0)+'h</td>'+
+
+      // Días con conteo
+      '<td style="padding:10px 12px;vertical-align:middle">'+
+        '<div style="display:flex;gap:3px;flex-wrap:wrap">'+
+        Object.entries(d.dias).sort(function(a,b){
+          var order=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+          return order.indexOf(a[0])-order.indexOf(b[0]);
+        }).map(function(e){
+          return '<div style="display:flex;flex-direction:column;align-items:center;padding:3px 5px;border-radius:6px;background:rgba(56,139,253,.1);border:1px solid rgba(56,139,253,.2)">'+
+            '<span style="font-size:8px;font-weight:700;color:#388bfd">'+e[0]+'</span>'+
+            '<span style="font-size:9px;color:var(--t2);font-weight:600">'+e[1]+'</span>'+
+          '</div>';
+        }).join('')+
+        '</div>'+
+      '</td>'+
+
+      // Modalidad
+      '<td style="padding:10px 12px;vertical-align:middle">'+
+        [...d.mods].map(function(m){
+          var mc=m.toLowerCase().includes('presencial')?'#3fb950':m.toLowerCase().includes('online')||m.toLowerCase().includes('virtual')?'#388bfd':'#a78bfa';
+          return '<span style="font-size:9px;padding:2px 7px;border-radius:5px;background:'+mc+'15;color:'+mc+';border:1px solid '+mc+'30;font-weight:600;white-space:nowrap;display:block;margin-bottom:2px">'+esc(m)+'</span>';
+        }).join('')+
+      '</td>'+
+
+      // Sedes
+      '<td style="padding:10px 12px;font-size:10px;color:var(--t3);vertical-align:middle">'+
+        [...d.sedes].join('<br>')+
+      '</td>'+
+
+      // Conflictos
+      '<td style="padding:10px 12px;vertical-align:middle">'+
+        (hasConf?
+          '<div style="display:flex;flex-direction:column;gap:3px">'+
+            '<div style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.25)">'+
+              '<span>⚠️</span><span style="font-size:10px;font-weight:700;color:#f85149">'+conf.length+' tope(s)</span>'+
+            '</div>'+
+            conf.slice(0,2).map(function(cf){
+              return '<div style="font-size:8px;color:#f85149;padding:2px 4px;background:rgba(248,81,73,.06);border-radius:4px">'+
+                _docFmtFecha(cf.fecha)+' · '+esc(abbr(cf.progA,14))+' / '+esc(abbr(cf.progB,14))+
+              '</div>';
+            }).join('')+
+          '</div>'
+        :
+          '<div style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.2)">'+
+            '<span>✅</span><span style="font-size:10px;font-weight:600;color:#3fb950">Sin topes</span>'+
+          '</div>'
+        )+
+      '</td>'+
+
+      // Botón detalle
+      '<td style="padding:10px 12px;text-align:center;vertical-align:middle">'+
+        '<button onclick="_docToggleDet(this)" data-id="'+detId+'" '+
+          'style="padding:5px 12px;border:1px solid #388bfd;border-radius:7px;background:rgba(56,139,253,.08);'+
+          'color:#388bfd;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">'+
+          '▼ Ver sesiones'+
+        '</button>'+
+      '</td>'+
+    '</tr>';
+
+    // ── Fila de detalle expandible ────────────────────────────
+    var sesOrd=d.sesiones.slice().sort(function(a,b){
+      if(!(a.fecha instanceof Date)||!(b.fecha instanceof Date)) return 0;
+      return a.fecha-b.fecha;
+    });
+
+    html+='<tr id="'+detId+'" style="display:none">'+
+      '<td colspan="9" style="padding:0 12px 12px 32px;background:rgba(56,139,253,.02)">'+
+        '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:4px">'+
+          '<div style="padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(56,139,253,.06);display:flex;align-items:center;justify-content:space-between">'+
+            '<div style="font-size:11px;font-weight:700;color:#388bfd">📅 Todas las sesiones de '+esc(abbr(d.doc,40))+'</div>'+
+            '<div style="font-size:10px;color:var(--t3)">'+d.totalSes+' sesiones · '+d.totalHoras.toFixed(0)+'h · '+d.progs.size+' programa(s)</div>'+
+          '</div>'+
+          '<table style="width:100%;border-collapse:collapse;font-size:10px">'+
+          '<thead><tr style="background:var(--surface2)">'+
+          ['Fecha','Día','Horario','Hrs','Prog.','Asignatura','Sede','Modalidad'].map(function(h){
+            return '<th style="padding:6px 10px;text-align:left;font-size:8px;font-weight:700;color:var(--t3);text-transform:uppercase;white-space:nowrap">'+h+'</th>';
+          }).join('')+
+          '</tr></thead><tbody>'+
+          sesOrd.map(function(ses,si){
+            var fStr=ses.fecha instanceof Date?
+              ('0'+ses.fecha.getDate()).slice(-2)+'/'+('0'+(ses.fecha.getMonth()+1)).slice(-2)+'/'+ses.fecha.getFullYear():'—';
+            var mc=ses.mod.toLowerCase().includes('presencial')?'#3fb950':ses.mod.toLowerCase().includes('online')||ses.mod.toLowerCase().includes('virtual')?'#388bfd':'#a78bfa';
+            return '<tr style="border-bottom:1px solid rgba(255,255,255,.04);background:'+(si%2?'transparent':'rgba(255,255,255,.013)')+'">'+
+              '<td style="padding:5px 10px;font-weight:700;color:var(--t1);font-family:monospace">'+fStr+'</td>'+
+              '<td style="padding:5px 10px;color:#388bfd;font-weight:700">'+esc(ses.dia)+'</td>'+
+              '<td style="padding:5px 10px;color:var(--t2)">'+esc(ses.horario||'—')+'</td>'+
+              '<td style="padding:5px 10px;text-align:right;color:#a78bfa;font-weight:700">'+ses.hora.toFixed(0)+'h</td>'+
+              '<td style="padding:5px 10px;font-size:9px;font-weight:700;color:var(--t2)" title="'+esc(ses.prog)+'">'+(ses.abrev?esc(ses.abrev):esc(abbr(ses.prog,20)))+'</td>'+
+              '<td style="padding:5px 10px;color:var(--t3);font-size:9px">'+esc(abbr(ses.asig,28))+'</td>'+
+              '<td style="padding:5px 10px;color:var(--t3)">'+esc(ses.sede||'—')+'</td>'+
+              '<td style="padding:5px 10px">'+
+                (ses.mod?'<span style="font-size:8px;padding:1px 6px;border-radius:4px;background:'+mc+'15;color:'+mc+';border:1px solid '+mc+'30;font-weight:600">'+esc(ses.mod)+'</span>':'—')+
+              '</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table>'+
+        '</div>'+
+      '</td>'+
+    '</tr>';
+  });
+
+  html+='</tbody></table>';
+  el.innerHTML=html;
+
+  // KPIs
+  var totalDoc=docArr.length;
+  var totalSes=df.length;
+  var totalHr=df.reduce(function(s,r){return s+(parseFloat(r['HORAS'])||0);},0);
+  var conConf=docArr.filter(function(d){return detectarConflictos(d.doc).length>0;}).length;
+  var kpiDiv=document.createElement('div');
+  kpiDiv.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px';
+  kpiDiv.innerHTML=[
+    {ico:'👨‍🏫',lbl:'Docentes',val:totalDoc,c:'#388bfd'},
+    {ico:'📚',lbl:'Sesiones',val:totalSes,c:'#3fb950'},
+    {ico:'⏱️',lbl:'Horas Totales',val:totalHr.toFixed(0)+'h',c:'#a78bfa'},
+    {ico:'⚠️',lbl:'Con Conflicto',val:conConf,c:conConf>0?'#f85149':'#3fb950'},
+  ].map(function(k){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-left:3px solid '+k.c+'">'+
+      '<div style="font-size:13px;margin-bottom:4px">'+k.ico+'</div>'+
+      '<div style="font-size:20px;font-weight:900;color:'+k.c+'">'+k.val+'</div>'+
+      '<div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">'+k.lbl+'</div>'+
+    '</div>';
+  }).join('');
+  if(el.parentElement.querySelector('.doc-kpi')) el.parentElement.querySelector('.doc-kpi').remove();
+  kpiDiv.className='doc-kpi';
+  el.parentElement.insertBefore(kpiDiv,el);
+}
+
+
+function _docToggleDet(idOrBtn){
+  var id=typeof idOrBtn==='string'?idOrBtn:idOrBtn.dataset.id;
+  var row=document.getElementById(id);
+  var btn=document.querySelector('[data-id="'+id+'"]');
+  if(!row) return;
+  var hidden=row.style.display==='none'||row.style.display==='';
+  row.style.display=hidden?'table-row':'none';
+  if(btn) btn.textContent=hidden?'▲ ocultar':'▼ sesiones';
+}
+
+
+function _docParseHorario(hor){
+  if(!hor) return null;
+  var m=String(hor).match(/(\d{1,2}):(\d{2})/g);
+  if(!m||m.length<2) return null;
+  function toMin(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
+  return {ini:toMin(m[0]),fin:toMin(m[1])};
+}
+
+function _docFmtFecha(d){
+  if(!(d instanceof Date)) return '';
+  return ('0'+d.getDate()).slice(-2)+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+d.getFullYear();
+}
+
+function _docExportar(){
+  if(typeof XLSX==='undefined') return;
+  var df=_docGetDf();
+  if(!df.length){showToast('Sin datos para exportar','err');return;}
+  var DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var rows=df.map(function(r){
+    var d=r['DIAS/FECHAS'];
+    return{
+      'Docente':r['PROFESOR']||'',
+      'Programa':r['PROGRAMA']||'',
+      'Fecha':d instanceof Date?_docFmtFecha(d):'',
+      'Día':d instanceof Date?DIAS[d.getDay()]:'',
+      'Horario':r['HORARIO']||'',
+      'Horas':parseFloat(r['HORAS'])||0,
+      'Sede':r['SEDE']||'',
+      'Modalidad':r['Modalidad_Calc']||'',
+      'Asignatura':r['ASIGNATURA']||'',
+    };
+  });
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:28},{wch:40},{wch:12},{wch:8},{wch:14},{wch:8},{wch:16},{wch:14},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws,'Asignación Docente');
+  XLSX.writeFile(wb,'AsignacionDocente_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Exportado: '+rows.length+' sesiones','ok');
+}
+
+
 function renderResumen() {
   const df=getDF();
   $('page').innerHTML='<div class="pg-title">Resumen de Programas</div>'
@@ -20768,3 +21119,4 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
+
