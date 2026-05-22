@@ -789,6 +789,192 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
 .aud-empty{text-align:center;padding:32px;color:var(--t4);font-size:11px}
 .aud-prog-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:3px}
 .aud-prog-fill{height:100%;border-radius:2px;transition:width .4s}
+
+/* ─── ADN Académico ─────────────────────────────────────────── */
+.adn-wrap { display:flex; gap:0; height:calc(100vh - 120px); overflow:hidden; }
+.adn-sidebar {
+  width:260px; flex-shrink:0;
+  background:var(--surface); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.adn-sb-head { padding:14px 16px; border-bottom:1px solid var(--border); }
+.adn-sb-search { padding:10px 12px; }
+.adn-sb-list { flex:1; overflow-y:auto; padding:6px 8px; }
+.adn-prog-item {
+  padding:10px 12px; border-radius:8px; cursor:pointer;
+  border:1px solid transparent; margin-bottom:3px; transition:all .15s;
+}
+.adn-prog-item:hover { background:rgba(56,139,253,.07); border-color:var(--border); }
+.adn-prog-item.active { background:rgba(56,139,253,.12); border-color:rgba(56,139,253,.3); }
+.adn-prog-name { font-size:11px; font-weight:600; color:var(--t1); line-height:1.3; margin-bottom:3px; }
+.adn-prog-meta { font-size:10px; color:var(--t3); display:flex; gap:8px; }
+.adn-main { flex:1; overflow-y:auto; padding:16px 20px; }
+.adn-hm-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:14px; }
+.adn-hm-cell {
+  min-width:52px; height:28px; border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:700; cursor:pointer; transition:all .15s;
+}
+.adn-hm-cell:hover { transform:scale(1.08); z-index:5; box-shadow:0 0 8px rgba(56,139,253,.3); }
+.adn-hm-cell.empty { background:rgba(255,255,255,.03); cursor:default; }
+.adn-hm-cell.empty:hover { transform:none; box-shadow:none; }
+.adn-hm-cell.pend { background:rgba(240,180,41,.1); color:#f0b429; border:1px dashed rgba(240,180,41,.3); }
+.adn-det-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  z-index:998; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.adn-det-overlay.open { opacity:1; pointer-events:auto; }
+.adn-det-panel {
+  position:fixed; top:0; right:-440px; width:420px; height:100vh;
+  background:var(--surface); border-left:1px solid var(--border);
+  z-index:999; transition:right .3s; overflow-y:auto;
+  box-shadow:-8px 0 32px rgba(0,0,0,.4);
+}
+.adn-det-panel.open { right:0; }
+.adn-upload-zone {
+  border:2px dashed var(--border); border-radius:12px;
+  padding:40px; text-align:center; cursor:pointer; transition:all .2s;
+}
+.adn-upload-zone:hover { border-color:#388bfd; background:rgba(56,139,253,.05); }
+
+/* ─── JARVIS Modal ADN ──────────────────────────────────── */
+#adnJarvis {
+  position:fixed; inset:0; z-index:9000;
+  background:rgba(0,5,15,.92);
+  backdrop-filter:blur(12px);
+  display:none; align-items:center; justify-content:center;
+  animation:jarvisFadeIn .25s ease;
+}
+#adnJarvis.open { display:flex; }
+@keyframes jarvisFadeIn { from{opacity:0} to{opacity:1} }
+@keyframes jarvisSlideUp { from{opacity:0;transform:translateY(20px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes jarvisScan {
+  0%{transform:translateY(-100%)} 100%{transform:translateY(200%)}
+}
+@keyframes jarvisPulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+@keyframes jarvisRotate { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes jarvisCountUp { from{opacity:0;transform:scale(.7)} to{opacity:1;transform:scale(1)} }
+
+.jarvis-box {
+  background:linear-gradient(145deg,#020d1a,#040f1f);
+  border:1px solid rgba(0,180,255,.2);
+  border-radius:16px;
+  width:min(92vw,1100px);
+  max-height:90vh;
+  overflow:hidden;
+  position:relative;
+  box-shadow:0 0 60px rgba(0,160,255,.08), inset 0 0 120px rgba(0,100,200,.04);
+  animation:jarvisSlideUp .3s cubic-bezier(.2,0,.2,1);
+}
+.jarvis-scanline {
+  position:absolute; inset:0; pointer-events:none; z-index:0; overflow:hidden; border-radius:16px;
+}
+.jarvis-scanline::after {
+  content:''; position:absolute; top:0; left:0; right:0;
+  height:2px; background:linear-gradient(90deg,transparent,rgba(0,200,255,.3),transparent);
+  animation:jarvisScan 4s linear infinite;
+}
+.jarvis-grid-bg {
+  position:absolute; inset:0; pointer-events:none; z-index:0;
+  background-image:
+    linear-gradient(rgba(0,150,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,150,255,.03) 1px, transparent 1px);
+  background-size:40px 40px;
+  border-radius:16px;
+}
+.jarvis-close {
+  position:absolute; top:14px; right:16px; z-index:20;
+  width:32px; height:32px; border-radius:8px;
+  border:1px solid rgba(0,150,255,.25);
+  background:rgba(0,50,100,.3);
+  color:rgba(0,200,255,.7); font-size:14px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .2s;
+}
+.jarvis-close:hover { background:rgba(255,50,50,.15); border-color:rgba(255,80,80,.4); color:#ff6b6b; }
+
+/* Header del JARVIS */
+.jarvis-header {
+  position:relative; z-index:1;
+  padding:20px 24px 16px;
+  border-bottom:1px solid rgba(0,150,255,.12);
+  display:flex; align-items:center; gap:20px;
+}
+.jarvis-avatar {
+  width:72px; height:72px; border-radius:50%;
+  border:2px solid rgba(0,200,255,.3);
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:900;
+  background:radial-gradient(circle, rgba(0,100,200,.25), rgba(0,20,60,.6));
+  position:relative; flex-shrink:0;
+  box-shadow:0 0 20px rgba(0,150,255,.15);
+}
+.jarvis-avatar::before {
+  content:''; position:absolute; inset:-6px;
+  border-radius:50%; border:1px solid rgba(0,200,255,.15);
+  animation:jarvisRotate 8s linear infinite;
+  border-top-color:rgba(0,200,255,.5);
+}
+.jarvis-avatar::after {
+  content:''; position:absolute; inset:-12px;
+  border-radius:50%; border:1px dashed rgba(0,150,255,.08);
+  animation:jarvisRotate 14s linear infinite reverse;
+}
+.jarvis-id-line {
+  font-family:monospace; font-size:10px;
+  color:rgba(0,200,255,.5); letter-spacing:.1em;
+}
+.jarvis-status-chip {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:3px 10px; border-radius:20px;
+  font-size:10px; font-weight:700; letter-spacing:.08em;
+}
+
+/* KPIs circulares */
+.jarvis-ring-kpi {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  position:relative;
+}
+.jarvis-ring-kpi svg { width:72px; height:72px; transform:rotate(-90deg); }
+.jarvis-ring-kpi .ring-val {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-size:13px; font-weight:900; line-height:1;
+  display:flex; flex-direction:column; align-items:center;
+}
+
+/* Grid de asignaturas estilo JARVIS */
+.jarvis-asig-grid {
+  display:grid; gap:4px;
+  grid-template-columns:repeat(auto-fill,minmax(80px,1fr));
+}
+.jarvis-asig-card {
+  background:rgba(0,30,60,.4);
+  border:1px solid rgba(0,100,150,.2);
+  border-radius:8px; padding:8px 6px;
+  text-align:center; cursor:default;
+  transition:all .2s;
+  position:relative; overflow:hidden;
+}
+.jarvis-asig-card::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg,transparent,rgba(0,150,255,.05));
+  opacity:0; transition:opacity .2s;
+}
+.jarvis-asig-card:hover::before { opacity:1; }
+.jarvis-asig-card:hover { border-color:rgba(0,200,255,.35); transform:translateY(-2px); }
+.jarvis-asig-nota {
+  font-size:20px; font-weight:900; line-height:1;
+  margin-bottom:3px;
+}
+.jarvis-asig-sig {
+  font-size:8px; font-weight:700; letter-spacing:.04em;
+  color:rgba(150,200,255,.6);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.jarvis-asig-est {
+  font-size:7px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; margin-top:2px;
+}
 </style>
 
 
@@ -962,6 +1148,9 @@ table.ht td.ht-label{text-align:left;color:var(--t2);max-width:160px;overflow:hi
     </button>
     <button class="sb-navbtn" data-cat="ayuda" onclick="setCat('ayuda',this)">
       <span class="sb-navico">&#9432;</span>Ayuda
+    </button>
+    <button class="sb-navbtn" data-cat="adn" onclick="setCat('adn',this)">
+      <span class="sb-navico">&#129514;</span>ADN Académico
     </button>
   </div>
   <div class="sb-divider"></div>
@@ -1526,6 +1715,7 @@ const CATS = {
   admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
   control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce'],
   ayuda:        ['manual','faqs'],
+  adn:          ['adnacademico'],
 };
 
 // Display labels for each tab key
@@ -1558,6 +1748,7 @@ const TAB_LABELS = {
   malla:        'Malla Curricular',
   planreporte:   'Reporte Planificaciones',
   manual:       'Manual',
+  adnacademico: '🧬 ADN Académico',
   faqs:         'FAQs',
 };
 
@@ -2589,7 +2780,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -2622,6 +2813,7 @@ function refreshView() {
     malla:        renderMalla,
   planreporte:   renderPlanReporte,
     manual:       renderManual,
+    adnacademico: renderAdnAcademico,
     faqs:         renderFAQs,
   };
   (FN[APP.tab]||renderEmpty)();
@@ -19253,6 +19445,741 @@ function ofertaAsignar(){
 /* ══════════════════════════════════════════════════════
    MANUAL & FAQs
 ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   ADN ACADÉMICO — Sistema de análisis de avance académico
+══════════════════════════════════════════════════════════════ */
+
+var _ADN = {
+  raw: [], progs: [], program: '', cohort: '', anio: '', status: 'todos',
+  search: '', students: [], courses: [], cnames: {}, totalC: 0,
+  fileName: '', selStu: null, charts: {}
+};
+
+function _adnNorm(s){ return String(s||'').trim().replace(/\s+/g,' '); }
+
+function _adnParseNota(raw){
+  if(raw===null||raw===undefined||raw==='') return null;
+  if(typeof raw==='number') return raw===0?null:raw;
+  var s=String(raw).trim();
+  if(s===''||s==='-'||s==='0'||s==='0,0'||s==='0.0') return null;
+  s=s.replace(/\s/g,'');
+  var c;
+  if(s.includes(',')&&s.includes('.')){
+    c=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+  } else if(s.includes(',')){ c=s.replace(/\./g,'').replace(',','.'); }
+  else { c=s; }
+  var n=parseFloat(c);
+  return isNaN(n)?null:n;
+}
+
+function _adnG2c(n){
+  if(!n||n<=0) return null;
+  var t=Math.max(0,Math.min(1,(n-4)/3));
+  return 'rgb('+Math.round(255-t*255)+','+Math.round(80+t*149)+','+Math.round(80-t*30)+')';
+}
+
+function _adnParseExcel(wb){
+  var sh=wb.Sheets[wb.SheetNames[0]];
+  var js=XLSX.utils.sheet_to_json(sh,{header:1,raw:true});
+  if(js.length<2) return [];
+  var hd=js[0].map(function(h){return _adnNorm(h).toUpperCase();});
+  function fc(ns){
+    for(var i=0;i<ns.length;i++){
+      var t=ns[i].toUpperCase().replace(/\s+/g,' ').trim();
+      for(var j=0;j<hd.length;j++) if(hd[j]===t) return j;
+      for(var j=0;j<hd.length;j++) if(hd[j].includes(t)||t.includes(hd[j])) return j;
+    }
+    return -1;
+  }
+  var co={
+    sigla:fc(['SIGLA']), nom:fc(['NOMBRE ASIGNATURA']), est:fc(['ESTADO']),
+    nota:fc(['NOTA']), id:fc(['ID EXPEDIENTE']),
+    rut:fc(['RUT','R.U.T','RUT ALUMNO','RUT_ALUMNO']),
+    ap:fc(['A. PATERNO','A.PATERNO','A PATERNO']),
+    am:fc(['A. MATERNO','A.MATERNO','A MATERNO']),
+    nm:fc(['NOMBRES']), prog:fc(['PROGRAMA']), coh:fc(['COHORTE']),
+    raz:fc(['RAZON INACTIVIDAD','RAZÓN INACTIVIDAD'])
+  };
+  if(co.sigla<0||co.id<0){ showToast('Faltan columnas SIGLA o ID EXPEDIENTE','err'); return []; }
+  var recs=[];
+  for(var i=1;i<js.length;i++){
+    var r=js[i];
+    if(!r||!r[co.id]) continue;
+    var est=co.est>=0?_adnNorm(r[co.est]).toUpperCase():'';
+    var nota=est==='PENDIENTE'?null:_adnParseNota(co.nota>=0?r[co.nota]:null);
+    if(nota!==null&&(nota<1||nota>7)) continue;
+    recs.push({
+      sigla:_adnNorm(r[co.sigla]), nombreAsig:co.nom>=0?_adnNorm(r[co.nom]):'',
+      estado:est, nota:nota,
+      idExpediente:String(r[co.id]||'').trim(),
+      rut:co.rut>=0?String(r[co.rut]||'').trim():'',
+      apPaterno:co.ap>=0?_adnNorm(r[co.ap]):'',
+      apMaterno:co.am>=0?_adnNorm(r[co.am]):'',
+      nombres:co.nm>=0?_adnNorm(r[co.nm]):'',
+      programa:co.prog>=0?_adnNorm(r[co.prog]):'Sin programa',
+      cohorte:co.coh>=0?String(r[co.coh]||'').trim():'',
+      razonInactividad:co.raz>=0?_adnNorm(r[co.raz]):''
+    });
+  }
+  return recs;
+}
+
+function _adnProcess(){
+  var f=_ADN.raw.filter(function(r){
+    if(r.programa!==_ADN.program) return false;
+    if(_ADN.cohort && r.cohorte!==_ADN.cohort) return false;
+    if(_ADN.anio && (!r.cohorte || !r.cohorte.startsWith(_ADN.anio))) return false;
+    return true;
+  });
+  if(!f.length){ _ADN.students=[]; _ADN.courses=[]; _ADN.cnames={}; _ADN.totalC=0; return; }
+  var cs=new Set(f.map(function(r){return r.sigla;}));
+  _ADN.courses=[...cs].sort(); _ADN.totalC=_ADN.courses.length; _ADN.cnames={};
+  f.forEach(function(r){ if(r.nombreAsig) _ADN.cnames[r.sigla]=r.nombreAsig; });
+  var map={};
+  f.forEach(function(r){
+    var k=r.idExpediente;
+    if(!map[k]) map[k]={id:k,rut:r.rut||k,apPaterno:r.apPaterno,apMaterno:r.apMaterno,nombres:r.nombres,
+      fullName:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' '),
+      cohorte:r.cohorte,cursos:{},razon:''};
+    var ri=r.razonInactividad;
+    if(ri==='Abandono') map[k].razon='Abandono';
+    else if(ri==='Retirado'&&map[k].razon!=='Abandono') map[k].razon='Retirado';
+    else if(ri==='Diplomado'&&!map[k].razon) map[k].razon='Diplomado';
+    else if(ri&&!map[k].razon) map[k].razon=ri;
+    if(!map[k].historial) map[k].historial={};
+    if(!map[k].historial[r.sigla]) map[k].historial[r.sigla]=[];
+    map[k].historial[r.sigla].push({estado:r.estado,nota:r.nota,periodo:r.cohorte||''});
+    if(!map[k].cursos[r.sigla]||(r.nota&&r.nota>0&&(!map[k].cursos[r.sigla].nota||map[k].cursos[r.sigla].nota===0)))
+      map[k].cursos[r.sigla]={sigla:r.sigla,estado:r.estado,nota:r.nota,periodo:r.cohorte||''};
+  });
+  var all=Object.values(map).map(function(s){
+    var e=Object.values(s.cursos);
+    var ap=e.filter(function(c){return c.estado==='APROBADO';}).length;
+    var pe=e.filter(function(c){return c.estado==='PENDIENTE';}).length;
+    var gr=e.filter(function(c){return c.nota&&c.nota>0;});
+    var pr=gr.length?gr.reduce(function(a,c){return a+c.nota;},0)/gr.length:0;
+    var av=_ADN.totalC?(ap/_ADN.totalC)*100:0;
+    var ef=s.razon==='Abandono'?'Abandono':s.razon==='Retirado'?'Retirado':s.razon==='Diplomado'?'Diplomado':'En Curso';
+    return Object.assign({},s,{totalC:e.length,aprobados:ap,pendientes:pe,promedio:pr,avance:av,estadoFinal:ef,historial:s.historial||{}});
+  });
+  all=all.filter(function(s){
+    if(_ADN.status!=='todos'&&s.estadoFinal!==_ADN.status) return false;
+    if(_ADN.search){var q=_ADN.search.toLowerCase();return s.fullName.toLowerCase().includes(q)||s.id.includes(q);}
+    return true;
+  });
+  all.sort(function(a,b){return b.promedio-a.promedio;});
+  _ADN.students=all;
+}
+
+function _adnDestroyCharts(){
+  Object.values(_ADN.charts).forEach(function(ch){try{ch.destroy();}catch(e){}});
+  _ADN.charts={};
+}
+
+function renderAdnAcademico(){
+  var pg=$('page'); if(!pg) return;
+  _adnDestroyCharts();
+
+  if(!_ADN.raw.length){
+    pg.innerHTML=
+      '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh">'+
+        '<div style="text-align:center;max-width:480px">'+
+          '<div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#388bfd,#22d3ee);'+
+            'display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:24px">🧬</div>'+
+          '<h2 style="font-size:22px;font-weight:900;color:#f0f6ff;margin-bottom:8px">ADN Académico</h2>'+
+          '<p style="font-size:13px;color:#8b949e;margin-bottom:24px;line-height:1.6">'+
+            'Carga un reporte académico Excel para visualizar el avance de cada alumno por asignatura.'+
+          '</p>'+
+          '<div class="adn-upload-zone" onclick="document.getElementById(\'adnFileInp\').click()" '+
+            'ondragover="event.preventDefault();this.style.borderColor=\'#388bfd\'" '+
+            'ondragleave="this.style.borderColor=\'var(--border)\'" '+
+            'ondrop="event.preventDefault();this.style.borderColor=\'var(--border)\';_adnHandleFile(event.dataTransfer.files[0])">'+
+            '<div style="font-size:36px;margin-bottom:12px">📊</div>'+
+            '<div style="font-size:14px;font-weight:700;color:#e6edf3;margin-bottom:6px">Arrastra tu archivo Excel aquí</div>'+
+            '<div style="font-size:12px;color:#8b949e">o haz clic para seleccionar · .xlsx / .xls / .csv</div>'+
+          '</div>'+
+          '<input type="file" id="adnFileInp" accept=".xlsx,.xls,.csv" style="display:none" onchange="if(this.files[0])_adnHandleFile(this.files[0])">'+
+          '<button onclick="_adnLoadDemo()" style="margin-top:14px;padding:10px 24px;border-radius:8px;border:1px solid #21262d;'+
+            'background:transparent;color:#8b949e;font-size:12px;cursor:pointer">⚗️ Cargar datos de demostración</button>'+
+        '</div>'+
+      '</div>';
+    return;
+  }
+
+  // Obtener años únicos de los datos
+  var anos = [...new Set(_ADN.raw.map(function(r){ return r.cohorte?r.cohorte.substring(0,4):''; }).filter(Boolean))].sort().reverse();
+  var cohortes = [...new Set(_ADN.raw.filter(function(r){return !_ADN.program||r.programa===_ADN.program;}).map(function(r){return r.cohorte;}).filter(Boolean))].sort();
+
+  pg.innerHTML=
+    // ── BARRA DE FILTROS ARRIBA ───────────────────────────────
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px 18px;margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<span style="font-size:13px;font-weight:900;color:#f0f6ff;flex-shrink:0">🧬 ADN Académico</span>'+
+        '<div style="width:1px;height:20px;background:#21262d;flex-shrink:0"></div>'+
+
+        // Filtro Programa
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Programa</span>'+
+          '<select id="adnFProg" onchange="_ADN.program=this.value;_ADN.cohort=\'\';renderAdnAcademico()" '+
+            'style="padding:6px 10px;border:1px solid #21262d;border-radius:7px;background:#161b22;color:#e6edf3;font-size:11px;max-width:280px">'+
+            '<option value="">Todos los programas</option>'+
+            _ADN.progs.map(function(p){return '<option value="'+esc(p)+'"'+(p===_ADN.program?' selected':'')+'>'+esc(abbr(p,40))+'</option>';}).join('')+
+          '</select>'+
+        '</div>'+
+
+        // Filtro Cohorte
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Cohorte</span>'+
+          '<select id="adnFCoh" onchange="_ADN.cohort=this.value;_adnRefresh()" '+
+            'style="padding:6px 10px;border:1px solid #21262d;border-radius:7px;background:#161b22;color:#e6edf3;font-size:11px">'+
+            '<option value="">Todas</option>'+
+            cohortes.map(function(co){return '<option value="'+esc(co)+'"'+(co===_ADN.cohort?' selected':'')+'>'+esc(co)+'</option>';}).join('')+
+          '</select>'+
+        '</div>'+
+
+        // Filtro Año
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Año</span>'+
+          '<select id="adnFAnio" onchange="_ADN.anio=this.value;_adnRefresh()" '+
+            'style="padding:6px 10px;border:1px solid #21262d;border-radius:7px;background:#161b22;color:#e6edf3;font-size:11px">'+
+            '<option value="">Todos</option>'+
+            anos.map(function(a){return '<option value="'+esc(a)+'"'+(_ADN.anio===a?' selected':'')+'>'+esc(a)+'</option>';}).join('')+
+          '</select>'+
+        '</div>'+
+
+        // Filtro Estado
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Estado</span>'+
+          '<div style="display:flex;gap:4px">'+
+          ['todos','Diplomado','En Curso','Retirado','Abandono'].map(function(f){
+            var active=_ADN.status===f;
+            var bc=f==='Diplomado'?'#3fb950':f==='En Curso'?'#388bfd':f==='Retirado'?'#f0b429':f==='Abandono'?'#f85149':'#8b949e';
+            return '<button onclick="_ADN.status=\''+f+'\';_adnRefresh()" '+
+              'style="padding:5px 10px;border-radius:6px;border:1px solid '+(active?bc+'60':'#21262d')+';'+
+              'background:'+(active?bc+'18':'transparent')+';color:'+(active?bc:'#6e7681')+';font-size:10px;cursor:pointer;font-weight:'+(active?'700':'400')+'">'+
+              (f==='todos'?'Todos':f)+
+            '</button>';
+          }).join('')+
+          '</div>'+
+        '</div>'+
+
+        // Buscador + botones derecha
+        '<div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">'+
+          '<input type="text" placeholder="🔍 Buscar alumno..." value="'+esc(_ADN.search||'')+'" '+
+            'oninput="_ADN.search=this.value;_adnRefresh()" '+
+            'style="padding:6px 12px;border:1px solid #21262d;border-radius:7px;background:#161b22;color:#e6edf3;font-size:11px;width:180px">'+
+          '<button onclick="renderAdnAcademico._reset()" '+
+            'style="padding:6px 12px;border-radius:7px;border:1px solid #21262d;background:transparent;color:#6e7681;font-size:11px;cursor:pointer" '+
+            'title="Cargar nuevo archivo">📂</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    // ── CONTENIDO PRINCIPAL ───────────────────────────────────
+    '<div id="adnMain">'+
+      (!_ADN.program?
+        '<div style="display:flex;align-items:center;justify-content:center;min-height:40vh">'+
+          '<div style="text-align:center;color:#8b949e">'+
+            '<div style="font-size:32px;margin-bottom:12px">☝️</div>'+
+            '<div style="font-size:14px;font-weight:600;color:#e6edf3;margin-bottom:4px">Selecciona un programa</div>'+
+            '<div style="font-size:12px">Usa el filtro de arriba para comenzar</div>'+
+          '</div>'+
+        '</div>' : '')+
+    '</div>'+
+    '<input type="file" id="adnFileInp" accept=".xlsx,.xls,.csv" style="display:none" onchange="if(this.files[0])_adnHandleFile(this.files[0])">';
+
+  if(_ADN.program) _adnRefresh();
+}
+
+
+function _adnBuildSb(){
+  var el=document.getElementById('adnSbList'); if(!el) return;
+  var stats={};
+  _ADN.progs.forEach(function(p){
+    var r=_ADN.raw.filter(function(x){return x.programa===p;});
+    stats[p]={a:new Set(r.map(function(x){return x.idExpediente;})).size,
+              c:new Set(r.map(function(x){return x.sigla;})).size};
+  });
+  el.innerHTML=_ADN.progs.map(function(p){
+    var s=stats[p];
+    return '<div class="adn-prog-item'+(p===_ADN.program?' active':'')+'" onclick="_adnSelProg(\''+esc(p)+'\')">'+
+      '<div class="adn-prog-name">'+esc(p)+'</div>'+
+      '<div class="adn-prog-meta"><span>'+s.a+' alum.</span><span>'+s.c+' asig.</span></div>'+
+    '</div>';
+  }).join('');
+}
+
+function _adnFilterSb(q){
+  document.querySelectorAll('.adn-prog-item').forEach(function(el){
+    el.style.display=el.querySelector('.adn-prog-name').textContent.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+
+function _adnSelProg(p){
+  _ADN.program=p; _ADN.cohort=''; _ADN.anio=''; _ADN.status='todos'; _ADN.search=''; _ADN.selStu=null;
+  _adnBuildSb();
+  _adnRefresh();
+}
+
+function _adnRefresh(){
+  _adnProcess();
+  _adnRenderMain();
+}
+
+function _adnRenderMain(){
+  var el=document.getElementById('adnMain'); if(!el) return;
+  _adnDestroyCharts();
+  var st=_ADN.students;
+  var tA=st.length;
+  var tAp=st.reduce(function(a,s){return a+s.aprobados;},0);
+  var tI=st.reduce(function(a,s){return a+s.totalC;},0);
+  var ta=tI?(tAp/tI)*100:0;
+  var ag=st.filter(function(s){return s.promedio>0;});
+  var pg=ag.length?ag.reduce(function(a,s){return a+s.promedio;},0)/ag.length:0;
+  var dc=st.filter(function(s){return s.estadoFinal==='Diplomado';}).length;
+  var tr=tA?(dc/tA)*100:0;
+
+  // Cohorts
+
+  el.innerHTML=
+        // KPIs
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px">'+
+    [
+      {ico:'👥',lbl:'Alumnos',val:tA,c:'#388bfd',fmt:function(v){return v;}},
+      {ico:'✅',lbl:'Tasa Aprobación',val:ta,c:'#3fb950',fmt:function(v){return v.toFixed(1)+'%';}},
+      {ico:'📊',lbl:'Prom. General',val:pg,c:'#f0b429',fmt:function(v){return v.toFixed(1);}},
+      {ico:'🎓',lbl:'Retención',val:tr,c:'#22d3ee',fmt:function(v){return v.toFixed(1)+'%';}},
+      {ico:'📚',lbl:'Cursos Aprob.',val:tAp,c:'#a78bfa',fmt:function(v){return v;}},
+    ].map(function(k){
+      return '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:12px 14px;border-left:3px solid '+k.c+'">'+
+        '<div style="font-size:13px;margin-bottom:6px">'+k.ico+'</div>'+
+        '<div style="font-size:20px;font-weight:900;color:'+k.c+'">'+k.fmt(k.val)+'</div>'+
+        '<div style="font-size:9px;color:#6e7681;margin-top:3px;text-transform:uppercase;letter-spacing:.3px">'+k.lbl+'</div>'+
+      '</div>';
+    }).join('')+
+    '</div>'+
+
+    // Gráficos
+    '<div style="display:grid;grid-template-columns:240px 1fr;gap:12px;margin-bottom:14px">'+
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">Estado</div>'+
+        '<canvas id="adnCEst" style="max-height:200px"></canvas>'+
+      '</div>'+
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">Promedio por Asignatura</div>'+
+        '<canvas id="adnCProm" style="max-height:200px"></canvas>'+
+      '</div>'+
+    '</div>'+
+
+    // Heatmap ADN
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px;margin-bottom:14px">'+
+      '<div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px">'+
+        '🧬 Mapa ADN — Avance por Alumno y Asignatura'+
+      '</div>'+
+      '<div id="adnHM" class="adn-hm-wrap"></div>'+
+    '</div>'+
+
+    // Tabla
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead><tr style="background:#161b22;border-bottom:2px solid #21262d">'+
+      ['#','Alumno / RUT','Estado','Cursos','Promedio','Avance',''].map(function(h){
+        return '<th style="padding:6px 8px;text-align:left;font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.3px">'+h+'</th>';
+      }).join('')+
+      '</tr></thead><tbody>'+
+      (st.length ? st.map(function(s,i){
+        var bc=s.estadoFinal==='Diplomado'?'#3fb950':s.estadoFinal==='Retirado'?'#f0b429':s.estadoFinal==='Abandono'?'#f85149':'#388bfd';
+        var pc=s.promedio>=6.5?'#3fb950':s.promedio>=6?'#a9e34b':s.promedio>0?'#f0b429':'#6e7681';
+        return '<tr style="border-bottom:1px solid #21262d;cursor:pointer" onclick="adnOpenDet(\''+esc(s.id)+'\')" '+
+          'onmouseover="this.style.background=\'rgba(56,139,253,.04)\'" onmouseout="this.style.background=\'transparent\'">'+
+          '<td style="padding:8px 12px;color:#6e7681">'+(i+1)+'</td>'+
+          '<td style="padding:5px 8px">'+
+            '<div style="font-size:11px;font-weight:600;color:#e6edf3">'+esc(s.fullName)+'</div>'+
+            '<div style="font-size:9px;color:#388bfd;font-family:monospace;margin-top:1px">'+(s.rut||s.id)+(s.cohorte?' <span style=\"color:#6e7681;font-family:sans-serif\">'+esc(s.cohorte)+'</span>':'')+'</div>'+
+          '</td>'+
+          '<td style="padding:5px 8px"><span style="font-size:9px;padding:2px 7px;border-radius:5px;background:'+bc+'18;color:'+bc+';border:1px solid '+bc+'40;font-weight:600">'+esc(s.estadoFinal)+'</span></td>'+
+          '<td style="padding:5px 8px;text-align:center;color:#e6edf3;font-weight:600;font-size:11px">'+s.aprobados+'/'+_ADN.totalC+'</td>'+
+          '<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+pc+';font-size:12px">'+(s.promedio>0?s.promedio.toFixed(1):'—')+'</td>'+
+          '<td style="padding:5px 8px;min-width:90px">'+
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<div style="flex:1;height:5px;background:#21262d;border-radius:3px;overflow:hidden">'+
+                '<div style="width:'+s.avance.toFixed(0)+'%;height:100%;background:linear-gradient(90deg,#388bfd,#22d3ee);border-radius:3px"></div>'+
+              '</div>'+
+              '<span style="font-size:10px;color:#e6edf3;min-width:28px">'+s.avance.toFixed(0)+'%</span>'+
+            '</div>'+
+          '</td>'+
+          '<td style="padding:5px 8px;color:#6e7681;font-size:10px">›</td>'+
+        '</tr>';
+      }).join('') :
+      '<tr><td colspan="7" style="padding:30px;text-align:center;color:#6e7681">Sin resultados</td></tr>')+
+      '</tbody></table>'+
+    '</div>';
+
+  // Renderizar gráficos
+  _adnRenderCharts(st);
+  _adnRenderHM(st);
+}
+
+function _adnRenderCharts(st){
+  // Doughnut Estado
+  var ec={};
+  st.forEach(function(s){ ec[s.estadoFinal]=(ec[s.estadoFinal]||0)+1; });
+  var el=Object.keys(ec), ed=Object.values(ec);
+  var colMap={Diplomado:'#3fb950',Retirado:'#f0b429',Abandono:'#f85149','En Curso':'#388bfd'};
+  var cEst=document.getElementById('adnCEst');
+  if(cEst&&el.length){
+    _ADN.charts.est=new Chart(cEst,{type:'doughnut',data:{labels:el,datasets:[{
+      data:ed,
+      backgroundColor:el.map(function(l){return (colMap[l]||'#8b949e')+'bb';}),
+      borderColor:'#0d1117',borderWidth:3,hoverOffset:4
+    }]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
+      plugins:{legend:{position:'bottom',labels:{padding:8,usePointStyle:true,font:{size:10},color:'#8b949e'}},
+      tooltip:{backgroundColor:'#161b22',borderColor:'#21262d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#8b949e'}}}});
+  }
+
+  // Barras por asignatura
+  var avg={};
+  _ADN.courses.forEach(function(sig){
+    var r=st.flatMap(function(s){return Object.values(s.cursos);}).filter(function(c){return c.sigla===sig&&c.nota&&c.nota>0;});
+    if(r.length) avg[sig]=r.reduce(function(a,c){return a+c.nota;},0)/r.length;
+  });
+  var ae=Object.entries(avg).sort(function(a,b){return a[0].localeCompare(b[0]);});
+  var cProm=document.getElementById('adnCProm');
+  if(cProm&&ae.length){
+    var al=ae.map(function(e){return e[0];}), ad=ae.map(function(e){return +e[1].toFixed(1);});
+    var ac=ad.map(function(v){return v>=6.5?'#3fb950':v>=6?'#a9e34b':v>=5.5?'#f0b429':'#f85149';});
+    _ADN.charts.prom=new Chart(cProm,{type:'bar',data:{labels:al,datasets:[{
+      data:ad,backgroundColor:ac.map(function(c){return c+'33';}),
+      borderColor:ac,borderWidth:2,borderRadius:4,maxBarThickness:40
+    }]},options:{responsive:true,maintainAspectRatio:false,
+      scales:{y:{min:4,max:7.2,grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6e7681',font:{size:9}}},
+              x:{grid:{display:false},ticks:{color:'#8b949e',font:{size:9},maxRotation:40}}},
+      plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'#161b22',borderColor:'#21262d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#8b949e',
+        callbacks:{title:function(i){return _ADN.cnames[ae[i[0].dataIndex][0]]||ae[i[0].dataIndex][0];},label:function(c){return ' '+c.raw.toFixed(1);}}}}}});
+  }
+}
+
+function _adnRenderHM(st){
+  var el=document.getElementById('adnHM');
+  if(!el||!st.length){ if(el) el.innerHTML=''; return; }
+  var CS=_ADN.courses;
+  var NW=120, CW=52, GAP=2;
+
+  function g2c(n){
+    if(!n||n<=0) return null;
+    var t=Math.max(0,Math.min(1,(n-4)/3));
+    return 'rgb('+Math.round(255-t*255)+','+Math.round(100+t*130)+','+Math.round(80-t*40)+')';
+  }
+
+  var html='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;min-width:'+(NW+CS.length*(CW+GAP))+'px">';
+
+  // ── Header de siglas ──────────────────────────────────────────
+  html+='<thead><tr>';
+  // Celda esquina
+  html+='<th style="min-width:'+NW+'px;padding:6px 8px;text-align:right;font-size:8px;font-weight:700;'+
+    'color:#6e7681;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #21262d;background:#0d1117">RUT</th>';
+
+  CS.forEach(function(sig){
+    html+='<th style="min-width:'+CW+'px;padding:6px 4px;text-align:center;font-size:8px;font-weight:700;'+
+      'color:#8b949e;border-bottom:2px solid #21262d;background:#0d1117;white-space:nowrap" '+
+      'title="'+esc(_ADN.cnames[sig]||sig)+'">'+esc(sig)+'</th>';
+  });
+  html+='</tr></thead><tbody>';
+
+  // ── Filas por alumno ──────────────────────────────────────────
+  st.forEach(function(s, ri){
+    var rowBg = ri%2===0 ? 'transparent' : 'rgba(255,255,255,.013)';
+    html+='<tr style="background:'+rowBg+'">';
+
+    // RUT
+    html+='<td onclick="adnOpenDet(\''+esc(s.id)+'\')" '+
+      'style="padding:4px 8px;text-align:right;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);'+
+      'white-space:nowrap" title="'+esc(s.fullName)+'">'+
+      '<span style="font-size:10px;font-weight:700;color:#388bfd;font-family:monospace;letter-spacing:.02em">'+(s.rut||s.id)+'</span>'+
+    '</td>';
+
+    // Celdas de notas
+    CS.forEach(function(sig){
+      var cu=s.cursos[sig];
+      var cellStyle='padding:3px 2px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04);border-left:1px solid rgba(255,255,255,.03)';
+
+      if(!cu){
+        html+='<td style="'+cellStyle+'"><div style="width:'+CW+'px;height:26px;background:rgba(255,255,255,.02);border-radius:3px;display:flex;align-items:center;justify-content:center;color:#30363d;font-size:9px">—</div></td>';
+        return;
+      }
+      if(cu.estado==='PENDIENTE'){
+        html+='<td style="'+cellStyle+'" onclick="adnOpenDet(\''+esc(s.id)+'\')" title="'+esc(sig)+': Pendiente">'+
+          '<div style="width:'+CW+'px;height:26px;background:rgba(240,180,41,.1);border:1px dashed rgba(240,180,41,.35);'+
+          'border-radius:3px;display:flex;align-items:center;justify-content:center;color:#f0b429;font-size:9px;font-weight:700;cursor:pointer">PN</div></td>';
+        return;
+      }
+      if(!cu.nota||cu.nota===0){
+        html+='<td style="'+cellStyle+'" onclick="adnOpenDet(\''+esc(s.id)+'\')" title="'+esc(sig)+': Aprobado S/N">'+
+          '<div style="width:'+CW+'px;height:26px;background:rgba(0,180,216,.1);border:1px solid rgba(0,180,216,.3);'+
+          'border-radius:3px;display:flex;align-items:center;justify-content:center;color:#22d3ee;font-size:9px;font-weight:700;cursor:pointer">AP</div></td>';
+        return;
+      }
+      var col=g2c(cu.nota)||'#8b949e';
+      var nota=cu.nota%1===0 ? cu.nota.toFixed(0) : cu.nota.toFixed(1);
+      html+='<td style="'+cellStyle+'" onclick="adnOpenDet(\''+esc(s.id)+'\')" title="'+esc(s.fullName)+' · '+esc(sig)+': '+cu.nota.toFixed(1)+'">'+
+        '<div style="width:'+CW+'px;height:26px;background:'+col+'20;border:1px solid '+col+'50;'+
+        'border-radius:3px;display:flex;align-items:center;justify-content:center;'+
+        'color:'+col+';font-size:11px;font-weight:800;cursor:pointer">'+nota+'</div></td>';
+    });
+
+    html+='</tr>';
+  });
+
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+
+function adnOpenDet(id){
+  var s=_ADN.students.find(function(x){return x.id===id;});
+  if(!s) return;
+  _ADN.selStu=id;
+
+  // Colores por estado y nota
+  var stColor=s.estadoFinal==='Diplomado'?'#00e5a0':s.estadoFinal==='Retirado'?'#ffc840':s.estadoFinal==='Abandono'?'#ff5577':'#38b4ff';
+  function notaColor(n){
+    if(!n||n<=0) return null;
+    var t=Math.max(0,Math.min(1,(n-4)/3));
+    return 'rgb('+Math.round(255-t*255)+','+Math.round(100+t*130)+','+Math.round(80-t*40)+')';
+  }
+  function ring(pct,color,val,lbl,sub){
+    var r=28, circ=2*Math.PI*r, dash=circ*pct/100, gap=circ-dash;
+    return '<div class="jarvis-ring-kpi">'+
+      '<svg viewBox="0 0 72 72" fill="none">'+
+        '<circle cx="36" cy="36" r="'+r+'" stroke="rgba(0,100,150,.2)" stroke-width="4"/>'+
+        '<circle cx="36" cy="36" r="'+r+'" stroke="'+color+'" stroke-width="4"'+
+          ' stroke-dasharray="'+dash.toFixed(1)+' '+gap.toFixed(1)+'"'+
+          ' stroke-linecap="round"/>'+
+      '</svg>'+
+      '<div class="ring-val"><span style="color:'+color+';font-size:12px;font-weight:900">'+val+'</span>'+
+        (sub?'<span style="font-size:8px;color:rgba(150,200,255,.5)">'+sub+'</span>':'')+
+      '</div>'+
+      '<div style="font-size:9px;color:rgba(100,160,220,.6);text-align:center;margin-top:1px;letter-spacing:.04em">'+lbl+'</div>'+
+    '</div>';
+  }
+
+  var initials=(s.nombres?s.nombres[0]:'')+(s.apPaterno?s.apPaterno[0]:'');
+  var promPct=s.promedio>0?Math.round((s.promedio-4)/3*100):0;
+
+  // Obtener período de cursos desde el raw
+  var rawAlumno=_ADN.raw.filter(function(r){return r.idExpediente===s.id && r.programa===_ADN.program;});
+  var periodos=[...new Set(rawAlumno.map(function(r){return r.cohorte||'';}).filter(Boolean))].sort();
+  var periodoIngreso=periodos.length?periodos[0]:'';
+  var periodoFin=periodos.length>1?periodos[periodos.length-1]:'';
+
+  // Construir cuadrícula de asignaturas
+  var asigCards=_ADN.courses.map(function(sig){
+    var cu=s.cursos[sig];
+    var nm=_ADN.cnames[sig]||sig;
+    if(!cu) return '<div class="jarvis-asig-card" style="opacity:.3" title="'+esc(nm)+'">'+
+      '<div class="jarvis-asig-nota" style="color:rgba(80,120,160,.6)">—</div>'+
+      '<div class="jarvis-asig-sig">'+esc(sig)+'</div>'+
+      '<div class="jarvis-asig-est" style="color:rgba(80,120,160,.4)">SIN REG.</div>'+
+    '</div>';
+    if(cu.estado==='PENDIENTE') return '<div class="jarvis-asig-card" style="border-color:rgba(240,180,41,.3)" title="'+esc(nm)+' — Pendiente">'+
+      '<div class="jarvis-asig-nota" style="color:#f0b429">PN</div>'+
+      '<div class="jarvis-asig-sig">'+esc(sig)+'</div>'+
+      '<div class="jarvis-asig-est" style="color:#f0b429">PENDIENTE</div>'+
+    '</div>';
+    if(!cu.nota||cu.nota===0) return '<div class="jarvis-asig-card" style="border-color:rgba(0,180,255,.3)" title="'+esc(nm)+' — Aprobado S/N">'+
+      '<div class="jarvis-asig-nota" style="color:#38b4ff;font-size:14px">AP</div>'+
+      '<div class="jarvis-asig-sig">'+esc(sig)+'</div>'+
+      '<div class="jarvis-asig-est" style="color:#38b4ff">S/NOTA</div>'+
+      (cu.periodo?'<div style="font-size:7px;color:rgba(0,180,255,.4);margin-top:2px;font-family:monospace">'+esc(cu.periodo)+'</div>':'')+
+    '</div>';
+    var nc=notaColor(cu.nota)||'#888';
+    var nIntentos=s.historial&&s.historial[sig]?s.historial[sig].length:1;
+    var cardBadge=nIntentos>1?'<div style="position:absolute;top:2px;right:3px;font-size:7px;font-weight:900;color:#ff7744">'+nIntentos+'x</div>':'';
+    return '<div class="jarvis-asig-card" style="border-color:'+nc+'40;position:relative" title="'+esc(nm)+(nIntentos>1?' ('+nIntentos+' intentos)':'')+'">'+cardBadge+
+      '<div class="jarvis-asig-nota" style="color:'+nc+'">'+cu.nota.toFixed(1)+'</div>'+
+      '<div class="jarvis-asig-sig" title="'+esc(sig)+'">'+esc(sig)+'</div>'+
+      '<div class="jarvis-asig-est" style="color:'+nc+'66">APROBADO</div>'+
+      (cu.periodo?'<div style="font-size:7px;color:'+nc+'44;margin-top:2px;font-family:monospace;letter-spacing:.04em">'+esc(cu.periodo)+'</div>':'')+
+    '</div>';
+  }).join('');
+
+  // Línea de tiempo por asignatura (bonus: barras de nota)
+  var notasValidas=_ADN.courses.map(function(sig){
+    var cu=s.cursos[sig]; return cu&&cu.nota&&cu.nota>0?{sig:sig,nota:cu.nota}:null;
+  }).filter(Boolean);
+  var prom_max=notasValidas.length?Math.max.apply(null,notasValidas.map(function(x){return x.nota;})):0;
+
+  document.getElementById('adnJarvisContent').innerHTML=
+    // HEADER
+    '<div class="jarvis-header">'+
+      '<div class="jarvis-avatar" style="color:'+stColor+'">'+esc(initials)+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        // Chips de info en la misma línea
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
+        '<div style="display:flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(56,139,253,.1);border:1px solid rgba(56,139,253,.25);border-radius:6px">'+
+          '<span style="font-size:8px;font-weight:700;color:rgba(56,139,253,.6);letter-spacing:.06em">RUT</span>'+
+          '<span style="font-size:10px;font-weight:800;color:#388bfd;font-family:monospace;letter-spacing:.04em">'+(s.rut||s.id)+'</span>'+
+        '</div>'+
+        (s.cohorte?
+          '<div style="display:flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(0,229,153,.08);border:1px solid rgba(0,229,153,.2);border-radius:6px">'+
+            '<span style="font-size:8px;font-weight:700;color:rgba(0,229,153,.5);letter-spacing:.06em">COHORTE</span>'+
+            '<span style="font-size:10px;font-weight:800;color:#00e5a0;letter-spacing:.02em">'+esc(s.cohorte)+'</span>'+
+          '</div>':'')+
+        (periodoIngreso?
+          '<div style="display:flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(168,139,250,.08);border:1px solid rgba(168,139,250,.2);border-radius:6px">'+
+            '<span style="font-size:8px;font-weight:700;color:rgba(168,139,250,.5);letter-spacing:.06em">INGRESO</span>'+
+            '<span style="font-size:10px;font-weight:800;color:#a78bfa;letter-spacing:.02em">'+esc(periodoIngreso)+'</span>'+
+          '</div>':'')+
+        (periodoFin && periodoFin!==periodoIngreso?
+          '<div style="display:flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);border-radius:6px">'+
+            '<span style="font-size:8px;font-weight:700;color:rgba(34,211,238,.5);letter-spacing:.06em">TÉRMINO</span>'+
+            '<span style="font-size:10px;font-weight:800;color:#22d3ee;letter-spacing:.02em">'+esc(periodoFin)+'</span>'+
+          '</div>':'')+
+      '</div>'+
+        '<div style="font-size:20px;font-weight:900;color:#e8f4ff;letter-spacing:-.01em;margin-bottom:6px">'+esc(s.fullName)+'</div>'+
+        '<span class="jarvis-status-chip" style="background:'+stColor+'15;color:'+stColor+';border:1px solid '+stColor+'35">'+
+          '◉ '+esc(s.estadoFinal)+
+        '</span>'+
+      '</div>'+
+      // Anillos KPI
+      '<div style="display:flex;gap:20px;flex-shrink:0;position:relative;z-index:1">'+
+        ring(promPct,'#38b4ff',s.promedio>0?s.promedio.toFixed(1):'—','PROMEDIO')+
+        ring(s.avance,'#00e5a0',s.avance.toFixed(0)+'%','AVANCE')+
+        ring(s.totalC?Math.round(s.aprobados/s.totalC*100):0,stColor,s.aprobados+'/'+_ADN.totalC,'APROBADOS')+
+      '</div>'+
+    '</div>'+
+
+    // CUERPO — 2 columnas
+    '<div style="display:grid;grid-template-columns:1fr 280px;height:calc(90vh - 140px);overflow:hidden;position:relative;z-index:1">'+
+
+      // Izquierda: cuadrícula de asignaturas
+      '<div style="padding:16px 20px;overflow-y:auto;border-right:1px solid rgba(0,100,150,.12)">'+
+        '<div style="font-size:9px;font-weight:700;letter-spacing:.12em;color:rgba(0,150,255,.5);margin-bottom:10px">'+
+          '◈ REGISTRO ACADÉMICO COMPLETO · '+_ADN.courses.length+' ASIGNATURAS'+
+        '</div>'+
+        '<div class="jarvis-asig-grid">'+asigCards+'</div>'+
+      '</div>'+
+
+      // Derecha: métricas y gráfico de barras
+      '<div style="padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">'+
+
+        // Distribución por estado
+        '<div style="background:rgba(0,20,40,.4);border:1px solid rgba(0,100,150,.15);border-radius:10px;padding:12px">'+
+          '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:rgba(0,150,255,.5);margin-bottom:10px">◈ RENDIMIENTO</div>'+
+          (notasValidas.length?
+            notasValidas.map(function(x){
+              var nc=notaColor(x.nota)||'#888';
+              var w=prom_max>0?Math.round(x.nota/prom_max*100):0;
+              return '<div style="margin-bottom:6px">'+
+                '<div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(150,200,255,.6);margin-bottom:2px">'+
+                  '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" title="'+esc(_ADN.cnames[x.sig]||x.sig)+'">'+esc(x.sig)+'</span>'+
+                  '<span style="color:'+nc+';font-weight:800;margin-left:6px">'+x.nota.toFixed(1)+'</span>'+
+                '</div>'+
+                '<div style="height:4px;background:rgba(0,80,150,.2);border-radius:2px;overflow:hidden">'+
+                  '<div style="width:'+w+'%;height:100%;background:linear-gradient(90deg,'+nc+'88,'+nc+');border-radius:2px;transition:width .6s"></div>'+
+                '</div>'+
+              '</div>';
+            }).join('')
+          : '<div style="font-size:11px;color:rgba(100,150,200,.4);text-align:center;padding:20px">Sin notas registradas</div>')+
+        '</div>'+
+
+        // Alertas
+        '<div style="background:rgba(0,20,40,.4);border:1px solid rgba(0,100,150,.15);border-radius:10px;padding:12px">'+
+          '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:rgba(0,150,255,.5);margin-bottom:10px">◈ ALERTAS</div>'+
+          // Cursos con repetición
+          (function(){
+            var hist=s.historial||{};
+            var reps=Object.entries(hist).filter(function(e){
+              return e[1].length>1 || e[1].some(function(i){return i.estado&&i.estado.toUpperCase().includes('REPROB');});
+            });
+            if(!reps.length) return '';
+            return '<div style="margin-bottom:8px;border:1px solid rgba(255,100,50,.3);border-radius:8px;overflow:hidden">'+
+              '<div style="padding:5px 10px;background:rgba(255,80,50,.12);font-size:8px;font-weight:700;color:rgba(255,120,80,.8);letter-spacing:.08em">⚠ REINSCRIPCIONES</div>'+
+              reps.map(function(e){
+                var sig=e[0], intentos=e[1];
+                var ultimo=intentos[intentos.length-1];
+                var nc=ultimo.nota&&ultimo.nota>0?_adnG2c(ultimo.nota)||'#888':'#888';
+                return '<div style="padding:5px 10px;border-top:1px solid rgba(255,80,50,.15);font-size:9px">'+
+                  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'+
+                    '<span style="color:#e8f4ff;font-weight:700">'+esc(sig)+'</span>'+
+                    '<span style="font-size:8px;padding:1px 6px;border-radius:4px;background:rgba(255,80,50,.15);color:#ff9966">'+intentos.length+'° intento</span>'+
+                  '</div>'+
+                  '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+                  intentos.map(function(it,idx){
+                    var ic=it.nota&&it.nota>0?_adnG2c(it.nota)||'#888':it.estado==='PENDIENTE'?'#f0b429':'#888';
+                    var lbl=it.nota&&it.nota>0?it.nota.toFixed(1):it.estado==='PENDIENTE'?'PN':'AP';
+                    return '<span style="font-size:8px;padding:2px 6px;border-radius:4px;background:'+ic+'18;color:'+ic+';border:1px solid '+ic+'40">'+
+                      (idx+1)+'°: '+lbl+(it.periodo?' ('+it.periodo+')':'')+'</span>';
+                  }).join('')+
+                  '</div>'+
+                '</div>';
+              }).join('')+
+            '</div>';
+          })()+
+          (function(){
+            var alerts=[];
+            if(s.pendientes>0) alerts.push({c:'#f0b429',t:'⚠ '+s.pendientes+' asig. pendiente(s)'});
+            if(s.estadoFinal==='Abandono') alerts.push({c:'#f85149',t:'✕ Situación: Abandono'});
+            if(s.estadoFinal==='Retirado') alerts.push({c:'#f0b429',t:'↩ Situación: Retirado'});
+            if(s.promedio>0&&s.promedio<5) alerts.push({c:'#f85149',t:'↓ Promedio bajo 5.0'});
+            if(!alerts.length) alerts.push({c:'#00e5a0',t:'✓ Sin alertas activas'});
+            return alerts.map(function(a){
+              return '<div style="font-size:10px;color:'+a.c+';padding:4px 0;border-bottom:1px solid rgba(0,80,150,.1);display:flex;align-items:center;gap:6px">'+
+                '<span style="width:6px;height:6px;border-radius:50%;background:'+a.c+';flex-shrink:0;display:inline-block"></span>'+
+                a.t+'</div>';
+            }).join('');
+          })()+
+        '</div>'+
+
+      '</div>'+
+    '</div>';
+
+  document.getElementById('adnJarvis').classList.add('open');
+}
+
+function adnCloseDet(){
+  document.getElementById('adnJarvis').classList.remove('open');
+  _ADN.selStu=null;
+}
+
+function _adnHandleFile(file){
+  if(!file) return;
+  var ext='.'+file.name.split('.').pop().toLowerCase();
+  if(!['.xlsx','.xls','.csv'].includes(ext)){ showToast('Formato no soportado','err'); return; }
+  showToast('Procesando...','ok');
+  var rd=new FileReader();
+  rd.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false});
+      var recs=_adnParseExcel(wb);
+      if(!recs.length){ showToast('No se encontraron registros válidos','err'); return; }
+      _ADN.raw=recs; _ADN.fileName=file.name;
+      _ADN.progs=[...new Set(recs.map(function(r){return _adnNorm(r.programa);}).filter(Boolean))].sort();
+      _ADN.program='';
+      showToast(recs.length+' registros cargados · '+_ADN.progs.length+' programa(s)','ok');
+      renderAdnAcademico();
+      if(_ADN.progs.length===1) setTimeout(function(){_adnSelProg(_ADN.progs[0]);},100);
+    }catch(err){ showToast('Error: '+err.message,'err'); }
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+function _adnLoadDemo(){
+  var CN={DFIS101:'Valor Social de la Filantropía',DFIS102:'Visión Estratégica y Tipologías',DFIS103:'Estrategia y Propuesta de Valor',DFIS104:'Taller de Articulación e Incidencia',DFIS105:'Taller de Innovación para Gestión',DFIS106:'Modelos de Financiamiento',DFIS107:'Estrategia de Comunicaciones',DFIS108:'Metodologías de Evaluación',DFIS109:'Taller Formulación de Proyectos',DFIS110:'Estrategia de Uso de Evidencia',DFIS113:'Gobernanza Efectiva'};
+  var PR='DIPLOMADO EN DIRECCIÓN DE FUNDACIONES E INVERSIÓN SOCIAL';
+  var DM=[['DFIS101','APROBADO','5.0','118295','RIVEROS','MARTINEZ','MIRIAM JANET','Diplomado'],['DFIS101','APROBADO','5.5','118511','GARCIA','BERGUECIO','CAROLINA','Diplomado'],['DFIS101','APROBADO','5.9','117821','BOWEN','CARRANZA','ALEX RODRIGO','Diplomado'],['DFIS101','APROBADO','6.0','118290','CORRAL','MENA','JOSE FRANCISCO','Diplomado'],['DFIS101','APROBADO','6.3','118297','ORTEGA','RIQUELME','FANI KARINA','Retirado'],['DFIS101','APROBADO','6.4','118296','PENA','CARIOLA','CARY ANDREA','Diplomado'],['DFIS101','APROBADO','6.6','118287','VOGT','JARA','FRANCISCA','Diplomado'],['DFIS102','APROBADO','5.5','118511','GARCIA','BERGUECIO','CAROLINA','Diplomado'],['DFIS102','APROBADO','6.3','118297','ORTEGA','RIQUELME','FANI KARINA','Retirado'],['DFIS102','APROBADO','5.6','118292','ROBLES','RAMOS','GABRIELA LUCIA','Abandono'],['DFIS102','APROBADO','5.9','117821','BOWEN','CARRANZA','ALEX RODRIGO','Diplomado'],['DFIS102','APROBADO','6.1','118288','REIXACH I','MOLET','MIREIA','Diplomado'],['DFIS103','APROBADO','5.5','118288','REIXACH I','MOLET','MIREIA','Diplomado'],['DFIS103','APROBADO','7.0','118287','VOGT','JARA','FRANCISCA','Diplomado'],['DFIS103','PENDIENTE','0','118292','ROBLES','RAMOS','GABRIELA LUCIA','Abandono'],['DFIS104','APROBADO','6.5','118285','YARUR','ARRASATE','MARIA','Diplomado'],['DFIS104','APROBADO','6.5','118288','REIXACH I','MOLET','MIREIA','Diplomado'],['DFIS105','APROBADO','6.0','117821','BOWEN','CARRANZA','ALEX RODRIGO','Diplomado'],['DFIS105','APROBADO','7.0','118289','CAMINO','MUNOZ','LETICIA','Diplomado'],['DFIS106','APROBADO','5.8','118290','CORRAL','MENA','JOSE FRANCISCO','Diplomado'],['DFIS107','APROBADO','7.0','118295','RIVEROS','MARTINEZ','MIRIAM JANET','Diplomado'],['DFIS108','APROBADO','6.1','118293','OLIVARES','ETEROVIC','MARIA JAVIERA','Diplomado'],['DFIS108','PENDIENTE','0','118292','ROBLES','RAMOS','GABRIELA LUCIA','Abandono'],['DFIS109','APROBADO','6.2','117821','BOWEN','CARRANZA','ALEX RODRIGO','Diplomado'],['DFIS110','APROBADO','0','118295','RIVEROS','MARTINEZ','MIRIAM JANET','Diplomado'],['DFIS113','APROBADO','5.7','118286','IBANEZ','DE TORO','MARIA ISIDORA','Diplomado']];
+  _ADN.raw=DM.map(function(r){return{sigla:r[0],nombreAsig:CN[r[0]]||r[0],estado:r[1],nota:r[1]==='PENDIENTE'?null:parseFloat(r[2]),idExpediente:r[3],apPaterno:r[4],apMaterno:r[5],nombres:r[6],programa:PR,cohorte:'2023',razonInactividad:r[7]};});
+  _ADN.fileName='demo'; _ADN.progs=[PR];_ADN.program='';
+  showToast('Datos de demostración cargados','ok');
+  renderAdnAcademico();
+  setTimeout(function(){_adnSelProg(PR);},100);
+}
+
+/* Cerrar con Escape */
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') adnCloseDet(); });
+
+
 function renderManual(){
   const STEPS=[
     ['📂 Carga de Datos','Usa el panel lateral izquierdo para cargar tu archivo académico. Acepta Excel (.xlsx, .xls) y CSV. También puedes arrastrar y soltar el archivo directamente en la zona de carga. Una vez cargado verás el número de registros procesados.','Las columnas se detectan automáticamente por nombre: DIAS/FECHAS, COORDINADORA RESPONSABLE, PROGRAMA, SEDE, HORARIO, PROFESOR, ASIGNATURA, SALA, Nº ALUMNOS. Si tu columna tiene un nombre parecido, también será detectada.'],
@@ -19775,5 +20702,20 @@ document.addEventListener('DOMContentLoaded', init);
     <line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
 </div>
+
+<!-- ADN Académico Detail Panel -->
+<div class="adn-det-overlay" id="adnDetOv" onclick="adnCloseDet()"></div>
+<div class="adn-det-panel" id="adnDetPanel"><div id="adnDetCont" style="padding:20px"></div></div>
+
+<!-- JARVIS Modal ADN -->
+<div id="adnJarvis" onclick="if(event.target===this)adnCloseDet()">
+  <div class="jarvis-box" id="adnJarvisBox">
+    <div class="jarvis-grid-bg"></div>
+    <div class="jarvis-scanline"></div>
+    <button class="jarvis-close" onclick="adnCloseDet()">✕</button>
+    <div id="adnJarvisContent"></div>
+  </div>
+</div>
 </body>
 </html>
+
