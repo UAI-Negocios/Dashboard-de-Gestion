@@ -19450,7 +19450,7 @@ function ofertaAsignar(){
 ══════════════════════════════════════════════════════════════ */
 
 var _ADN = {
-  raw: [], progs: [], program: '', cohort: '', anio: '', status: 'todos',
+  raw: [], progs: [], program: '', cohort: '', anio: '', periodo: '', status: 'todos',
   search: '', students: [], courses: [], cnames: {}, totalC: 0,
   fileName: '', selStu: null, charts: {}
 };
@@ -19497,7 +19497,8 @@ function _adnParseExcel(wb){
     rut:fc(['RUT','R.U.T','RUT ALUMNO','RUT_ALUMNO']),
     ap:fc(['A. PATERNO','A.PATERNO','A PATERNO']),
     am:fc(['A. MATERNO','A.MATERNO','A MATERNO']),
-    nm:fc(['NOMBRES']), prog:fc(['PROGRAMA']), coh:fc(['COHORTE']),
+    nm:fc(['NOMBRES']), prog:fc(['PROGRAMA']), coh:fc(['COHORTE','COH','AÑO INGRESO']),
+    per:fc(['PERIODO ACADEMICO','PERIODO ACADÉMICO','PERIODO','PERIOD','SEMESTRE']),
     raz:fc(['RAZON INACTIVIDAD','RAZÓN INACTIVIDAD'])
   };
   if(co.sigla<0||co.id<0){ showToast('Faltan columnas SIGLA o ID EXPEDIENTE','err'); return []; }
@@ -19518,6 +19519,7 @@ function _adnParseExcel(wb){
       nombres:co.nm>=0?_adnNorm(r[co.nm]):'',
       programa:co.prog>=0?_adnNorm(r[co.prog]):'Sin programa',
       cohorte:co.coh>=0?String(r[co.coh]||'').trim():'',
+      periodoAcad:co.per>=0?String(r[co.per]||'').trim():'',
       razonInactividad:co.raz>=0?_adnNorm(r[co.raz]):''
     });
   }
@@ -19531,6 +19533,10 @@ function _adnProcess(){
     if(_ADN.anio && (!r.cohorte || !r.cohorte.startsWith(_ADN.anio))) return false;
     return true;
   });
+  // Filtro por período: filtrar solo asignaturas de ese período
+  if(_ADN.periodo){
+    f=f.filter(function(r){ return r.periodoAcad===_ADN.periodo; });
+  }
   if(!f.length){ _ADN.students=[]; _ADN.courses=[]; _ADN.cnames={}; _ADN.totalC=0; return; }
   var cs=new Set(f.map(function(r){return r.sigla;}));
   _ADN.courses=[...cs].sort(); _ADN.totalC=_ADN.courses.length; _ADN.cnames={};
@@ -19538,9 +19544,10 @@ function _adnProcess(){
   var map={};
   f.forEach(function(r){
     var k=r.idExpediente;
-    if(!map[k]) map[k]={id:k,rut:r.rut||k,apPaterno:r.apPaterno,apMaterno:r.apMaterno,nombres:r.nombres,
+    if(!map[k]) map[k]={id:k,rut:r.rut||k,apPaterno:r.apPaterno,apMaterno:r.apMaterno,nombres:r.nombres,periodos:new Set(),
       fullName:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' '),
       cohorte:r.cohorte,cursos:{},razon:''};
+    if(r.periodoAcad) map[k].periodos.add(r.periodoAcad);
     var ri=r.razonInactividad;
     if(ri==='Abandono') map[k].razon='Abandono';
     else if(ri==='Retirado'&&map[k].razon!=='Abandono') map[k].razon='Retirado';
@@ -19548,9 +19555,9 @@ function _adnProcess(){
     else if(ri&&!map[k].razon) map[k].razon=ri;
     if(!map[k].historial) map[k].historial={};
     if(!map[k].historial[r.sigla]) map[k].historial[r.sigla]=[];
-    map[k].historial[r.sigla].push({estado:r.estado,nota:r.nota,periodo:r.cohorte||''});
+    map[k].historial[r.sigla].push({estado:r.estado,nota:r.nota,periodo:r.periodoAcad||r.cohorte||''});
     if(!map[k].cursos[r.sigla]||(r.nota&&r.nota>0&&(!map[k].cursos[r.sigla].nota||map[k].cursos[r.sigla].nota===0)))
-      map[k].cursos[r.sigla]={sigla:r.sigla,estado:r.estado,nota:r.nota,periodo:r.cohorte||''};
+      map[k].cursos[r.sigla]={sigla:r.sigla,estado:r.estado,nota:r.nota,periodo:r.periodoAcad||r.cohorte||''};
   });
   var all=Object.values(map).map(function(s){
     var e=Object.values(s.cursos);
@@ -19606,9 +19613,11 @@ function renderAdnAcademico(){
     return;
   }
 
-  // Obtener años únicos de los datos
-  var anos = [...new Set(_ADN.raw.map(function(r){ return r.cohorte?r.cohorte.substring(0,4):''; }).filter(Boolean))].sort().reverse();
-  var cohortes = [...new Set(_ADN.raw.filter(function(r){return !_ADN.program||r.programa===_ADN.program;}).map(function(r){return r.cohorte;}).filter(Boolean))].sort();
+  // Obtener datos para filtros
+  var filtRaw = _ADN.raw.filter(function(r){return !_ADN.program||r.programa===_ADN.program;});
+  var cohortes = [...new Set(filtRaw.map(function(r){return r.cohorte;}).filter(Boolean))].sort();
+  var anos = [...new Set(cohortes.map(function(co){return co.substring(0,4);}).filter(Boolean))].sort().reverse();
+  var periodosAcad = [...new Set(filtRaw.map(function(r){return r.periodoAcad;}).filter(Boolean))].sort();
 
   pg.innerHTML=
     // ── BARRA DE FILTROS ARRIBA ───────────────────────────────
@@ -19646,6 +19655,17 @@ function renderAdnAcademico(){
             anos.map(function(a){return '<option value="'+esc(a)+'"'+(_ADN.anio===a?' selected':'')+'>'+esc(a)+'</option>';}).join('')+
           '</select>'+
         '</div>'+
+
+        // Filtro Período Académico
+        (periodosAcad.length?
+        '<div style="display:flex;flex-direction:column;gap:3px">'+
+          '<span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Período</span>'+
+          '<select id="adnFPer" onchange="_ADN.periodo=this.value;_adnRefresh()" '+
+            'style="padding:6px 10px;border:1px solid #21262d;border-radius:7px;background:#161b22;color:#e6edf3;font-size:11px">'+
+            '<option value="">Todos</option>'+
+            periodosAcad.map(function(p){return '<option value="'+esc(p)+'"'+(_ADN.periodo===p?' selected':'')+'>'+esc(p)+'</option>';}).join('')+
+          '</select>'+
+        '</div>' : '')+
 
         // Filtro Estado
         '<div style="display:flex;flex-direction:column;gap:3px">'+
@@ -19716,7 +19736,7 @@ function _adnFilterSb(q){
 }
 
 function _adnSelProg(p){
-  _ADN.program=p; _ADN.cohort=''; _ADN.anio=''; _ADN.status='todos'; _ADN.search=''; _ADN.selStu=null;
+  _ADN.program=p; _ADN.cohort=''; _ADN.anio=''; _ADN.periodo=''; _ADN.status='todos'; _ADN.search=''; _ADN.selStu=null;
   _adnBuildSb();
   _adnRefresh();
 }
@@ -20006,7 +20026,15 @@ function adnOpenDet(id){
 
   // Línea de tiempo por asignatura (bonus: barras de nota)
   var notasValidas=_ADN.courses.map(function(sig){
-    var cu=s.cursos[sig]; return cu&&cu.nota&&cu.nota>0?{sig:sig,nota:cu.nota}:null;
+    var cu=s.cursos[sig];
+    if(!cu||!cu.nota||cu.nota<=0) return null;
+    // Obtener periodo del historial si el curso no lo tiene
+    var periodoFinal=cu.periodo||'';
+    if(!periodoFinal&&s.historial&&s.historial[sig]){
+      var hi=s.historial[sig].find(function(h){return h.periodo;});
+      if(hi) periodoFinal=hi.periodo;
+    }
+    return {sig:sig,nota:cu.nota,periodo:periodoFinal};
   }).filter(Boolean);
   var prom_max=notasValidas.length?Math.max.apply(null,notasValidas.map(function(x){return x.nota;})):0;
 
@@ -20071,13 +20099,21 @@ function adnOpenDet(id){
             notasValidas.map(function(x){
               var nc=notaColor(x.nota)||'#888';
               var w=prom_max>0?Math.round(x.nota/prom_max*100):0;
-              return '<div style="margin-bottom:6px">'+
-                '<div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(150,200,255,.6);margin-bottom:2px">'+
-                  '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" title="'+esc(_ADN.cnames[x.sig]||x.sig)+'">'+esc(x.sig)+'</span>'+
-                  '<span style="color:'+nc+';font-weight:800;margin-left:6px">'+x.nota.toFixed(1)+'</span>'+
+              var periodo=x.periodo||'';
+              var nIntentos=s.historial&&s.historial[x.sig]?s.historial[x.sig].length:1;
+              return '<div style="margin-bottom:8px">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:rgba(150,200,255,.6);margin-bottom:3px">'+
+                  '<div style="display:flex;flex-direction:column;min-width:0;flex:1">'+
+                    '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;color:rgba(180,210,255,.8)" title="'+esc(_ADN.cnames[x.sig]||x.sig)+'">'+esc(x.sig)+'</span>'+
+                    (periodo?'<span style="font-size:7px;color:rgba(100,150,200,.5);font-family:monospace;margin-top:1px">'+esc(periodo)+'</span>':'')+
+                  '</div>'+
+                  '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:6px">'+
+                    (nIntentos>1?'<span style="font-size:7px;padding:1px 4px;border-radius:3px;background:rgba(255,100,50,.2);color:#ff7744;font-weight:700">'+nIntentos+'x</span>':'')+
+                    '<span style="color:'+nc+';font-weight:800;font-size:10px">'+x.nota.toFixed(1)+'</span>'+
+                  '</div>'+
                 '</div>'+
                 '<div style="height:4px;background:rgba(0,80,150,.2);border-radius:2px;overflow:hidden">'+
-                  '<div style="width:'+w+'%;height:100%;background:linear-gradient(90deg,'+nc+'88,'+nc+');border-radius:2px;transition:width .6s"></div>'+
+                  '<div style="width:'+w+'%;height:100%;background:linear-gradient(90deg,'+nc+'88,'+nc+');border-radius:2px"></div>'+
                 '</div>'+
               '</div>';
             }).join('')
@@ -20118,17 +20154,31 @@ function adnOpenDet(id){
             '</div>';
           })()+
           (function(){
+            // Estado del estudiante
+            var stateC=s.estadoFinal==='Diplomado'?'#00e5a0':s.estadoFinal==='En Curso'?'#38b4ff':s.estadoFinal==='Retirado'?'#ffc840':'#ff5577';
+            var html='<div style="padding:6px 0;border-bottom:1px solid rgba(0,80,150,.15);margin-bottom:6px">'+
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'+
+                '<span style="font-size:8px;color:rgba(100,150,200,.5);text-transform:uppercase;letter-spacing:.06em">Estado</span>'+
+                '<span style="font-size:10px;font-weight:800;color:'+stateC+';padding:2px 8px;border-radius:5px;background:'+stateC+'15;border:1px solid '+stateC+'35">'+esc(s.estadoFinal)+'</span>'+
+              '</div>'+
+              (s.razon&&s.razon!==s.estadoFinal?
+                '<div style="display:flex;align-items:center;justify-content:space-between">'+
+                  '<span style="font-size:8px;color:rgba(100,150,200,.5);text-transform:uppercase;letter-spacing:.06em">Razón</span>'+
+                  '<span style="font-size:9px;color:rgba(200,180,120,.8);font-weight:600">'+esc(s.razon)+'</span>'+
+                '</div>':'')+
+            '</div>';
             var alerts=[];
             if(s.pendientes>0) alerts.push({c:'#f0b429',t:'⚠ '+s.pendientes+' asig. pendiente(s)'});
-            if(s.estadoFinal==='Abandono') alerts.push({c:'#f85149',t:'✕ Situación: Abandono'});
-            if(s.estadoFinal==='Retirado') alerts.push({c:'#f0b429',t:'↩ Situación: Retirado'});
             if(s.promedio>0&&s.promedio<5) alerts.push({c:'#f85149',t:'↓ Promedio bajo 5.0'});
-            if(!alerts.length) alerts.push({c:'#00e5a0',t:'✓ Sin alertas activas'});
-            return alerts.map(function(a){
-              return '<div style="font-size:10px;color:'+a.c+';padding:4px 0;border-bottom:1px solid rgba(0,80,150,.1);display:flex;align-items:center;gap:6px">'+
+            var reps=Object.keys(s.historial||{}).filter(function(k){return (s.historial[k]||[]).length>1;});
+            if(reps.length) alerts.push({c:'#ff7744',t:'↺ '+reps.length+' curso(s) repetido(s)'});
+            if(!alerts.length) html+='<div style="font-size:10px;color:#00e5a0;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#00e5a0;display:inline-block"></span>Sin alertas adicionales</div>';
+            else html+=alerts.map(function(a){
+              return '<div style="font-size:10px;color:'+a.c+';padding:3px 0;border-bottom:1px solid rgba(0,80,150,.08);display:flex;align-items:center;gap:6px">'+
                 '<span style="width:6px;height:6px;border-radius:50%;background:'+a.c+';flex-shrink:0;display:inline-block"></span>'+
                 a.t+'</div>';
             }).join('');
+            return html;
           })()+
         '</div>'+
 
@@ -20718,4 +20768,3 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
-
