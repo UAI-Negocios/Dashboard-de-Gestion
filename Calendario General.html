@@ -1713,7 +1713,7 @@ const CATS = {
   calendarios:  ['calendario','reservas'],
   planificador: ['plancursos','malla','planreporte','propuestas','horario'],
   admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
-  control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce'],
+  control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce','controlhoras'],
   ayuda:        ['manual','faqs'],
   adn:          ['adnacademico'],
 };
@@ -1734,6 +1734,7 @@ const TAB_LABELS = {
   presupuesto:  '💰 Presupuesto vs Real',
   informe:      '📄 Informe Ejecutivo',
   cruce:        '🔀 Reporte de Cruce',
+  controlhoras: '📊 Control de Horas',
   declarado:    '📊 Gestión de Contratos',
   contratos:    'Contratos Emitidos',
   calendario:   'Calendario',
@@ -2764,6 +2765,18 @@ function renderSubtabs() {
     html += '<button class="' + cls + '" data-tab="' + t + '" onclick="setTab(this.dataset.tab)">' + (TAB_LABELS[t]||t) + '</button>';
   }
   el.innerHTML = html;
+
+  // Click en filas de docente
+  if (_ch.vista==='docente') {
+    el.querySelectorAll('tr[data-gkey]').forEach(function(tr) {
+      tr.addEventListener('mouseover',function(){this.style.background='rgba(56,139,253,.06)';});
+      tr.addEventListener('mouseout',function(){var gi2=parseInt(this.dataset.gkey); this.style.background=gi2%2?'transparent':'rgba(255,255,255,.012)';});
+      tr.addEventListener('click',function(){
+        var idx2=parseInt(this.dataset.gkey);
+        var g2=arr[idx2]; if(g2&&window._chGrupos&&window._chGrupos[g2.key]) _chAbrirJarvis(window._chGrupos[g2.key]);
+      });
+    });
+  }
 }
 function goTo(cat, tab) {
   APP.cat=cat; APP.tab=tab;
@@ -2781,7 +2794,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -2800,6 +2813,7 @@ function refreshView() {
     presupuesto:  renderPresupuesto,
     informe:      renderInformeEjecutivo,
     cruce:        renderCruceInfo,
+    controlhoras: renderControlHoras,
     declarado:    renderDeclarado,
   contratos:    renderContratos,
     calendario:   renderCalendario,
@@ -10466,13 +10480,23 @@ function _adAnalisisPhora(periodos) {
   periodos.forEach(function(p) {
     (_adPeriodos[p]||[]).forEach(function(r) {
       if (!r.phora || r.phora <= 0) return;
-      var key = r.profesor + '|||' + r.actCod;
-      if (!idx[key]) {
-        idx[key] = {};
-        metaDoc[key] = { nombre:r.profesor, cc:r.cc, prog:r.programa,
-          sigla:r.actCod, actNom:r.actNom };
-      }
-      if (!idx[key][p]) idx[key][p] = r.phora;
+      
+      // MEJORA: Distribuir valor hora entre docentes compartidos
+      var profesorRaw = r.profesor || '';
+      var docentes = profesorRaw.includes('/') 
+        ? profesorRaw.split('/').map(function(d){return d.trim();}).filter(Boolean)
+        : [profesorRaw];
+      
+      // El valor hora es el mismo para todos (no se divide como las horas)
+      docentes.forEach(function(doc){
+        var key = doc + '|||' + r.actCod;
+        if (!idx[key]) {
+          idx[key] = {};
+          metaDoc[key] = { nombre:doc, cc:r.cc, prog:r.programa,
+            sigla:r.actCod, actNom:r.actNom };
+        }
+        if (!idx[key][p]) idx[key][p] = r.phora;
+      });
     });
   });
 
@@ -10522,7 +10546,9 @@ function _adAnalisisPhora(periodos) {
       x.nombre.toLowerCase().indexOf(filtroBusq.toLowerCase())>=0 ||
       x.cc.toLowerCase().indexOf(filtroBusq.toLowerCase())>=0 ||
       x.sigla.toLowerCase().indexOf(filtroBusq.toLowerCase())>=0;
-    return okTipo && okBusq;
+    // MEJORA: Filtro automático por programa seleccionado en la parte superior
+    var okProg = !_ADN.program || x.cc.toLowerCase().indexOf(_ADN.program.toLowerCase())>=0;
+    return okTipo && okBusq && okProg;
   });
 
   // ── HTML ─────────────────────────────────────────────────────
@@ -10581,7 +10607,7 @@ function _adAnalisisPhora(periodos) {
     '<div style="font-size:10px;color:#8b949e;margin-bottom:16px">'+
       'Top docentes con mayor variación · línea punteada = promedio general'+
     '</div>'+
-    '<canvas id="adPhoraChart" height="260"></canvas>'+
+    '<canvas id="adPhoraChart" height="180"></canvas>'+
   '</div>'+
 
   // ── Filtros de la tabla ───────────────────────────────────────
@@ -10590,7 +10616,13 @@ function _adAnalisisPhora(periodos) {
     '<div style="font-size:11px;font-weight:700;color:#e6edf3">🔍 Tabla de Contingencia</div>'+
     '<div style="font-size:10px;color:#8b949e">'+
       'Docentes ordenados por mayor variación · Semáforo de riesgo'+
+      (_ADN.program?' · Filtrando por programa: '+_ADN.program:'')+
     '</div>'+
+    (_ADN.program?
+      '<div style="padding:4px 10px;background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.3);'+
+        'border-radius:16px;font-size:10px;font-weight:700;color:#388bfd">'+
+        '📌 '+_ADN.program+
+      '</div>':'')+
     '<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'+
       // Buscador
       '<input id="adPhoraFiltro" type="text" placeholder="Buscar docente, CC, sigla…" '+
@@ -10900,6 +10932,646 @@ function _adDrawPhoraChart(periodos) {
    centro_costo, TIPO, SUBTIPO, area_nombre, FechaInicio, etc.
 ══════════════════════════════════════════════════════════════════ */
 var _ppt = { rows: [], realRows: [], declRows: [], filename: '', realFilename: '', declFilename: '', loadedAt: null };
+
+/* ══════════════════════════════════════════════════════════════
+   CONTROL DE HORAS — PPT vs REAL por corte de fecha
+   Fuente: Excel con hoja Data (columnas REAL/PPT, Horas, Profesores, Programa, centro_costo)
+══════════════════════════════════════════════════════════════ */
+var _ch = {
+  rows: [], filename: '', cortes: [], ppt: '',
+  filtProg: '', filtCC: '', filtDoc: '', buscar: '',
+  vista: 'docente', // 'docente' | 'programa' | 'grafico'
+  grafCorte: ''  // corte seleccionado para el gráfico
+};
+
+function renderControlHoras() {
+  var pg = $('page'); if (!pg) return;
+
+  if (!_ch.rows.length) {
+    pg.innerHTML =
+      '<div class="pg-title">📊 Control de Horas</div>'+
+      '<div style="font-size:12px;color:var(--t3);margin-bottom:20px">'+
+        'Carga el reporte de control de horas para comparar PPT vs REAL por corte de fecha'+
+      '</div>'+
+      '<div style="max-width:480px;border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s" '+
+        'onclick="document.getElementById(\'chFileInp\').click()" '+
+        'ondragover="event.preventDefault();this.style.borderColor=\'#388bfd\'" '+
+        'ondragleave="this.style.borderColor=\'var(--border)\'" '+
+        'ondrop="event.preventDefault();this.style.borderColor=\'var(--border)\';_chHandleFile(event.dataTransfer.files[0])">'+
+        '<div style="font-size:36px;margin-bottom:12px">📊</div>'+
+        '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px">Arrastra el reporte aquí</div>'+
+        '<div style="font-size:11px;color:var(--t3)">Excel con hoja "Data" · columna REAL/PPT · .xlsx</div>'+
+      '</div>'+
+      '<input type="file" id="chFileInp" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0])_chHandleFile(this.files[0])">';
+    return;
+  }
+
+  _chRender();
+}
+
+function _chHandleFile(file) {
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { showToast('XLSX no disponible','err'); return; }
+  showToast('Procesando...','ok');
+  var rd = new FileReader();
+  rd.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      // Buscar hoja Data
+      var shName = wb.SheetNames.find(function(n){ return n.toUpperCase()==='DATA'; }) || wb.SheetNames[0];
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[shName], {defval:''});
+      if (!rows.length) { showToast('Hoja Data vacía','err'); return; }
+
+      // Detectar columna REAL/PPT
+      var sample = rows[0];
+      var rppCol = Object.keys(sample).find(function(k){ return k.toUpperCase().includes('REAL') || k.includes('PPT'); });
+      if (!rppCol) {
+        // Buscar la columna con "PPT" o "REAL" en sus valores
+        rppCol = Object.keys(sample).find(function(k){ return String(sample[k]).includes('PPT'); });
+      }
+      if (!rppCol) { showToast('No se encontró columna REAL/PPT','err'); return; }
+
+      // Procesar rows expandiendo docentes compartidos
+      var expandedRows = [];
+      rows.forEach(function(r){
+        var profesor = String(r['Profesores']||r['Profesor']||'');
+        var horas = parseFloat(r['Horas'])||0;
+        
+        // MEJORA: Si hay múltiples docentes (separados por '/'), dividir horas
+        var docentes = profesor.includes('/') 
+          ? profesor.split('/').map(function(d){return d.trim();}).filter(Boolean)
+          : [profesor];
+        var horasPorDocente = docentes.length > 1 ? horas / docentes.length : horas;
+        
+        docentes.forEach(function(doc){
+          expandedRows.push({
+            rpp:     String(r['REAL/PPT']||r[rppCol]||''),
+            horas:   horasPorDocente,
+            profesor:doc,
+            programa:String(r['Programa']||''),
+            cc:      String(r['centro_costo']||r['CC']||''),
+            tipo:    String(r['TIPO']||''),
+            nombre:  String(r['Nombre']||r['NombreEspecifico']||''),
+          });
+        });
+      });
+      
+      _ch.rows = expandedRows.filter(function(r){ return r.rpp && r.horas > 0; });
+
+      // Detectar cortes únicos y ordenarlos (PPT primero, luego REAL por fecha)
+      var cortesSet = {};
+      _ch.rows.forEach(function(r){ cortesSet[r.rpp] = true; });
+      var todos = Object.keys(cortesSet);
+      _ch.ppt = todos.find(function(c){ return c.toUpperCase().includes('PPT'); }) || todos[0];
+      var reales = todos.filter(function(c){ return c !== _ch.ppt; }).sort(function(a,b){
+        // Extraer fecha dd-mm-yy para ordenar
+        var fa = _chParseCorte(a), fb = _chParseCorte(b);
+        return fa - fb;
+      });
+      _ch.cortes = [_ch.ppt].concat(reales);
+      _ch.filename = file.name;
+      _ch.filtProg = ''; _ch.filtCC = ''; _ch.filtDoc = ''; _ch.buscar = '';
+
+      showToast(_ch.rows.length+' registros · '+_ch.cortes.length+' cortes detectados','ok');
+      _chRender();
+    } catch(err) { showToast('Error: '+err.message,'err'); }
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+function _chParseCorte(s) {
+  var m = s.match(/(\d{2})-(\d{2})-(\d{2,4})/);
+  if (!m) return 0;
+  var d=parseInt(m[1]),mo=parseInt(m[2]),y=parseInt(m[3]);
+  if (y < 100) y += 2000;
+  return new Date(y,mo-1,d).getTime();
+}
+
+function _chGetFiltered() {
+  return _ch.rows.filter(function(r){
+    if (_ch.filtProg && r.programa !== _ch.filtProg) return false;
+    if (_ch.filtCC   && r.cc       !== _ch.filtCC  ) return false;
+    if (_ch.buscar) {
+      var q = _ch.buscar.toLowerCase();
+      return r.profesor.toLowerCase().includes(q) || r.programa.toLowerCase().includes(q);
+    }
+    return true;
+  });
+}
+
+function _chRender() {
+  var pg = $('page'); if (!pg) return;
+  var df = _chGetFiltered();
+
+  // Obtener valores únicos para filtros
+  var progs = [...new Set(_ch.rows.map(function(r){return r.programa;}).filter(Boolean))].sort();
+  var ccs   = [...new Set(_ch.rows.map(function(r){return r.cc;}).filter(Boolean))].sort();
+  var reales = _ch.cortes.filter(function(c){ return c !== _ch.ppt; });
+
+  // Totales generales por corte
+  var totByCorte = {};
+  _ch.cortes.forEach(function(c){ totByCorte[c]=0; });
+  df.forEach(function(r){ if(r.rpp in totByCorte) totByCorte[r.rpp]+=r.horas; });
+
+  var pptTotal = totByCorte[_ch.ppt]||0;
+  var lastReal = reales.length ? reales[reales.length-1] : null;
+  var lastRealTotal = lastReal ? (totByCorte[lastReal]||0) : 0;
+  var diffTotal = lastRealTotal - pptTotal;
+
+  pg.innerHTML =
+    '<div class="pg-title" style="margin-bottom:4px">📊 Control de Horas</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:16px">'+
+      'Comparativa PPT vs REAL por corte de fecha · '+esc(_ch.filename)+'&nbsp;'+
+      '<button onclick="_ch.rows=[];_chRender()" style="font-size:10px;padding:2px 8px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--t3);cursor:pointer">📂 Nuevo</button>'+
+    '</div>'+
+
+    // KPIs
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px" id="chKPIs">'+
+    [
+      {ico:'📋',lbl:'PPT Total',val:pptTotal.toFixed(0)+'h',c:'#388bfd'},
+      {ico:'✅',lbl:'Real Último',val:lastRealTotal.toFixed(0)+'h',c:'#3fb950',sub:lastReal?_chShortCorte(lastReal):'—'},
+      {ico:'📉',lbl:'Diferencia',val:(diffTotal>0?'+':'')+diffTotal.toFixed(0)+'h',c:diffTotal>0?'#f0b429':diffTotal<0?'#f85149':'#3fb950'},
+      {ico:'👨‍🏫',lbl:'Docentes',val:new Set(df.map(function(r){return r.profesor;})).size,c:'#a78bfa'},
+      {ico:'📅',lbl:'Cortes',val:_ch.cortes.length,c:'#22d3ee'},
+    ].map(function(k){
+      return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-left:3px solid '+k.c+'">'+
+        '<div style="font-size:13px;margin-bottom:4px">'+k.ico+'</div>'+
+        '<div style="font-size:20px;font-weight:900;color:'+k.c+'">'+k.val+'</div>'+
+        '<div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">'+k.lbl+'</div>'+
+        (k.sub?'<div style="font-size:9px;color:'+k.c+'66;margin-top:1px">'+k.sub+'</div>':'')+
+      '</div>';
+    }).join('')+
+    '</div>'+
+
+    // Filtros
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'+
+      _chMkSel('chFProg','Programa',progs,'_ch.filtProg=this.value;_chRender()',_ch.filtProg,200)+
+      _chMkSel('chFCC','Centro Costo',ccs,'_ch.filtCC=this.value;_chRender()',_ch.filtCC,140)+
+      '<div style="display:flex;flex-direction:column;gap:3px">'+
+        '<label style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Buscar docente</label>'+
+        '<input id="chBuscar" type="text" placeholder="Nombre..." value="'+esc(_ch.buscar)+'"'+
+          ' oninput="_ch.buscar=this.value;_chRender()"'+
+          ' style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--t1);font-size:11px;min-width:200px">'+
+      '</div>'+
+      // Vista
+      '<div style="display:flex;flex-direction:column;gap:3px">'+
+        '<label style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Vista</label>'+
+        '<div style="display:flex;gap:4px">'+
+        ['docente','programa','grafico'].map(function(v){
+          var on = _ch.vista===v;
+          return '<button onclick="_ch.vista=\''+v+'\';_chRender()" '+
+            'style="padding:6px 12px;border-radius:7px;border:1px solid '+(on?'#388bfd':'var(--border)')+';'+
+            'background:'+(on?'rgba(56,139,253,.12)':'transparent')+';color:'+(on?'#388bfd':'var(--t3)')+';font-size:10px;font-weight:'+(on?'700':'400')+';cursor:pointer">'+
+            (v==='docente'?'👤 Docente':v==='programa'?'📚 Programa':'📊 Gráfico')+'</button>';
+        }).join('')+
+        '</div>'+
+      '</div>'+
+      '<button onclick="_chExportar()" style="margin-left:auto;padding:7px 14px;background:#388bfd;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📥 Exportar</button>'+
+    '</div>'+
+
+    // Tabla
+    '<div id="chTabla" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto"></div>';
+
+  _chRenderTabla(df);
+}
+
+function _chMkSel(id,lbl,opts,onch,cur,mw){
+  return '<div style="display:flex;flex-direction:column;gap:3px">'+
+    '<label style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+lbl+'</label>'+
+    '<select id="'+id+'" onchange="'+onch+'" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--t1);font-size:11px;max-width:'+(mw||180)+'px">'+
+      '<option value="">Todos</option>'+
+      opts.map(function(o){return '<option value="'+esc(o)+'"'+(o===cur?' selected':'')+'>'+esc(abbr(o,30))+'</option>';}).join('')+
+    '</select></div>';
+}
+
+function _chShortCorte(s) {
+  var m = s.match(/(\d{2}-\d{2}-\d{2,4})/);
+  return m ? m[1] : s.replace('REAL','').trim();
+}
+
+function _chRenderTabla(df) {
+  var el = document.getElementById('chTabla'); if (!el) return;
+  if (_ch.vista === 'grafico') { _chRenderGrafico(df); return; }
+  var reales = _ch.cortes.filter(function(c){ return c !== _ch.ppt; });
+
+  // Agrupar según vista
+  var grupos = {}; window._chGrupos={};
+  df.forEach(function(r) {
+    var key = _ch.vista==='docente' ? r.profesor : r.programa;
+    if (!key) key = '(Sin asignar)';
+    if (!grupos[key]) {
+      grupos[key] = {key:key, cortes:{}};
+      _ch.cortes.forEach(function(c){ grupos[key].cortes[c]=0; });
+    }
+    grupos[key].cortes[r.rpp] = (grupos[key].cortes[r.rpp]||0) + r.horas;
+    grupos[key].rows=(grupos[key].rows||[]);
+    grupos[key].rows.push(r);
+    window._chGrupos=grupos;
+  });
+
+  var arr = Object.values(grupos).filter(function(g){ return g.cortes[_ch.ppt]>0||reales.some(function(c){return g.cortes[c]>0;}); })
+    .sort(function(a,b){ return (b.cortes[_ch.ppt]||0)-(a.cortes[_ch.ppt]||0); });
+
+  if (!arr.length) { el.innerHTML='<div style="padding:30px;text-align:center;color:var(--t3)">Sin datos</div>'; return; }
+
+  var S = 'padding:7px 10px;';
+  var SH = 'padding:8px 10px;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;';
+
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">'+
+    '<th style="'+SH+'">'+(_ch.vista==='docente'?'Docente':'Programa')+'</th>'+
+    '<th style="'+SH+'text-align:right">PPT 2026</th>'+
+    reales.map(function(c){
+      return '<th style="'+SH+'text-align:right">'+esc(_chShortCorte(c))+'</th>'+
+             '<th style="'+SH+'text-align:right;color:#f0b429">Δ PPT</th>';
+    }).join('')+
+    '<th style="'+SH+'">Tendencia</th>'+
+    '</tr></thead><tbody>';
+
+  arr.forEach(function(g, gi) {
+    var ppt = g.cortes[_ch.ppt]||0;
+    var bg = gi%2 ? 'transparent' : 'rgba(255,255,255,.012)';
+
+    var docKey=_ch.vista==='docente';
+    var trId='chtr_'+gi;
+    html += '<tr id="'+trId+'" data-gkey="'+gi+'" style="border-bottom:1px solid var(--border);background:'+bg+';cursor:'+(docKey?'pointer':'default')+'">';
+
+    // Nombre
+    html += '<td style="'+S+'font-weight:600;color:var(--t1);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(g.key)+'">'+
+      (docKey?'<span style="margin-right:4px;opacity:.5;font-size:9px">🔍</span>':'')+
+      esc(abbr(g.key,45))+'</td>';
+
+    // PPT
+    html += '<td style="'+S+'text-align:right;color:#388bfd;font-weight:700">'+ppt.toFixed(0)+'h</td>';
+
+    // Cada corte REAL + su delta
+    reales.forEach(function(c, ci) {
+      var real = g.cortes[c]||0;
+      var delta = real - ppt;
+      var noData = real===0;
+      var dc = delta > 0 ? '#f0b429' : delta < 0 ? '#f85149' : '#3fb950';
+
+      html += '<td style="'+S+'text-align:right;color:'+(noData?'#6e7681':'var(--t1)')+';font-weight:'+(noData?'400':'600')+'">'+
+        (noData?'—':real.toFixed(0)+'h')+'</td>';
+      html += '<td style="'+S+'text-align:right;font-weight:700;color:'+(noData?'#6e7681':dc)+'">'+
+        (noData?'—':(delta>0?'+':'')+delta.toFixed(0)+'h')+'</td>';
+    });
+
+    // Tendencia mini sparkline
+    var vals = reales.map(function(c){ return g.cortes[c]||null; });
+    var maxV = Math.max(ppt, Math.max.apply(null, vals.filter(Boolean).concat([0])));
+    var W=60, H=20;
+    var pts = [{v:ppt,i:-1}].concat(vals.map(function(v,i){return {v:v,i:i};})).filter(function(p){return p.v!==null;});
+    var svgPts = '';
+    if(pts.length>1){
+      svgPts = pts.map(function(p,idx2){
+        var x = idx2/(pts.length-1)*W;
+        var y = maxV>0?H-(p.v/maxV)*H:H/2;
+        return x+','+y.toFixed(1);
+      }).join(' ');
+    }
+    var lastDelta = vals.length && vals[vals.length-1] !== null ? (vals[vals.length-1]-ppt) : 0;
+    var lineColor = lastDelta > 0 ? '#f0b429' : lastDelta < 0 ? '#f85149' : '#3fb950';
+
+    html += '<td style="'+S+'">'+
+      (pts.length>1?
+        '<svg width="'+W+'" height="'+H+'" style="overflow:visible">'+
+          '<polyline points="'+svgPts+'" fill="none" stroke="'+lineColor+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'+
+          '<circle cx="'+(pts[pts.length-1]?pts.length-1/(pts.length-1)*W:W)+'" cy="'+(maxV>0?H-(pts[pts.length-1].v/maxV)*H:H/2).toFixed(1)+'" r="2.5" fill="'+lineColor+'"/>'+
+        '</svg>'
+      : '<span style="color:var(--t3)">—</span>')+
+    '</td></tr>';
+  });
+
+  // Totales
+  var totPPT = arr.reduce(function(s,g){return s+(g.cortes[_ch.ppt]||0);},0);
+  html += '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border);position:sticky;bottom:0">'+
+    '<td style="'+S+'font-weight:700;color:var(--t2)">TOTAL ('+arr.length+')</td>'+
+    '<td style="'+S+'text-align:right;font-weight:800;color:#388bfd">'+totPPT.toFixed(0)+'h</td>'+
+    reales.map(function(c){
+      var totReal = arr.reduce(function(s,g){return s+(g.cortes[c]||0);},0);
+      var d = totReal - totPPT;
+      var dc = d>0?'#f0b429':d<0?'#f85149':'#3fb950';
+      return '<td style="'+S+'text-align:right;font-weight:800;color:var(--t1)">'+totReal.toFixed(0)+'h</td>'+
+             '<td style="'+S+'text-align:right;font-weight:800;color:'+dc+'">'+(d>0?'+':'')+d.toFixed(0)+'h</td>';
+    }).join('')+
+    '<td></td></tr></tfoot></table>';
+
+  el.innerHTML = html;
+
+  // Click en filas de docente → abrir JARVIS
+  if (_ch.vista==='docente') {
+    el.querySelectorAll('tr[data-gkey]').forEach(function(tr){
+      tr.addEventListener('mouseover',function(){this.style.background='rgba(56,139,253,.06)';});
+      tr.addEventListener('mouseout',function(){var i=parseInt(this.dataset.gkey);this.style.background=i%2?'transparent':'rgba(255,255,255,.012)';});
+      tr.addEventListener('click',function(){
+        var i=parseInt(this.dataset.gkey);
+        var g=arr[i]; if(!g) return;
+        var data=window._chGrupos&&window._chGrupos[g.key]?window._chGrupos[g.key]:g;
+        // Asegurar que tiene 'doc' (el modal lo necesita)
+        if(!data.doc) data.doc=g.key;
+        if(!data.rows) data.rows=[];
+        _chAbrirJarvis(data);
+      });
+    });
+  }
+}
+
+function _chRenderGrafico(df) {
+  var el = document.getElementById('chTabla'); if (!el) return;
+  var reales = _ch.cortes.filter(function(c){ return c !== _ch.ppt; });
+  if (!_ch.grafCorte) _ch.grafCorte = reales.length ? reales[reales.length-1] : _ch.ppt;
+
+  var grupos = {};
+  df.forEach(function(r){
+    var key = r.profesor||'(Sin asignar)';
+    if(!grupos[key]){grupos[key]={doc:key,cortes:{},rows:[]}; _ch.cortes.forEach(function(c){grupos[key].cortes[c]=0;});}
+    grupos[key].cortes[r.rpp]=(grupos[key].cortes[r.rpp]||0)+r.horas;
+    grupos[key].rows.push(r);
+  });
+  window._chGrupos=grupos;
+
+  var corteSel=_ch.grafCorte;
+  var arr=Object.values(grupos)
+    .filter(function(g){return g.cortes[_ch.ppt]>0||g.cortes[corteSel]>0;})
+    .sort(function(a,b){return Math.abs((b.cortes[corteSel]||0)-(b.cortes[_ch.ppt]||0))-Math.abs((a.cortes[corteSel]||0)-(a.cortes[_ch.ppt]||0));})
+    .slice(0,20);
+
+  if(!arr.length){el.innerHTML='<div style="padding:30px;text-align:center;color:var(--t3)">Sin datos</div>';return;}
+  if(window._chChart){try{window._chChart.destroy();}catch(e){}window._chChart=null;}
+
+  var labels = arr.map(function(g){
+    var parts = g.doc.split(',');
+    return parts.length>1 ? (parts[1].trim().split(' ')[0]+' '+parts[0].trim()).substring(0,22) : g.doc.substring(0,22);
+  });
+  var dataPPT  = arr.map(function(g){ return g.cortes[_ch.ppt]||0; });
+  var dataReal = arr.map(function(g){ return g.cortes[corteSel]||0; });
+
+  var canvasH = Math.max(300, arr.length * 28 + 60);
+
+  el.innerHTML =
+    '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--t1)">📊 PPT vs Real por Docente — Top 20</div>'+
+      '<select onchange="_ch.grafCorte=this.value;_chRenderTabla(_chGetFiltered())" '+
+        'style="padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px">'+
+        _ch.cortes.map(function(c){return'<option value="'+esc(c)+'"'+(c===corteSel?' selected':'')+'>'+esc(c)+'</option>';}).join('')+
+      '</select>'+
+      '<span style="font-size:10px;color:var(--t3)">Haz clic en una barra para ver el detalle</span>'+
+      '<button onclick="_chExportarGrafico()" style="margin-left:auto;padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--t3);border-radius:7px;font-size:10px;cursor:pointer">📥 PNG</button>'+
+    '</div>'+
+    '<div style="padding:16px;overflow-x:auto">'+
+      '<div style="position:relative" id="chGrafWrap">'+
+        '<canvas id="chGrafCanvas" height="'+canvasH+'"></canvas>'+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap">'+
+      '<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:rgba(56,139,253,.7)"></span>PPT 2026</div>'+
+      '<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:rgba(63,185,80,.8)"></span>Real sin cambio</div>'+
+      '<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:rgba(248,81,73,.8)"></span>Real menor al PPT</div>'+
+      '<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:rgba(240,180,41,.8)"></span>Real mayor al PPT</div>'+
+    '</div>';
+
+  window._chGrafArr = arr;
+
+  setTimeout(function(){
+    var ctx=document.getElementById('chGrafCanvas');
+    if(!ctx||typeof Chart==='undefined') return;
+    var realColors = arr.map(function(g){
+      var d=(g.cortes[corteSel]||0)-(g.cortes[_ch.ppt]||0);
+      return d>2?'rgba(240,180,41,.85)':d<-2?'rgba(248,81,73,.85)':'rgba(63,185,80,.8)';
+    });
+    window._chChart = new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels:labels,
+        datasets:[
+          {label:'PPT 2026', data:dataPPT, backgroundColor:'rgba(56,139,253,.6)', borderColor:'#388bfd', borderWidth:1.5, borderRadius:3, maxBarThickness:14},
+          {label:'Real', data:dataReal, backgroundColor:realColors, borderColor:realColors.map(function(c){return c.replace('.85','').replace('.8','');}), borderWidth:1.5, borderRadius:3, maxBarThickness:14}
+        ]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        onClick:function(evt,items){
+          if(items&&items[0]&&window._chGrafArr){
+            var g=window._chGrafArr[items[0].index];
+            if(g&&window._chGrupos&&window._chGrupos[g.doc]) _chAbrirJarvis(window._chGrupos[g.doc]);
+          }
+        },
+        plugins:{
+          legend:{position:'top',labels:{color:'#8b949e',font:{size:10},padding:10,usePointStyle:true}},
+          tooltip:{
+            backgroundColor:'#1c2128',borderColor:'#30363d',borderWidth:1,
+            titleColor:'#f0f6ff',bodyColor:'#8b949e',padding:10,
+            callbacks:{
+              title:function(i){return arr[i[0].index].doc.split(',').reverse().join(' ').trim().substring(0,40);},
+              afterBody:function(i){
+                var g=arr[i[0].index];
+                var ppt=g.cortes[_ch.ppt]||0, real=g.cortes[corteSel]||0, d=real-ppt;
+                return ['','Δ: '+(d>0?'+':'')+d.toFixed(0)+'h'+(ppt>0?' ('+((d/ppt)*100).toFixed(1)+'%)':'')];
+              }
+            }
+          }
+        },
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8b949e',font:{size:9}}},
+          y:{grid:{display:false},ticks:{color:'#c9d1d9',font:{size:9,weight:'500'},maxRotation:0}}
+        }
+      }
+    });
+  },80);
+}
+
+
+function _chExportarGrafico(){
+  var cv=document.getElementById('chGrafCanvas'); if(!cv) return;
+  var a=document.createElement('a');
+  a.download='ControlHoras_'+new Date().toISOString().substring(0,10)+'.png';
+  a.href=cv.toDataURL('image/png'); a.click();
+  showToast('Gráfico exportado','ok');
+}
+
+/* ══ JARVIS DOCENTE — ficha completa de horas ══════════════════════ */
+function _chAbrirJarvis(g){
+  // Validaciones defensivas
+  if(!g) return;
+  g.doc = g.doc||g.key||'(Sin nombre)';
+  g.rows = g.rows||[];
+  g.cortes = g.cortes||{};
+  // Eliminar modal anterior si existe
+  var old = document.getElementById('chJarvisModal');
+  if(old) old.remove();
+
+  var reales = _ch.cortes.filter(function(c){return c!==_ch.ppt;});
+  var ppt = g.cortes[_ch.ppt]||0;
+  var lastReal = reales.length ? reales[reales.length-1] : null;
+  var realUlt = lastReal ? (g.cortes[lastReal]||0) : 0;
+  var delta = realUlt - ppt;
+  var dColor = delta>2 ? '#d97706' : delta<-2 ? '#dc2626' : '#16a34a';
+  var docNombre = g.doc.includes(',')
+    ? (g.doc.split(',')[1].trim().split(' ')[0]+' '+g.doc.split(',')[0].trim())
+    : g.doc;
+  var initials = g.doc.split(',')[0].trim().substring(0,2).toUpperCase();
+
+  // Evolución
+  var evolRows = _ch.cortes.map(function(c){
+    var h=g.cortes[c]||0, isPPT=c===_ch.ppt, d=isPPT?0:h-ppt;
+    var dc=isPPT?'#1d4ed8':d>0?'#d97706':d<0?'#dc2626':'#16a34a';
+    return '<tr style="border-bottom:1px solid #f0f0f0;background:'+(isPPT?'#eff6ff':'white')+'">'+
+      '<td style="padding:7px 12px;font-size:11px;color:#374151;font-weight:'+(isPPT?'700':'400')+'">'+esc(_chShortCorte(c))+'</td>'+
+      '<td style="padding:7px 12px;font-size:11px;font-weight:700;color:'+dc+';text-align:right">'+h.toFixed(0)+'h</td>'+
+      '<td style="padding:7px 12px;font-size:10px;color:'+(isPPT?'#9ca3af':dc)+';text-align:right">'+(isPPT?'—':(d>0?'+':'')+d.toFixed(0)+'h')+'</td>'+
+      '<td style="padding:7px 12px;font-size:10px;color:'+(isPPT?'#9ca3af':dc)+';text-align:right">'+(isPPT||!ppt?'—':Math.round(h/ppt*100)+'%')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  // Programas
+  var progMap={};
+  g.rows.filter(function(r){return r.rpp===_ch.ppt;}).forEach(function(r){
+    var p=r.programa||'(Sin)';
+    if(!progMap[p])progMap[p]={prog:p,horas:0,cc:r.cc};
+    progMap[p].horas+=r.horas;
+  });
+  var progs=Object.values(progMap).sort(function(a,b){return b.horas-a.horas;});
+  var maxH=progs.length?progs[0].horas:1;
+  var progRows=progs.slice(0,15).map(function(p){
+    var pct=Math.round(p.horas/maxH*100);
+    var col=p.horas>=50?'#1d4ed8':p.horas>=20?'#0891b2':'#6b7280';
+    return '<div style="padding:8px 14px;border-bottom:1px solid #f3f4f6">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+        '<div style="font-size:11px;color:#111827;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px" title="'+esc(p.prog)+'">'+esc(abbr(p.prog,32))+'</div>'+
+        '<div style="font-size:12px;font-weight:800;color:'+col+';flex-shrink:0">'+p.horas.toFixed(0)+'h</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<div style="flex:1;height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden">'+
+          '<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px"></div>'+
+        '</div>'+
+        '<div style="font-size:9px;color:#9ca3af">CC '+esc(p.cc)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  // Tipos
+  var tipos={};
+  g.rows.filter(function(r){return r.rpp===_ch.ppt;}).forEach(function(r){tipos[r.tipo]=(tipos[r.tipo]||0)+r.horas;});
+  var tipoCols=['#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d4','#ef4444'];
+  var tipoRows=Object.entries(tipos).sort(function(a,b){return b[1]-a[1];}).map(function(e,i){
+    var col=tipoCols[i%tipoCols.length];
+    var pct=ppt?Math.round(e[1]/ppt*100):0;
+    return '<div style="padding:6px 14px;border-bottom:1px solid #f3f4f6">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:3px">'+
+        '<span style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+esc(abbr(e[0],22))+'</span>'+
+        '<span style="font-size:10px;font-weight:700;color:'+col+'">'+e[1].toFixed(0)+'h</span>'+
+      '</div>'+
+      '<div style="height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden">'+
+        '<div style="width:'+pct+'%;height:100%;background:'+col+'"></div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  // Crear modal completo como nodo independiente
+  var modal = document.createElement('div');
+  modal.id = 'chJarvisModal';
+  modal.style.cssText = [
+    'position:fixed','inset:0','z-index:9999',
+    'display:flex','align-items:center','justify-content:center',
+    'background:rgba(0,0,0,.55)',
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+  ].join(';');
+  modal.onclick = function(e){ if(e.target===modal) _chCerrarJarvis(); };
+
+  modal.innerHTML =
+    '<div style="background:#f9fafb;border-radius:16px;width:min(92vw,860px);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)">'+
+
+      // Header
+      '<div style="background:linear-gradient(135deg,#1e40af,#1e3a8a);padding:20px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0">'+
+        '<div style="width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:#fff;flex-shrink:0">'+esc(initials)+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Control de Horas · Docente</div>'+
+          '<div style="font-size:16px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(abbr(docNombre,50))+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:10px;flex-shrink:0">'+
+        [
+          {l:'PPT',v:ppt.toFixed(0)+'h',c:'rgba(255,255,255,.95)'},
+          {l:'Real',v:realUlt.toFixed(0)+'h',c:dColor==='#16a34a'?'#86efac':dColor==='#dc2626'?'#fca5a5':'#fcd34d'},
+          {l:'Delta',v:(delta>0?'+':'')+delta.toFixed(0)+'h',c:dColor==='#16a34a'?'#86efac':dColor==='#dc2626'?'#fca5a5':'#fcd34d'},
+        ].map(function(k){
+          return '<div style="text-align:center;padding:8px 14px;background:rgba(255,255,255,.12);border-radius:10px;border:1px solid rgba(255,255,255,.2)">'+
+            '<div style="font-size:17px;font-weight:900;color:'+k.c+'">'+k.v+'</div>'+
+            '<div style="font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">'+k.l+'</div>'+
+          '</div>';
+        }).join('')+
+        '</div>'+
+        '<button onclick="_chCerrarJarvis()" style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.8);font-size:14px;cursor:pointer;flex-shrink:0">✕</button>'+
+      '</div>'+
+
+      // Body
+      '<div style="display:grid;grid-template-columns:1fr 272px;overflow:hidden;flex:1">'+
+
+        // Izq — programas
+        '<div style="overflow-y:auto;border-right:1px solid #e5e7eb">'+
+          '<div style="padding:10px 14px;background:#f1f5f9;border-bottom:2px solid #e2e8f0;display:flex;justify-content:space-between">'+
+            '<span style="font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em">Programas (PPT)</span>'+
+            '<span style="font-size:10px;font-weight:700;color:#1d4ed8">'+progs.length+'</span>'+
+          '</div>'+
+          progRows+
+        '</div>'+
+
+        // Der — evolución + tipos
+        '<div style="overflow-y:auto;background:white">'+
+          // Evolución
+          '<div style="padding:10px 14px;background:#f1f5f9;border-bottom:2px solid #e2e8f0">'+
+            '<span style="font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em">Evolución por corte</span>'+
+          '</div>'+
+          '<table style="width:100%;border-collapse:collapse">'+
+            '<thead><tr style="background:#f8fafc">'+
+              '<th style="padding:6px 12px;font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;text-align:left">Corte</th>'+
+              '<th style="padding:6px 12px;font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;text-align:right">Horas</th>'+
+              '<th style="padding:6px 12px;font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;text-align:right">Δ PPT</th>'+
+              '<th style="padding:6px 12px;font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;text-align:right">%</th>'+
+            '</tr></thead>'+
+            '<tbody>'+evolRows+'</tbody>'+
+          '</table>'+
+          // Tipos
+          '<div style="padding:10px 14px;background:#f1f5f9;border-top:2px solid #e2e8f0;border-bottom:2px solid #e2e8f0;margin-top:8px">'+
+            '<span style="font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em">Tipo actividad</span>'+
+          '</div>'+
+          tipoRows+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  document.body.appendChild(modal);
+}
+
+
+function _chCerrarJarvis(){
+  var m=document.getElementById('chJarvisModal');
+  if(m) m.remove();
+}
+
+
+function _chExportar() {
+  if (typeof XLSX==='undefined') return;
+  var df = _chGetFiltered();
+  var reales = _ch.cortes.filter(function(c){ return c!==_ch.ppt; });
+  var grupos = {};
+  df.forEach(function(r){
+    var key = r.profesor;
+    if (!grupos[key]) { grupos[key]={doc:key,prog:r.programa}; _ch.cortes.forEach(function(c){grupos[key][c]=0;}); }
+    grupos[key][r.rpp]=(grupos[key][r.rpp]||0)+r.horas;
+  });
+  var rows = Object.values(grupos).map(function(g){
+    var row = {'Docente':g.doc, 'PPT 2026':g[_ch.ppt]||0};
+    reales.forEach(function(c){ row[_chShortCorte(c)]=g[c]||0; row['Δ '+_chShortCorte(c)]=(g[c]||0)-(g[_ch.ppt]||0); });
+    return row;
+  });
+  var wb2 = XLSX.utils.book_new();
+  var ws2 = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb2,ws2,'Control Horas');
+  XLSX.writeFile(wb2,'ControlHoras_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Exportado','ok');
+}
+
 
 function renderPresupuesto() {
   var pg = $('page'); if(!pg) return;
@@ -13667,13 +14339,37 @@ function renderPropuestasCalendario() {
 
       '</div>'+ // grid
 
+      // ── Selector de Modo ───────────────────────────────────────
+      '<div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:10px;padding:14px 16px;margin-top:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:10px;display:flex;align-items:center;gap:6px">'+
+          '<span>⚙️</span> Modo de generación'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+          '<button id="ppModoCompleto" style="padding:7px 14px;border-radius:7px;border:2px solid #2563eb;background:rgba(37,99,235,.15);color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer">'+
+            '📋 Por Programa Completo'+
+          '</button>'+
+          '<button id="ppModoCurso" style="padding:7px 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--t3);font-size:11px;cursor:pointer">'+
+            '📄 Por Curso Específico'+
+          '</button>'+
+        '</div>'+
+        '<div id="ppModoDesc" style="font-size:10px;color:var(--t3);margin-bottom:8px">'+
+          'Genera una propuesta unificada con todos los cursos del programa seleccionado.'+
+        '</div>'+
+        '<div id="ppCursoWrap" style="display:none;margin-top:6px">'+
+          '<label style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;display:block;margin-bottom:4px">Selecciona el curso:</label>'+
+          '<select id="ppCursoSel" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--t1);font-size:11px">'+
+            '<option value="">— Selecciona un curso —</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+
       // ── Botones ────────────────────────────────────────────────
-      '<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">'+
-        '<button onclick="ppGenerar()" '+
+      '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'+
+        '<button onclick="ppGenerarConModo()" '+
           'style="padding:10px 24px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;'+
             'border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;'+
             'box-shadow:0 2px 10px rgba(37,99,235,.35);display:flex;align-items:center;gap:8px">'+
-          '📅 Generar Propuesta de Calendario'+
+          '📅 Generar Propuesta'+
         '</button>'+
         '<button onclick="ppLimpiar()" '+
           'style="padding:10px 16px;border:1px solid var(--border);background:var(--surface2);'+
@@ -13688,6 +14384,15 @@ function renderPropuestasCalendario() {
     '<div id="ppResultado"></div>'+
 
     '</div>'; // section-propuestas-calendario
+
+  // Bind botones modo con delegación
+  setTimeout(function(){
+    var bC=document.getElementById('ppModoCompleto');
+    var bK=document.getElementById('ppModoCurso');
+    if(bC) bC.onclick=function(){ppSetModo('completo');};
+    if(bK) bK.onclick=function(){ppSetModo('curso');};
+    ppSetModo('completo'); // default
+  },50);
 }
 
 /* ── Helpers UI del generador ──────────────────────────────────── */
@@ -13812,6 +14517,7 @@ function ppCargarPrograma() {
 
   ppMostrarCalendarioActual(nombreReal);
   ppAutocompletar(nombreReal, sesiones);
+  if (_ppModo==='curso') ppCargarCursosSel();
   showToast('Calendario cargado: '+sesiones.length+' sesiones','ok');
 }
 
@@ -14066,6 +14772,238 @@ function ppLimpiar() {
 }
 
 /* ── Función principal: calcular propuesta ──────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   MODO DE GENERACIÓN: Programa Completo vs Por Curso
+══════════════════════════════════════════════════════════════ */
+var _ppModo = 'completo'; // 'completo' | 'curso'
+
+function ppSetModo(modo) {
+  _ppModo = modo;
+  var btnC = document.getElementById('ppModoCompleto');
+  var btnK = document.getElementById('ppModoCurso');
+  var desc = document.getElementById('ppModoDesc');
+  var wrap = document.getElementById('ppCursoWrap');
+
+  if (btnC) btnC.style = 'padding:7px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;' +
+    (modo==='completo' ? 'border:2px solid #2563eb;background:rgba(37,99,235,.15);color:#60a5fa;' :
+                         'border:1px solid var(--border);background:transparent;color:var(--t3);');
+  if (btnK) btnK.style = 'padding:7px 14px;border-radius:7px;font-size:11px;cursor:pointer;' +
+    (modo==='curso' ? 'border:2px solid #7c3aed;background:rgba(124,58,237,.15);color:#a78bfa;font-weight:700;' :
+                      'border:1px solid var(--border);background:transparent;color:var(--t3);');
+
+  if (desc) desc.textContent = modo==='completo'
+    ? 'Genera una propuesta unificada con todos los cursos del programa seleccionado.'
+    : 'Genera una propuesta solo para el curso elegido del programa seleccionado.';
+
+  if (wrap) wrap.style.display = modo==='curso' ? 'block' : 'none';
+
+  // Cargar cursos si modo=curso y hay programa seleccionado
+  if (modo==='curso' && _ppProgSel) ppCargarCursosSel();
+}
+
+function ppCargarCursosSel() {
+  var sel = document.getElementById('ppCursoSel'); if (!sel) return;
+  var df  = getDF();
+  var ses = df.filter(function(r){ return r['PROGRAMA'] === _ppProgSel; });
+  var cursos = [...new Set(ses.map(function(r){
+    return r['ASIGNATURA'] || r['SIGLA'] || '';
+  }).filter(Boolean))].sort();
+
+  sel.innerHTML = '<option value="">— Selecciona un curso —</option>' +
+    cursos.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+}
+
+function ppGenerarConModo() {
+  if (_ppModo === 'completo') {
+    ppGenerarProgramaCompleto();
+  } else {
+    // Modo por curso: validar que se eligió un curso
+    var cursoSel = (document.getElementById('ppCursoSel')||{value:''}).value;
+    if (!cursoSel) {
+      showToast('Selecciona un curso específico','err'); return;
+    }
+    // Filtrar nombre del form al curso elegido y generar
+    var inpN = document.getElementById('ppNombre');
+    if (inpN) inpN.value = (_ppProgSel||inpN.value) + ' — ' + cursoSel;
+    _ppCursoFiltro = cursoSel;
+    ppGenerar();
+    _ppCursoFiltro = null;
+  }
+}
+
+var _ppCursoFiltro = null; // null = todos, string = curso específico
+
+function ppGenerarProgramaCompleto() {
+  var nombre   = _ppProgSel || (document.getElementById('ppNombre')||{value:''}).value.trim() || 'Programa';
+  var iniStr   = (document.getElementById('ppIni')||{value:''}).value;
+  var finStr   = (document.getElementById('ppFin')||{value:''}).value;
+  var sede     = (document.getElementById('ppSede')||{value:''}).value.trim();
+  var modalidad= (document.getElementById('ppMod')||{value:'Presencial'}).value;
+  var res      = document.getElementById('ppResultado'); if (!res) return;
+
+  if (!iniStr || !finStr) {
+    res.innerHTML='<div style="padding:12px;color:#dc2626;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);border-radius:8px;font-size:12px">⚠️ Define la fecha de inicio y término.</div>';
+    return;
+  }
+  var fechaIni = new Date(iniStr+'T12:00:00');
+  var fechaFin = new Date(finStr+'T12:00:00');
+  if (fechaFin <= fechaIni) {
+    res.innerHTML='<div style="padding:12px;color:#dc2626;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);border-radius:8px;font-size:12px">⚠️ La fecha de término debe ser posterior al inicio.</div>';
+    return;
+  }
+
+  var df  = getDF();
+  var ses = df.filter(function(r){ return r['PROGRAMA'] === nombre; });
+
+  // Obtener cursos únicos del programa
+  var cursosMap = {};
+  ses.forEach(function(r){
+    var asig = r['ASIGNATURA'] || r['SIGLA'] || '(Sin nombre)';
+    if (!cursosMap[asig]) cursosMap[asig] = {
+      asig: asig, sesiones: 0, horas: 0, dias: new Set(),
+      horarios: new Set(), docentes: new Set()
+    };
+    var c = cursosMap[asig];
+    c.sesiones++;
+    c.horas += parseFloat(r['HORAS'])||0;
+    if (r['Dia_Semana']) c.dias.add(r['Dia_Semana']);
+    if (r['HORARIO']) c.horarios.add(r['HORARIO']);
+    if (r['PROFESOR']) c.docentes.add(r['PROFESOR']);
+  });
+  var cursos = Object.values(cursosMap);
+
+  if (!cursos.length) {
+    res.innerHTML='<div style="padding:12px;color:#dc2626;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);border-radius:8px;font-size:12px">⚠️ No hay cursos cargados para este programa. Carga el calendario primero.</div>';
+    return;
+  }
+
+  var totalSes = cursos.reduce(function(s,c){return s+c.sesiones;},0);
+  var totalHrs = cursos.reduce(function(s,c){return s+c.horas;},0);
+  var totalDoc = new Set(ses.filter(function(r){return r['PROFESOR'];}).map(function(r){return r['PROFESOR'];})).size;
+
+  var hoy = new Date().toLocaleDateString('es-CL',{year:'numeric',month:'long',day:'numeric'});
+  var fmtDate = function(d){ return d.toLocaleDateString('es-CL',{year:'numeric',month:'long',day:'numeric'}); };
+
+  res.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">'+
+
+      // Header
+      '<div style="padding:16px 20px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(124,58,237,.07));border-bottom:1px solid var(--border)">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">'+
+          '<div>'+
+            '<div style="font-size:15px;font-weight:900;color:var(--t1);margin-bottom:4px">📋 Propuesta de Calendario — Programa Completo</div>'+
+            '<div style="font-size:12px;font-weight:700;color:#60a5fa">'+esc(nombre)+'</div>'+
+            '<div style="font-size:10px;color:var(--t3);margin-top:2px">Generado el '+hoy+'</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px">'+
+            '<button onclick="ppExportarCompleto()" style="padding:7px 14px;border:1px solid var(--border);background:var(--surface2);color:var(--t2);border-radius:7px;font-size:11px;cursor:pointer">📥 Exportar Excel</button>'+
+            '<button onclick="ppImprimirCompleto()" style="padding:7px 14px;border:1px solid var(--border);background:var(--surface2);color:var(--t2);border-radius:7px;font-size:11px;cursor:pointer">🖨 Imprimir</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+
+      // KPIs resumen
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-bottom:1px solid var(--border)">'+
+      [
+        {ico:'📚',lbl:'Cursos',val:cursos.length,c:'#60a5fa'},
+        {ico:'📅',lbl:'Sesiones',val:totalSes,c:'#818cf8'},
+        {ico:'⏱',lbl:'Horas Total',val:totalHrs.toFixed(0)+'h',c:'#34d399'},
+        {ico:'👨‍🏫',lbl:'Docentes',val:totalDoc,c:'#f59e0b'},
+        {ico:'📍',lbl:'Período',val:fmtDate(fechaIni).split(' ').slice(-1)[0],c:'#a78bfa'},
+      ].map(function(k){
+        return '<div style="padding:12px 14px;border-right:1px solid var(--border);text-align:center">'+
+          '<div style="font-size:14px;margin-bottom:3px">'+k.ico+'</div>'+
+          '<div style="font-size:18px;font-weight:900;color:'+k.c+'">'+k.val+'</div>'+
+          '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px">'+k.lbl+'</div>'+
+        '</div>';
+      }).join('')+
+      '</div>'+
+
+      // Info general
+      '<div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap">'+
+        '<div><span style="font-size:10px;color:var(--t3);text-transform:uppercase">Período propuesto</span>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-top:2px">'+fmtDate(fechaIni)+' — '+fmtDate(fechaFin)+'</div></div>'+
+        (sede?'<div><span style="font-size:10px;color:var(--t3);text-transform:uppercase">Sede</span>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-top:2px">'+esc(sede)+'</div></div>':'')+
+        '<div><span style="font-size:10px;color:var(--t3);text-transform:uppercase">Modalidad</span>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--t1);margin-top:2px">'+esc(modalidad)+'</div></div>'+
+      '</div>'+
+
+      // Tabla de cursos
+      '<div style="padding:14px 20px;border-bottom:1px solid var(--border)">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📖 Detalle de Cursos</div>'+
+        '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+        '<thead><tr style="background:var(--surface2)">'+
+        ['#','Curso / Asignatura','Docente(s)','Sesiones','Horas','Días','Horario'].map(function(h){
+          return '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;border-bottom:2px solid var(--border)">'+h+'</th>';
+        }).join('')+
+        '</tr></thead><tbody>'+
+        cursos.map(function(c,i){
+          var bg=i%2?'transparent':'rgba(255,255,255,.02)';
+          return '<tr style="border-bottom:1px solid var(--border);background:'+bg+'">'+
+            '<td style="padding:7px 10px;color:var(--t3);font-weight:700">'+(i+1)+'</td>'+
+            '<td style="padding:7px 10px;font-weight:600;color:var(--t1)">'+esc(c.asig)+'</td>'+
+            '<td style="padding:7px 10px;font-size:10px;color:var(--t3)">'+esc([...c.docentes].slice(0,2).join(', ') || '—')+'</td>'+
+            '<td style="padding:7px 10px;text-align:center;font-weight:700;color:#60a5fa">'+c.sesiones+'</td>'+
+            '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#34d399">'+c.horas.toFixed(0)+'h</td>'+
+            '<td style="padding:7px 10px;font-size:10px;color:var(--t3)">'+esc([...c.dias].join(', '))+'</td>'+
+            '<td style="padding:7px 10px;font-size:10px;color:var(--t3)">'+esc([...c.horarios].slice(0,1).join(''))+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody>'+
+        '<tfoot><tr style="background:var(--surface2);border-top:2px solid var(--border)">'+
+          '<td colspan="3" style="padding:8px 10px;font-weight:700;color:var(--t2);font-size:11px">TOTAL</td>'+
+          '<td style="padding:8px 10px;text-align:center;font-weight:800;color:#60a5fa">'+totalSes+'</td>'+
+          '<td style="padding:8px 10px;text-align:right;font-weight:800;color:#34d399">'+totalHrs.toFixed(0)+'h</td>'+
+          '<td colspan="2"></td>'+
+        '</tr></tfoot>'+
+        '</table>'+
+      '</div>'+
+
+      // Footer
+      '<div style="padding:12px 20px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between">'+
+        '<div style="font-size:10px;color:var(--t3)">Propuesta generada por Dashboard Postgrado UAI · '+hoy+'</div>'+
+        '<div style="font-size:10px;color:var(--t3)">'+cursos.length+' cursos · '+totalSes+' sesiones · '+totalHrs.toFixed(0)+'h</div>'+
+      '</div>'+
+
+    '</div>';
+
+  // Guardar datos para exportar
+  window._ppPropCompleto = {nombre:nombre, cursos:cursos, totalSes:totalSes, totalHrs:totalHrs, fechaIni:fechaIni, fechaFin:fechaFin, sede:sede, modalidad:modalidad};
+}
+
+function ppExportarCompleto() {
+  var d = window._ppPropCompleto;
+  if (!d || typeof XLSX==='undefined') { showToast('Sin datos para exportar','err'); return; }
+  var rows = d.cursos.map(function(c,i){
+    return {
+      'N°': i+1, 'Asignatura': c.asig,
+      'Docente(s)': [...c.docentes].join(', '),
+      'Sesiones': c.sesiones, 'Horas': c.horas.toFixed(0),
+      'Días': [...c.dias].join(', '),
+      'Horario': [...c.horarios].slice(0,1).join('')
+    };
+  });
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:5},{wch:40},{wch:30},{wch:10},{wch:8},{wch:20},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Propuesta');
+  XLSX.writeFile(wb, 'Propuesta_'+d.nombre.substring(0,30).replace(/[^a-zA-Z0-9]/g,'_')+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Excel exportado','ok');
+}
+
+function ppImprimirCompleto() {
+  var el = document.getElementById('ppResultado');
+  if (!el) return;
+  var w = window.open('','_blank');
+  w.document.write('<html><head><title>Propuesta</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:6px 10px;font-size:11px}th{background:#f3f4f6}@media print{button{display:none}}</style></head><body>'+el.innerHTML+'</body></html>');
+  w.document.close(); w.print();
+}
+
+// Actualizar ppCargarPrograma para cargar cursos si modo=curso
+var _ppProgSel_orig_load = typeof ppCargarPrograma !== 'undefined' ? ppCargarPrograma : null;
+
+
 function ppGenerar() {
   var nombre    = ($('ppNombre')   ||{value:''}).value.trim() || 'Programa sin nombre';
   var iniStr    = ($('ppIni')      ||{value:''}).value;
@@ -19917,7 +20855,7 @@ function _adnProcess(){
     var gr=e.filter(function(c){return c.nota&&c.nota>0;});
     var pr=gr.length?gr.reduce(function(a,c){return a+c.nota;},0)/gr.length:0;
     var av=_ADN.totalC?(ap/_ADN.totalC)*100:0;
-    var ef=s.razon==='Abandono'?'Abandono':s.razon==='Retirado'?'Retirado':s.razon==='Diplomado'?'Diplomado':'En Curso';
+    var ef=s.razon==='Abandono'?'Abandono':s.razon==='Retirado'?'Retirado':s.razon==='Diplomado'?'Cerrado':'Activo';
     return Object.assign({},s,{totalC:e.length,aprobados:ap,pendientes:pe,promedio:pr,avance:av,estadoFinal:ef,historial:s.historial||{}});
   });
   all=all.filter(function(s){
@@ -20022,9 +20960,9 @@ function renderAdnAcademico(){
         '<div style="display:flex;flex-direction:column;gap:3px">'+
           '<span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Estado</span>'+
           '<div style="display:flex;gap:4px">'+
-          ['todos','Diplomado','En Curso','Retirado','Abandono'].map(function(f){
+          ['todos','Cerrado','Activo','Retirado','Abandono'].map(function(f){
             var active=_ADN.status===f;
-            var bc=f==='Diplomado'?'#3fb950':f==='En Curso'?'#388bfd':f==='Retirado'?'#f0b429':f==='Abandono'?'#f85149':'#8b949e';
+            var bc=f==='Diplomado'?'#3fb950':f==='Activo'?'#3fb950':f==='Retirado'?'#f0b429':f==='Abandono'?'#f85149':'#8b949e';
             return '<button onclick="_ADN.status=\''+f+'\';_adnRefresh()" '+
               'style="padding:5px 10px;border-radius:6px;border:1px solid '+(active?bc+'60':'#21262d')+';'+
               'background:'+(active?bc+'18':'transparent')+';color:'+(active?bc:'#6e7681')+';font-size:10px;cursor:pointer;font-weight:'+(active?'700':'400')+'">'+
@@ -20107,7 +21045,7 @@ function _adnRenderMain(){
   var ta=tI?(tAp/tI)*100:0;
   var ag=st.filter(function(s){return s.promedio>0;});
   var pg=ag.length?ag.reduce(function(a,s){return a+s.promedio;},0)/ag.length:0;
-  var dc=st.filter(function(s){return s.estadoFinal==='Diplomado';}).length;
+  var dc=st.filter(function(s){return s.estadoFinal==='Cerrado';}).length;
   var tr=tA?(dc/tA)*100:0;
 
   // Cohorts
@@ -20159,7 +21097,7 @@ function _adnRenderMain(){
       }).join('')+
       '</tr></thead><tbody>'+
       (st.length ? st.map(function(s,i){
-        var bc=s.estadoFinal==='Diplomado'?'#3fb950':s.estadoFinal==='Retirado'?'#f0b429':s.estadoFinal==='Abandono'?'#f85149':'#388bfd';
+        var bc=s.estadoFinal==='Cerrado'?'#3fb950':s.estadoFinal==='Retirado'?'#f0b429':s.estadoFinal==='Abandono'?'#f85149':'#388bfd';
         var pc=s.promedio>=6.5?'#3fb950':s.promedio>=6?'#a9e34b':s.promedio>0?'#f0b429':'#6e7681';
         return '<tr style="border-bottom:1px solid #21262d;cursor:pointer" onclick="adnOpenDet(\''+esc(s.id)+'\')" '+
           'onmouseover="this.style.background=\'rgba(56,139,253,.04)\'" onmouseout="this.style.background=\'transparent\'">'+
@@ -20196,7 +21134,7 @@ function _adnRenderCharts(st){
   var ec={};
   st.forEach(function(s){ ec[s.estadoFinal]=(ec[s.estadoFinal]||0)+1; });
   var el=Object.keys(ec), ed=Object.values(ec);
-  var colMap={Diplomado:'#3fb950',Retirado:'#f0b429',Abandono:'#f85149','En Curso':'#388bfd'};
+  var colMap={Cerrado:'#22d3ee',Retirado:'#f0b429',Abandono:'#f85149','Activo':'#3fb950'};
   var cEst=document.getElementById('adnCEst');
   if(cEst&&el.length){
     _ADN.charts.est=new Chart(cEst,{type:'doughnut',data:{labels:el,datasets:[{
@@ -20313,7 +21251,7 @@ function adnOpenDet(id){
   _ADN.selStu=id;
 
   // Colores por estado y nota
-  var stColor=s.estadoFinal==='Diplomado'?'#00e5a0':s.estadoFinal==='Retirado'?'#ffc840':s.estadoFinal==='Abandono'?'#ff5577':'#38b4ff';
+  var stColor=s.estadoFinal==='Cerrado'?'#22d3ee':s.estadoFinal==='Activo'?'#3fb950':s.estadoFinal==='Retirado'?'#ffc840':s.estadoFinal==='Abandono'?'#ff5577':'#38b4ff';
   function notaColor(n){
     if(!n||n<=0) return null;
     var t=Math.max(0,Math.min(1,(n-4)/3));
@@ -20394,6 +21332,8 @@ function adnOpenDet(id){
     '<div class="jarvis-header">'+
       '<div class="jarvis-avatar" style="color:'+stColor+'">'+esc(initials)+'</div>'+
       '<div style="flex:1;min-width:0">'+
+        // Programa del alumno
+      '<div style="font-size:9px;font-weight:700;color:#388bfd;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+esc(_ADN.program||'')+'</div>'+
         // Chips de info en la misma línea
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
         '<div style="display:flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(56,139,253,.1);border:1px solid rgba(56,139,253,.25);border-radius:6px">'+
@@ -20420,7 +21360,15 @@ function adnOpenDet(id){
         '<span class="jarvis-status-chip" style="background:'+stColor+'15;color:'+stColor+';border:1px solid '+stColor+'35">'+
           '◉ '+esc(s.estadoFinal)+
         '</span>'+
+        (periodoIngreso?
+          '<span style="font-size:9px;font-weight:600;color:rgba(168,139,250,.7);margin-left:8px;'+
+            'padding:2px 8px;background:rgba(168,139,250,.1);border:1px solid rgba(168,139,250,.2);border-radius:12px">'+
+            '📅 '+esc(periodoIngreso)+(periodoFin&&periodoFin!==periodoIngreso?' → '+esc(periodoFin):'')+'</span>':'')+
       '</div>'+
+      // Período del alumno
+      (periodoIngreso?'<div style="font-size:9px;color:rgba(168,139,250,.7);font-weight:600;margin-top:6px;display:flex;align-items:center;gap:5px">'+
+        '<span style="padding:2px 8px;background:rgba(168,139,250,.1);border:1px solid rgba(168,139,250,.25);border-radius:10px">'+
+          '📅 '+esc(periodoIngreso)+(periodoFin&&periodoFin!==periodoIngreso?' → '+esc(periodoFin):'')+'</span></div>':'')+
       // Anillos KPI
       '<div style="display:flex;gap:20px;flex-shrink:0;position:relative;z-index:1">'+
         ring(promPct,'#38b4ff',s.promedio>0?s.promedio.toFixed(1):'—','PROMEDIO')+
@@ -20506,7 +21454,7 @@ function adnOpenDet(id){
           })()+
           (function(){
             // Estado del estudiante
-            var stateC=s.estadoFinal==='Diplomado'?'#00e5a0':s.estadoFinal==='En Curso'?'#38b4ff':s.estadoFinal==='Retirado'?'#ffc840':'#ff5577';
+            var stateC=s.estadoFinal==='Cerrado'?'#22d3ee':s.estadoFinal==='Activo'?'#3fb950':s.estadoFinal==='Retirado'?'#ffc840':'#ff5577';
             var html='<div style="padding:6px 0;border-bottom:1px solid rgba(0,80,150,.15);margin-bottom:6px">'+
               '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'+
                 '<span style="font-size:8px;color:rgba(100,150,200,.5);text-transform:uppercase;letter-spacing:.06em">Estado</span>'+
