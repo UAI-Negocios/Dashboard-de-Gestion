@@ -1713,7 +1713,7 @@ const CATS = {
   calendarios:  ['calendario','reservas'],
   planificador: ['plancursos','malla','planreporte','propuestas','horario'],
   admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
-  control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce','controlhoras'],
+  control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce','controlhoras','valoreshora'],
   ayuda:        ['manual','faqs'],
   adn:          ['adnacademico'],
 };
@@ -1735,6 +1735,7 @@ const TAB_LABELS = {
   informe:      '📄 Informe Ejecutivo',
   cruce:        '🔀 Reporte de Cruce',
   controlhoras: '📊 Control de Horas',
+  valoreshora:  '💰 Valores Hora',
   declarado:    '📊 Gestión de Contratos',
   contratos:    'Contratos Emitidos',
   calendario:   'Calendario',
@@ -2794,7 +2795,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -2814,6 +2815,7 @@ function refreshView() {
     informe:      renderInformeEjecutivo,
     cruce:        renderCruceInfo,
     controlhoras: renderControlHoras,
+    valoreshora:  renderValoresHora,
     declarado:    renderDeclarado,
   contratos:    renderContratos,
     calendario:   renderCalendario,
@@ -10944,6 +10946,189 @@ var _ch = {
   grafCorte: ''  // corte seleccionado para el gráfico
 };
 
+var _chValoresHora = {
+  rows: [],       // datos del archivo valores hora
+  filename: '',
+  byRut: {},      // índice por rut_profesor
+  byNombre: {},   // índice por nombre del profesor
+  loaded: false
+};
+
+/* ══════════════════════════════════════════════════════════════
+   VALORES HORA — Carga de archivo con PrecioHora por docente
+   Cruce por rut_profesor con Control de Horas
+══════════════════════════════════════════════════════════════ */
+function renderValoresHora() {
+  var pg = $('page'); if (!pg) return;
+
+  pg.innerHTML =
+    '<div class="pg-title">💰 Valores Hora</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:20px">'+
+      'Carga el archivo con los valores de PrecioHora por docente (Excel con columna rut_profesor)'+
+    '</div>'+
+
+    // KPIs si ya está cargado
+    (_chValoresHora.loaded?
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">'+
+      [
+        {ico:'📄',lbl:'Registros',val:_chValoresHora.rows.length,c:'#388bfd'},
+        {ico:'👨‍🏫',lbl:'Docentes únicos',val:Object.keys(_chValoresHora.byRut).length,c:'#3fb950'},
+        {ico:'💵',lbl:'Precio Promedio',val:'$'+Math.round(_chValoresHora.rows.reduce(function(s,r){return s+(r.precioHora||0);},0)/_chValoresHora.rows.length).toLocaleString('es-CL'),c:'#f0b429'},
+        {ico:'🔗',lbl:'Archivo',val:_chValoresHora.filename,c:'#a78bfa'},
+      ].map(function(k){
+        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;border-left:3px solid '+k.c+'">'+
+          '<div style="font-size:13px;margin-bottom:4px">'+k.ico+'</div>'+
+          '<div style="font-size:18px;font-weight:900;color:'+k.c+'">'+k.val+'</div>'+
+          '<div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase">'+k.lbl+'</div>'+
+        '</div>';
+      }).join('')+
+      '</div>'+
+      '<button onclick="_chValoresHora={rows:[],filename:\'\',byRut:{},loaded:false};renderValoresHora()" '+
+        'style="padding:7px 14px;border:1px solid var(--border);background:transparent;color:var(--t3);border-radius:8px;font-size:11px;cursor:pointer;margin-bottom:20px">'+
+        '📂 Cargar otro archivo'+
+      '</button>'
+    :'')+
+
+    // Zona de carga
+    (!_chValoresHora.loaded?
+      '<div style="max-width:480px;border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s" '+
+        'onclick="document.getElementById(\'vhFileInp\').click()" '+
+        'ondragover="event.preventDefault();this.style.borderColor=\'#388bfd\'" '+
+        'ondragleave="this.style.borderColor=\'var(--border)\'" '+
+        'ondrop="event.preventDefault();this.style.borderColor=\'var(--border)\';_vhHandleFile(event.dataTransfer.files[0])">'+
+        '<div style="font-size:36px;margin-bottom:12px">💰</div>'+
+        '<div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px">Arrastra el archivo aquí</div>'+
+        '<div style="font-size:11px;color:var(--t3)">Excel con columnas: rut_profesor, PrecioHora, Profesor, etc.</div>'+
+      '</div>'+
+      '<input type="file" id="vhFileInp" accept=".xlsx,.xls" style="display:none" onchange="if(this.files[0])_vhHandleFile(this.files[0])">'
+    :
+      // Tabla de previsualización
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:500px">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+          '<thead style="position:sticky;top:0;background:var(--surface2);z-index:1">'+
+            '<tr>'+
+              '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);border-bottom:2px solid var(--border)">RUT</th>'+
+              '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);border-bottom:2px solid var(--border)">Profesor</th>'+
+              '<th style="padding:8px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);border-bottom:2px solid var(--border)">Precio Hora</th>'+
+              '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);border-bottom:2px solid var(--border)">Programa</th>'+
+              '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);border-bottom:2px solid var(--border)">Asignatura</th>'+
+            '</tr>'+
+          '</thead>'+
+          '<tbody>'+
+            _chValoresHora.rows.slice(0,100).map(function(r,i){
+              return '<tr style="border-bottom:1px solid var(--border);background:'+(i%2?'transparent':'rgba(255,255,255,.012)')+'">'+
+                '<td style="padding:7px 10px;color:var(--t2);font-family:monospace">'+esc(r.rut)+'</td>'+
+                '<td style="padding:7px 10px;color:var(--t1)">'+esc(abbr(r.profesor,30))+'</td>'+
+                '<td style="padding:7px 10px;text-align:right;font-weight:700;color:#3fb950">$'+r.precioHora.toLocaleString('es-CL')+'</td>'+
+                '<td style="padding:7px 10px;color:var(--t3)">'+esc(abbr(r.programa,25))+'</td>'+
+                '<td style="padding:7px 10px;color:var(--t3)">'+esc(abbr(r.asignatura,25))+'</td>'+
+              '</tr>';
+            }).join('')+
+          '</tbody>'+
+        '</table>'+
+        (_chValoresHora.rows.length>100?
+          '<div style="padding:12px;text-align:center;color:var(--t3);font-size:10px;border-top:1px solid var(--border)">'+
+            'Mostrando primeros 100 de '+_chValoresHora.rows.length+' registros'+
+          '</div>'
+        :'')+
+      '</div>'
+    );
+}
+
+/* Helper: Parsear número en formato chileno (. = miles, , = decimal) */
+function _parseNumCL(val) {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  var str = String(val).trim();
+  // Remover separadores de miles (puntos)
+  str = str.replace(/\./g, '');
+  // Reemplazar coma decimal por punto
+  str = str.replace(',', '.');
+  // Remover cualquier carácter no numérico excepto punto y signo
+  str = str.replace(/[^0-9.-]/g, '');
+  var num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+
+
+function _vhHandleFile(file) {
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { showToast('XLSX no disponible','err'); return; }
+  showToast('Procesando...','ok');
+  
+  var rd = new FileReader();
+  rd.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      var shName = wb.SheetNames[0];
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[shName], {defval:''});
+      
+      if (!rows.length) { showToast('Archivo vacío','err'); return; }
+      
+      // Detectar columnas
+      var sample = rows[0];
+      var colRut = Object.keys(sample).find(function(k){ return k.toLowerCase().includes('rut'); });
+      var colPrecio = Object.keys(sample).find(function(k){ return k.toLowerCase().includes('precio'); });
+      var colProf = Object.keys(sample).find(function(k){ return k.toLowerCase().includes('profesor'); });
+      
+      if (!colRut || !colPrecio) {
+        showToast('Faltan columnas: rut_profesor y/o PrecioHora','err');
+        return;
+      }
+      
+      // Procesar filas
+      _chValoresHora.rows = rows.map(function(r){
+        return {
+          rut:        String(r[colRut]||'').trim(),
+          profesor:   String(r[colProf]||r['Profesor']||''),
+          precioHora: _parseNumCL(r[colPrecio]),
+          programa:   String(r['Programa']||''),
+          asignatura: String(r['Asignatura']||''),
+          mes:        String(r['Mes']||''),
+          seccion:    String(r['seccion_id']||''),
+          tipoDoc:    String(r['Tipo Documento']||''),
+        };
+      }).filter(function(r){ return r.rut && r.precioHora > 0; });
+      
+      // Crear índice por RUT
+      _chValoresHora.byRut = {};
+      _chValoresHora.rows.forEach(function(r){
+        if (!_chValoresHora.byRut[r.rut]) {
+          _chValoresHora.byRut[r.rut] = [];
+        }
+        _chValoresHora.byRut[r.rut].push(r);
+      });
+      
+      // Crear índice por nombre (normalizado)
+      _chValoresHora.byNombre = {};
+      _chValoresHora.rows.forEach(function(r){
+        var nombreKey = r.profesor.toLowerCase().trim();
+        if (!_chValoresHora.byNombre[nombreKey]) {
+          _chValoresHora.byNombre[nombreKey] = [];
+        }
+        _chValoresHora.byNombre[nombreKey].push(r);
+      });
+      
+      _chValoresHora.filename = file.name;
+      _chValoresHora.loaded = true;
+      
+      showToast(_chValoresHora.rows.length+' registros · '+Object.keys(_chValoresHora.byRut).length+' docentes únicos','ok');
+      renderValoresHora();
+      
+      // Si ya hay datos de Control de Horas, actualizar
+      if (_ch.rows.length > 0) {
+        showToast('Cruzando con Control de Horas...','ok');
+        setTimeout(function(){ _chRender(); }, 500);
+      }
+      
+    } catch(err) {
+      showToast('Error: '+err.message,'err');
+    }
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+
 function renderControlHoras() {
   var pg = $('page'); if (!pg) return;
 
@@ -10995,7 +11180,7 @@ function _chHandleFile(file) {
       var expandedRows = [];
       rows.forEach(function(r){
         var profesor = String(r['Profesores']||r['Profesor']||'');
-        var horas = parseFloat(r['Horas'])||0;
+        var horas = _parseNumCL(r['Horas']);
         
         // MEJORA: Si hay múltiples docentes (separados por '/'), dividir horas
         var docentes = profesor.includes('/') 
@@ -11012,6 +11197,7 @@ function _chHandleFile(file) {
             cc:      String(r['centro_costo']||r['CC']||''),
             tipo:    String(r['TIPO']||''),
             nombre:  String(r['Nombre']||r['NombreEspecifico']||''),
+            rut:     String(r['rut_profesor']||'').trim(), // NUEVO: guardar RUT
           });
         });
       });
@@ -11058,6 +11244,41 @@ function _chGetFiltered() {
     return true;
   });
 }
+
+/* Helper: Obtener precio hora por RUT */
+function _chGetPrecioHora(rut, nombre) {
+  if (!_chValoresHora.loaded) return null;
+  
+  // Intento 1: Buscar por RUT
+  if (rut && _chValoresHora.byRut[rut]) {
+    var regs = _chValoresHora.byRut[rut];
+    var sum = regs.reduce(function(s,r){ return s + r.precioHora; }, 0);
+    return Math.round(sum / regs.length);
+  }
+  
+  // Intento 2: Buscar por nombre exacto (normalizado)
+  if (nombre) {
+    var nombreKey = nombre.toLowerCase().trim();
+    if (_chValoresHora.byNombre[nombreKey]) {
+      var regs = _chValoresHora.byNombre[nombreKey];
+      var sum = regs.reduce(function(s,r){ return s + r.precioHora; }, 0);
+      return Math.round(sum / regs.length);
+    }
+    
+    // Intento 3: Buscar por coincidencia parcial de nombre
+    var matches = _chValoresHora.rows.filter(function(r){
+      return r.profesor.toLowerCase().indexOf(nombreKey) >= 0 ||
+             nombreKey.indexOf(r.profesor.toLowerCase()) >= 0;
+    });
+    if (matches.length > 0) {
+      var sum = matches.reduce(function(s,r){ return s + r.precioHora; }, 0);
+      return Math.round(sum / matches.length);
+    }
+  }
+  
+  return null;
+}
+
 
 function _chRender() {
   var pg = $('page'); if (!pg) return;
@@ -11128,6 +11349,17 @@ function _chRender() {
       '</div>'+
       '<button onclick="_chExportar()" style="margin-left:auto;padding:7px 14px;background:#388bfd;color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer">📥 Exportar</button>'+
     '</div>'+
+    // Banner de info sobre valores hora
+    (!_chValoresHora.loaded?
+      '<div style="background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">'+
+        '<div style="font-size:16px">💡</div>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;font-weight:700;color:#f0b429;margin-bottom:2px">Valores Hora no cargados</div>'+
+          '<div style="font-size:10px;color:var(--t3)">Carga el archivo de valores hora en <strong>Control → Valores Hora</strong> para ver precio/hora y monto total por docente</div>'+
+        '</div>'+
+        '<button onclick="setTab(\'control\',\'valoreshora\')" style="padding:6px 12px;background:#f0b429;color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">Cargar ahora</button>'+
+      '</div>'
+    :'')+
 
     // Tabla
     '<div id="chTabla" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto"></div>';
@@ -11186,6 +11418,10 @@ function _chRenderTabla(df) {
              '<th style="'+SH+'text-align:right;color:#f0b429">Δ PPT</th>';
     }).join('')+
     '<th style="'+SH+'">Tendencia</th>'+
+    (_chValoresHora.loaded?
+      '<th style="'+SH+'text-align:right">Precio Hora</th>'+
+      '<th style="'+SH+'text-align:right">Monto Total</th>'
+    :'')+
     '</tr></thead><tbody>';
 
   arr.forEach(function(g, gi) {
@@ -11240,7 +11476,29 @@ function _chRenderTabla(df) {
           '<circle cx="'+(pts[pts.length-1]?pts.length-1/(pts.length-1)*W:W)+'" cy="'+(maxV>0?H-(pts[pts.length-1].v/maxV)*H:H/2).toFixed(1)+'" r="2.5" fill="'+lineColor+'"/>'+
         '</svg>'
       : '<span style="color:var(--t3)">—</span>')+
-    '</td></tr>';
+    '</td>';
+    
+    // NUEVO: Columnas Precio Hora y Monto Total
+    if (_chValoresHora.loaded) {
+      var rutDoc = null;
+      // Buscar el RUT del primer registro de este docente
+      for (var ri=0; ri<df.length; ri++) {
+        if (df[ri].profesor === g.key) {
+          rutDoc = df[ri].rut;
+          break;
+        }
+      }
+      var precioHora = _chGetPrecioHora(rutDoc, g.key);
+      var montoTotal = precioHora ? ppt * precioHora : null;
+      
+      html += '<td style="'+S+'text-align:right;font-weight:700;color:'+(precioHora?'#3fb950':'#f85149')+'"'+
+        (precioHora?'':' title="No encontrado: '+esc(g.key)+'"')+'">'+
+        (precioHora ? '$'+precioHora.toLocaleString('es-CL') : '<span style="opacity:.5">Sin valor</span>')+'</td>';
+      html += '<td style="'+S+'text-align:right;font-weight:800;color:'+(montoTotal?'#388bfd':'#f85149')+'">'+
+        (montoTotal ? '$'+Math.round(montoTotal).toLocaleString('es-CL') : '<span style="opacity:.5">—</span>')+'</td>';
+    }
+    
+    html += '</tr>';
   });
 
   // Totales
@@ -11255,9 +11513,14 @@ function _chRenderTabla(df) {
       return '<td style="'+S+'text-align:right;font-weight:800;color:var(--t1)">'+totReal.toFixed(0)+'h</td>'+
              '<td style="'+S+'text-align:right;font-weight:800;color:'+dc+'">'+(d>0?'+':'')+d.toFixed(0)+'h</td>';
     }).join('')+
-    '<td></td></tr></tfoot></table>';
+    '<td></td>'+
+    (_chValoresHora.loaded?'<td></td><td></td>':'')+
+    '</tr></tfoot></table>';
 
   el.innerHTML = html;
+
+  // Guardar arr en window para acceso desde event listeners
+  window._chArr = arr;
 
   // Click en filas de docente → abrir JARVIS
   if (_ch.vista==='docente') {
@@ -11266,7 +11529,8 @@ function _chRenderTabla(df) {
       tr.addEventListener('mouseout',function(){var i=parseInt(this.dataset.gkey);this.style.background=i%2?'transparent':'rgba(255,255,255,.012)';});
       tr.addEventListener('click',function(){
         var i=parseInt(this.dataset.gkey);
-        var g=arr[i]; if(!g) return;
+        if(!window._chArr || !window._chArr[i]) return;
+        var g=window._chArr[i];
         var data=window._chGrupos&&window._chGrupos[g.key]?window._chGrupos[g.key]:g;
         // Asegurar que tiene 'doc' (el modal lo necesita)
         if(!data.doc) data.doc=g.key;
@@ -11411,6 +11675,14 @@ function _chAbrirJarvis(g){
     ? (g.doc.split(',')[1].trim().split(' ')[0]+' '+g.doc.split(',')[0].trim())
     : g.doc;
   var initials = g.doc.split(',')[0].trim().substring(0,2).toUpperCase();
+  
+  // Obtener precio hora del docente
+  var rutDoc = null;
+  if(g.rows && g.rows.length > 0) {
+    rutDoc = g.rows[0].rut;
+  }
+  var precioHora = _chGetPrecioHora(rutDoc, g.doc);
+  var montoEstimado = precioHora && realUlt > 0 ? realUlt * precioHora : null;
 
   // Evolución
   var evolRows = _ch.cortes.map(function(c){
@@ -11494,7 +11766,9 @@ function _chAbrirJarvis(g){
           {l:'PPT',v:ppt.toFixed(0)+'h',c:'rgba(255,255,255,.95)'},
           {l:'Real',v:realUlt.toFixed(0)+'h',c:dColor==='#16a34a'?'#86efac':dColor==='#dc2626'?'#fca5a5':'#fcd34d'},
           {l:'Delta',v:(delta>0?'+':'')+delta.toFixed(0)+'h',c:dColor==='#16a34a'?'#86efac':dColor==='#dc2626'?'#fca5a5':'#fcd34d'},
-        ].map(function(k){
+        ].concat(precioHora ? [{l:'Valor/h',v:'$'+precioHora.toLocaleString('es-CL'),c:'#fcd34d'}] : [])
+        .concat(montoEstimado ? [{l:'Monto',v:'$'+Math.round(montoEstimado/1e6*10)/10+'M',c:'#86efac'}] : [])
+        .map(function(k){
           return '<div style="text-align:center;padding:8px 14px;background:rgba(255,255,255,.12);border-radius:10px;border:1px solid rgba(255,255,255,.2)">'+
             '<div style="font-size:17px;font-weight:900;color:'+k.c+'">'+k.v+'</div>'+
             '<div style="font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:2px">'+k.l+'</div>'+
@@ -11503,6 +11777,16 @@ function _chAbrirJarvis(g){
         '</div>'+
         '<button onclick="_chCerrarJarvis()" style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.8);font-size:14px;cursor:pointer;flex-shrink:0">✕</button>'+
       '</div>'+
+      
+      // Banner de info si no hay valor hora
+      (!precioHora && _chValoresHora.loaded?
+        '<div style="padding:10px 14px;background:#fef3c7;border-bottom:1px solid #fcd34d;display:flex;align-items:center;gap:8px">'+
+          '<div style="font-size:14px">💡</div>'+
+          '<div style="font-size:10px;color:#92400e">'+
+            '<strong>Valor hora no encontrado</strong> para este docente'+(rutDoc?' (RUT: '+rutDoc+')':'')+'. Verifica que el nombre coincida en ambos archivos.'+
+          '</div>'+
+        '</div>'
+      :'')+
 
       // Body
       '<div style="display:grid;grid-template-columns:1fr 272px;overflow:hidden;flex:1">'+
