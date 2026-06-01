@@ -10474,8 +10474,97 @@ function _adDetDoc(label, rows, yC) {
    · Gráfico lineal: evolución del valor hora por docente
 ──────────────────────────────────────────────────────────────────── */
 
+/* Genera el bloque de filtros (Año + Docente) del módulo Variación de Valor Hora */
+function _adPhoraFiltrosHTML(periodos) {
+  // Detectar años disponibles desde los labels de período
+  var yearsSet = {};
+  periodos.forEach(function(p){
+    var m = String(p).match(/(\d{4})/);
+    if (m) yearsSet[m[1]] = true;
+  });
+  var years = Object.keys(yearsSet).sort();
+
+  // Detectar docentes únicos de todos los períodos
+  var docsSet = {};
+  periodos.forEach(function(p){
+    (_adPeriodos[p]||[]).forEach(function(r){
+      if (!r.phora || r.phora<=0) return;
+      var raw = r.profesor||'';
+      var docs = raw.indexOf('/')>=0 ? raw.split('/').map(function(d){return d.trim();}) : [raw];
+      docs.forEach(function(d){ if(d) docsSet[d] = true; });
+    });
+  });
+  var docs = Object.keys(docsSet).sort();
+
+  var yrCur = _ADN.phoraYear||'';
+  var docCur = _ADN.phoraDocente||'';
+
+  return '<div style="padding:12px 22px;border-bottom:1px solid #21262d;background:#161b22;'+
+    'display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+    '<div style="font-size:11px;font-weight:700;color:#e6edf3">🔎 Filtros del módulo</div>'+
+
+    // Select Año
+    '<div style="display:flex;flex-direction:column;gap:2px">'+
+      '<label style="font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px">Año</label>'+
+      '<select id="adPhoraYear" onchange="_ADN.phoraYear=this.value;_adRender(Object.keys(_adPeriodos||{}))" '+
+        'style="padding:6px 12px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:11px;cursor:pointer;min-width:120px">'+
+        '<option value="">Todos los años</option>'+
+        years.map(function(y){return '<option value="'+esc(y)+'"'+(y===yrCur?' selected':'')+'>'+esc(y)+'</option>';}).join('')+
+      '</select>'+
+    '</div>'+
+
+    // Buscador Docente (datalist con autocomplete)
+    '<div style="display:flex;flex-direction:column;gap:2px">'+
+      '<label style="font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px">Docente</label>'+
+      '<input id="adPhoraDocente" list="adPhoraDocList" type="text" '+
+        'placeholder="Buscar docente…" value="'+esc(docCur)+'" '+
+        'onchange="_ADN.phoraDocente=this.value;_adRender(Object.keys(_adPeriodos||{}))" '+
+        'style="padding:6px 12px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:11px;min-width:240px">'+
+      '<datalist id="adPhoraDocList">'+
+        docs.map(function(d){return '<option value="'+esc(d)+'">';}).join('')+
+      '</datalist>'+
+    '</div>'+
+
+    // Chips activos
+    ((yrCur||docCur)?
+      '<div style="display:flex;gap:6px;margin-left:8px;flex-wrap:wrap">'+
+        (yrCur?'<span style="padding:4px 10px;background:rgba(56,139,253,.15);border:1px solid rgba(56,139,253,.3);border-radius:14px;font-size:10px;font-weight:700;color:#388bfd">📅 '+esc(yrCur)+'</span>':'')+
+        (docCur?'<span style="padding:4px 10px;background:rgba(168,139,250,.15);border:1px solid rgba(168,139,250,.3);border-radius:14px;font-size:10px;font-weight:700;color:#a78bfa">👤 '+esc(abbr(docCur,30))+'</span>':'')+
+      '</div>'
+    :'')+
+
+    // Botón limpiar
+    ((yrCur||docCur)?
+      '<button onclick="_ADN.phoraYear=\'\';_ADN.phoraDocente=\'\';_adRender(Object.keys(_adPeriodos||{}))" '+
+        'style="margin-left:auto;padding:6px 12px;border:1px solid #30363d;background:transparent;color:#8b949e;border-radius:6px;font-size:10px;cursor:pointer">'+
+        '✕ Limpiar filtros'+
+      '</button>'
+    :'')+
+  '</div>';
+}
+
+
 function _adAnalisisPhora(periodos) {
-  if (periodos.length < 2) return '';
+  // ── FILTROS: año y docente (estado en _ADN) ─────────────────
+  var _yrFilt = (_ADN.phoraYear||'').trim();
+  var _docFilt = (_ADN.phoraDocente||'').toLowerCase().trim();
+
+  // Si hay filtro de año, restringir la lista de períodos a los que matchean el año
+  var _periodosFilt = periodos;
+  if (_yrFilt) {
+    _periodosFilt = periodos.filter(function(p){ return String(p).indexOf(_yrFilt)>=0; });
+  }
+
+  if (_periodosFilt.length < 2) {
+    // No hay suficientes períodos para comparar después de filtrar — mostrar mensaje + filtros
+    return _adPhoraFiltrosHTML(periodos) +
+      '<div style="padding:40px 22px;text-align:center;color:#8b949e;font-size:12px;background:#0d1117;border:1px solid #21262d;border-radius:10px;margin:12px 0">'+
+        '<div style="font-size:24px;margin-bottom:8px">🔍</div>'+
+        'Se requieren al menos 2 períodos para comparar variación.'+
+        (_yrFilt?'<br><span style="color:#f0b429">Filtro de año "'+esc(_yrFilt)+'" aplicado — solo '+_periodosFilt.length+' período(s) coinciden.</span>':'')+
+      '</div>';
+  }
+  periodos = _periodosFilt;
 
   // ── Construir índice docente+sigla → {período→phora} ────────
   var idx = {}, metaDoc = {};
@@ -10491,6 +10580,8 @@ function _adAnalisisPhora(periodos) {
       
       // El valor hora es el mismo para todos (no se divide como las horas)
       docentes.forEach(function(doc){
+        // FILTRO: docente — saltar si no coincide
+        if (_docFilt && doc.toLowerCase().indexOf(_docFilt) < 0) return;
         var key = doc + '|||' + r.actCod;
         if (!idx[key]) {
           idx[key] = {};
@@ -10524,6 +10615,14 @@ function _adAnalisisPhora(periodos) {
       historia:periodos.map(function(p){ return idx[k][p]||null; }) };
   }).sort(function(a,b){ return Math.abs(b.deltaPct)-Math.abs(a.deltaPct); });
 
+  // ── Promedios globales para tarjetas estilo NeuroBi ──────────
+  var _valsAnt = keys.map(function(k){return idx[k][p0];}).filter(function(v){return v>0;});
+  var _valsAct = keys.map(function(k){return idx[k][pN];}).filter(function(v){return v>0;});
+  var promAnt = _valsAnt.length ? Math.round(_valsAnt.reduce(function(a,b){return a+b;},0)/_valsAnt.length) : 0;
+  var promAct = _valsAct.length ? Math.round(_valsAct.reduce(function(a,b){return a+b;},0)/_valsAct.length) : 0;
+  var promDelta = promAct - promAnt;
+  var promDeltaPct = promAnt>0 ? promDelta/promAnt*100 : 0;
+
   // ── KPIs ─────────────────────────────────────────────────────
   var nAlza   = items.filter(function(x){ return x.delta>500; }).length;
   var nBaja   = items.filter(function(x){ return x.delta<-500; }).length;
@@ -10554,7 +10653,9 @@ function _adAnalisisPhora(periodos) {
   });
 
   // ── HTML ─────────────────────────────────────────────────────
+  var _filtrosHTML = _adPhoraFiltrosHTML(Object.keys(_adPeriodos||{}));
   var html =
+    _filtrosHTML +
   '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;'+
     'overflow:hidden;margin-bottom:20px">'+
 
@@ -10601,15 +10702,57 @@ function _adAnalisisPhora(periodos) {
   }).join('')+
   '</div>'+
 
-  // ── Gráfico lineal ────────────────────────────────────────────
+  // ── Tarjetas Variación estilo NeuroBi (Anterior / Actual / Variación) ──
   '<div style="padding:18px 22px;border-bottom:1px solid #21262d;background:#0d1117">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px">'+
+      // Período Anterior
+      '<div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:16px 18px">'+
+        '<div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">📅 Período Anterior</div>'+
+        '<div style="display:flex;align-items:flex-end;justify-content:space-between">'+
+          '<div>'+
+            '<div style="font-size:30px;font-weight:900;color:#e6edf3;line-height:1">$'+promAnt.toLocaleString('es-CL')+'</div>'+
+            '<div style="font-size:10px;color:#8b949e;margin-top:4px">'+esc(p0)+' · valor hora prom.</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:2px;align-items:flex-end;height:32px">'+
+            [40,55,48,68].map(function(h){return '<div style="width:6px;height:'+h+'%;background:#484f58;border-radius:1px"></div>';}).join('')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      // Período Actual
+      '<div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:16px 18px">'+
+        '<div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">📅 Período Actual</div>'+
+        '<div style="display:flex;align-items:flex-end;justify-content:space-between">'+
+          '<div>'+
+            '<div style="font-size:30px;font-weight:900;color:#e6edf3;line-height:1">$'+promAct.toLocaleString('es-CL')+'</div>'+
+            '<div style="font-size:10px;color:#8b949e;margin-top:4px">'+esc(pN)+' · valor hora prom.</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:2px;align-items:flex-end;height:32px">'+
+            [50,68,60,85].map(function(h){return '<div style="width:6px;height:'+h+'%;background:#dc2626;border-radius:1px"></div>';}).join('')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      // Variación
+      '<div style="background:'+(promDelta>=0?'rgba(220,38,38,.06)':'rgba(8,145,178,.06)')+';border:1.5px solid '+(promDelta>=0?'#dc2626':'#0891b2')+';border-radius:12px;padding:16px 18px">'+
+        '<div style="font-size:10px;font-weight:700;color:'+(promDelta>=0?'#f87171':'#22d3ee')+';text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">⚡ Variación</div>'+
+        '<div style="font-size:30px;font-weight:900;color:'+(promDelta>=0?'#dc2626':'#0891b2')+';line-height:1">'+
+          (promDelta>=0?'↑':'↓')+Math.abs(promDeltaPct).toFixed(1)+'%'+
+        '</div>'+
+        '<div style="font-size:13px;font-weight:700;color:'+(promDelta>=0?'#f87171':'#22d3ee')+';margin-top:5px">'+
+          (promDelta>=0?'+':'')+'$'+promDelta.toLocaleString('es-CL')+'/hr'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
     '<div style="font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:3px">'+
       '📊 Evolución del Valor Hora por Docente'+
     '</div>'+
-    '<div style="font-size:10px;color:#8b949e;margin-bottom:16px">'+
-      'Top docentes con mayor variación · línea punteada = promedio general'+
+    '<div style="font-size:10px;color:#8b949e;margin-bottom:14px">'+
+      '<span style="color:#dc2626">━ Promedio actual</span> · '+
+      '<span style="color:#6b7280">┅ Referencia período anterior</span> · '+
+      'líneas tenues = top docentes con mayor variación'+
     '</div>'+
-    '<canvas id="adPhoraChart" height="180"></canvas>'+
+    '<div style="position:relative;height:320px;width:100%">'+
+      '<canvas id="adPhoraChart"></canvas>'+
+    '</div>'+
   '</div>'+
 
   // ── Filtros de la tabla ───────────────────────────────────────
@@ -10808,119 +10951,183 @@ function _adDrawPhoraChart(periodos) {
   var canvas = document.getElementById('adPhoraChart');
   if (!canvas) return;
 
-  // Construir dataset: top 8 docentes por variación absoluta + línea promedio
-  var idx = {};
-  var metaDoc = {};
+  // ── FILTROS: año y docente (estado en _ADN) ─────────────────
+  var _yrFilt = (_ADN.phoraYear||'').trim();
+  var _docFilt = (_ADN.phoraDocente||'').toLowerCase().trim();
+  if (_yrFilt) {
+    periodos = periodos.filter(function(p){ return String(p).indexOf(_yrFilt)>=0; });
+  }
+  if (periodos.length < 2) {
+    if (_adCharts.phora) { try{_adCharts.phora.destroy();}catch(e){} _adCharts.phora=null; }
+    return;
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // GRÁFICO ESTILO NeuroBi: 2 series de evolución (Anterior vs Actual)
+  // Cada serie = promedio del valor hora de todos los docentes por período
+  // ════════════════════════════════════════════════════════════════
+  var idx = {}, metaDoc = {};
   periodos.forEach(function(p) {
     (_adPeriodos[p]||[]).forEach(function(r) {
       if (!r.phora || r.phora <= 0) return;
+      // FILTRO docente: aplicar antes de indexar
+      if (_docFilt && String(r.profesor||'').toLowerCase().indexOf(_docFilt) < 0) return;
       var key = r.profesor + '|||' + r.actCod;
       if (!idx[key]) { idx[key] = {}; metaDoc[key] = r; }
       if (!idx[key][p]) idx[key][p] = r.phora;
     });
   });
 
-  var keys = Object.keys(idx).filter(function(k){return Object.keys(idx[k]).length>=2;});
-  if (!keys.length) return;
+  var keys = Object.keys(idx);
+  if (!keys.length) {
+    if (_adCharts.phora) { try{_adCharts.phora.destroy();}catch(e){} _adCharts.phora=null; }
+    return;
+  }
 
-  var p0 = periodos[0], pN = periodos[periodos.length-1];
-  var items = keys.map(function(k){
-    var ph0=idx[k][p0]||0, phN=idx[k][pN]||0;
-    return {key:k, nombre:metaDoc[k].profesor, delta:Math.abs(phN-ph0),
-            historia:periodos.map(function(p){return idx[k][p]||null;})};
-  }).sort(function(a,b){return b.delta-a.delta;}).slice(0,8);
+  var pAnt = periodos[0], pAct = periodos[periodos.length-1];
 
-  // Promedio por período
-  var avgLine = periodos.map(function(p){
-    var vals = keys.filter(function(k){return idx[k][p];}).map(function(k){return idx[k][p];});
+  // Top 8 docentes por variación absoluta entre anclas (para las líneas individuales)
+  var docKeys = keys.filter(function(k){ return idx[k][pAnt]!=null && idx[k][pAct]!=null; });
+  var items = docKeys.map(function(k){
+    return { key:k, nombre:metaDoc[k].profesor,
+             absVar:Math.abs((idx[k][pAct]||0)-(idx[k][pAnt]||0)) };
+  }).sort(function(a,b){ return b.absVar-a.absVar; }).slice(0,8);
+
+  // Eje X: TODOS los períodos (la "evolución" a lo largo del tiempo)
+  // Serie ACTUAL (rojo) = promedio de cada período
+  // Serie ANTERIOR (gris) = línea de referencia del primer período (constante de base)
+  var promPorPeriodo = periodos.map(function(p){
+    var vals = keys.filter(function(k){return idx[k][p]>0;}).map(function(k){return idx[k][p];});
     return vals.length ? Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length) : null;
   });
 
-  var COLORS = ['#2563eb','#10b981','#f59e0b','#7c3aed','#ef4444','#06b6d4','#f97316','#14b8a6'];
-  var tick = '#64748b', lbl = '#374151', grid = 'rgba(148,163,184,.12)';
+  // Base = promedio del primer período (la referencia "anterior")
+  var baseAnt = promPorPeriodo[0];
+  var lineaAnterior = periodos.map(function(){ return baseAnt; });
+
+  var COLORS = ['#2563eb','#10b981','#f59e0b','#7c3aed','#06b6d4','#f97316','#14b8a6','#ec4899'];
+  var tick = '#8b949e', grid = 'rgba(148,163,184,.10)';
 
   if (_adCharts.phora) { try{_adCharts.phora.destroy();}catch(e){} }
 
+  var datasets = [
+    // Serie ACTUAL — promedio general (rojo, gruesa, protagonista)
+    {
+      label: 'Promedio actual',
+      data: promPorPeriodo,
+      borderColor: '#dc2626',
+      backgroundColor: 'rgba(220,38,38,.06)',
+      borderWidth: 3,
+      pointRadius: 4,
+      pointHoverRadius: 7,
+      pointBackgroundColor: '#dc2626',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      tension: 0.35,
+      fill: true,
+      spanGaps: true,
+      order: 1,
+    },
+    // Serie ANTERIOR — referencia base (gris, punteada)
+    {
+      label: 'Referencia (período anterior)',
+      data: lineaAnterior,
+      borderColor: '#6b7280',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [6,4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      tension: 0,
+      spanGaps: true,
+      order: 2,
+    },
+  ];
+
+  // Líneas individuales tenues de los top docentes (contexto)
+  items.forEach(function(it, i){
+    datasets.push({
+      label: abbr(it.nombre, 18),
+      data: periodos.map(function(p){ return idx[it.key][p]||null; }),
+      borderColor: COLORS[i%COLORS.length]+'66',
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      pointRadius: 2,
+      pointHoverRadius: 5,
+      pointBackgroundColor: COLORS[i%COLORS.length],
+      tension: 0.3,
+      spanGaps: true,
+      order: 5,
+      hidden: false,
+    });
+  });
+
   _adCharts.phora = new Chart(canvas, {
     type: 'line',
-    data: {
-      labels: periodos,
-      datasets: items.map(function(x, i) {
-        return {
-          label: abbr(x.nombre, 22),
-          data: x.historia,
-          borderColor: COLORS[i % COLORS.length],
-          backgroundColor: COLORS[i % COLORS.length] + '18',
-          borderWidth: 2.5,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          pointBackgroundColor: COLORS[i % COLORS.length],
-          pointBorderColor: '#fff',
-          pointBorderWidth: 2,
-          tension: 0.3,
-          spanGaps: true,
-        };
-      }).concat([{
-        label: '── Promedio general',
-        data: avgLine,
-        borderColor: '#94a3b8',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6,4],
-        pointRadius: 3,
-        pointBackgroundColor: '#94a3b8',
-        tension: 0.2,
-        spanGaps: true,
-      }]),
-    },
+    data: { labels: periodos, datasets: datasets },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 8, right: 12, bottom: 4, left: 4 } },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          position: 'right',
+          position: 'top',
+          align: 'end',
           labels: {
-            color: lbl, font: { size: 10 }, padding: 10,
-            usePointStyle: true, pointStyleWidth: 8,
-            boxHeight: 8,
+            color: '#cbd5e1', font: { size: 10 }, padding: 10,
+            usePointStyle: true, pointStyleWidth: 10, boxHeight: 8,
+            filter: function(item){
+              // Solo mostrar las 2 series principales en la leyenda
+              return item.text.indexOf('Promedio')>=0 || item.text.indexOf('Referencia')>=0;
+            },
           },
         },
         tooltip: {
-          backgroundColor: 'rgba(15,23,42,.95)',
+          backgroundColor: 'rgba(15,23,42,.96)',
           titleColor: '#f1f5f9', bodyColor: '#cbd5e1',
           borderColor: '#334155', borderWidth: 1,
-          padding: 12, cornerRadius: 8,
+          padding: 11, cornerRadius: 8,
           callbacks: {
-            title: function(items){ return 'Período: '+items[0].label; },
-            label: function(ctx) {
+            title: function(ctx){ return 'Período: '+ctx[0].label; },
+            label: function(ctx){
               if (ctx.raw === null) return null;
-              return ' '+ctx.dataset.label+': $'+Math.round(ctx.raw).toLocaleString('es-CL')+'/hr';
+              var v = '$'+Math.round(ctx.raw).toLocaleString('es-CL')+'/hr';
+              // Para la serie principal, añadir Δ vs base
+              if (ctx.dataset.label === 'Promedio actual' && baseAnt>0) {
+                var d = ctx.raw - baseAnt;
+                var pct = d/baseAnt*100;
+                var s = d>=0?'+':'';
+                return [' '+ctx.dataset.label+': '+v,
+                        ' Δ '+s+'$'+Math.round(d).toLocaleString('es-CL')+' ('+s+pct.toFixed(1)+'%)'];
+              }
+              return ' '+ctx.dataset.label+': '+v;
             },
           },
         },
       },
       scales: {
         x: {
-          ticks: { color: tick, font: { size: 12, weight: '700' } },
-          grid: { color: grid },
-          title: { display: true, text: 'Período académico', color: tick, font: { size: 11 } },
+          ticks: { color: tick, font: { size: 11, weight: '600' }, maxRotation:0, autoSkip:true, maxTicksLimit:8 },
+          grid: { display: false },
+          border: { display: false },
         },
         y: {
           ticks: {
-            color: tick, font: { size: 10 },
-            callback: function(v){ return '$'+Math.round(v).toLocaleString('es-CL'); },
+            color: tick, font: { size: 10 }, maxTicksLimit: 6,
+            callback: function(v){
+              if (v >= 1e6) return '$'+(v/1e6).toFixed(1).replace('.0','')+'M';
+              if (v >= 1e3) return '$'+Math.round(v/1e3)+'k';
+              return '$'+v;
+            },
           },
           grid: { color: grid },
-          title: { display: true, text: 'Valor hora ($)', color: tick, font: { size: 11 } },
+          border: { display: false },
         },
       },
     },
   });
 }
-
-
-
 
 /* ═══════════════════════════════════════════════════════════════════
    PROGRAMAS → INFORME EJECUTIVO
@@ -21025,7 +21232,9 @@ function ofertaAsignar(){
 var _ADN = {
   raw: [], progs: [], program: '', cohort: '', anio: '', periodo: '', status: 'todos',
   search: '', students: [], courses: [], cnames: {}, totalC: 0,
-  fileName: '', selStu: null, charts: {}
+  fileName: '', selStu: null,
+  phoraYear: '', phoraDocente: '',  // Filtros del módulo Variación de Valor Hora
+  charts: {}
 };
 
 function _adnNorm(s){ return String(s||'').trim().replace(/\s+/g,' '); }
