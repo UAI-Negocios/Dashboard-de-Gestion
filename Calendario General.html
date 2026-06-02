@@ -1715,7 +1715,7 @@ const CATS = {
   admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
   control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce','controlhoras','valoreshora'],
   ayuda:        ['manual','faqs'],
-  adn:          ['adnacademico'],
+  adn:          ['adnacademico','finalizados'],
 };
 
 // Display labels for each tab key
@@ -1752,6 +1752,7 @@ const TAB_LABELS = {
   planreporte:   'Reporte Planificaciones',
   manual:       'Manual',
   adnacademico: '🧬 ADN Académico',
+  finalizados:  '📊 Avance Académico',
   faqs:         'FAQs',
 };
 
@@ -2795,7 +2796,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','finalizados'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -2832,6 +2833,7 @@ function refreshView() {
   planreporte:   renderPlanReporte,
     manual:       renderManual,
     adnacademico: renderAdnAcademico,
+    finalizados:  renderAlumnosFinalizados,
     faqs:         renderFAQs,
   };
   (FN[APP.tab]||renderEmpty)();
@@ -21260,6 +21262,32 @@ function _adnG2c(n){
   return 'rgb('+Math.round(255-t*255)+','+Math.round(80+t*149)+','+Math.round(80-t*30)+')';
 }
 
+
+function _adnParseAvance(v){
+  if(v===null||v===undefined||v==='') return null;
+  if(typeof v==='number') return v<=1 ? v*100 : v;
+  var s=String(v).replace('%','').replace(',','.').trim();
+  var n=parseFloat(s); if(isNaN(n)) return null;
+  return n<=1 ? n*100 : n;
+}
+
+function _adnParseNum(v){
+  if(v===null||v===undefined||v==='') return null;
+  if(typeof v==='number') return v;
+  var s=String(v).replace(',','.').trim();
+  var n=parseFloat(s); return isNaN(n)?null:n;
+}
+
+function _adnParseFecha(v){
+  if(!v) return '';
+  if(typeof v==='number'){
+    // Excel serial
+    var d=new Date((v-25569)*86400*1000);
+    if(!isNaN(d)) return d.toISOString().substring(0,10);
+  }
+  return String(v).trim();
+}
+
 function _adnParseExcel(wb){
   var sh=wb.Sheets[wb.SheetNames[0]];
   var js=XLSX.utils.sheet_to_json(sh,{header:1,raw:true});
@@ -21281,7 +21309,33 @@ function _adnParseExcel(wb){
     am:fc(['A. MATERNO','A.MATERNO','A MATERNO']),
     nm:fc(['NOMBRES']), prog:fc(['PROGRAMA']), coh:fc(['COHORTE','COH','AÑO INGRESO']),
     per:fc(['PERIODO ACADEMICO','PERIODO ACADÉMICO','PERIODO','PERIOD','SEMESTRE']),
-    raz:fc(['RAZON INACTIVIDAD','RAZÓN INACTIVIDAD'])
+    raz:fc(['RAZON INACTIVIDAD','RAZÓN INACTIVIDAD','RAZON DE INACTIVIDAD','RAZÓN DE INACTIVIDAD']),
+    // ── Columnas para módulo Alumnos Finalizados ──────────────
+    avance:    fc(['% AVANCE PLAN DE ESTUDIOS','AVANCE PLAN DE ESTUDIOS','% AVANCE']),
+    promGrado: fc(['PROMEDIO GRADO','PROMEDIO DE GRADO','PROM. GRADO']),
+    sede:      fc(['SEDE']),
+    email:     fc(['EMAIL UAI','EMAIL']),
+    emailPers: fc(['EMAIL PERSONAL']),
+    fNac:      fc(['FECHA NACIMIENTO','FECHA DE NACIMIENTO']),
+    fEgreso:   fc(['FECHA DE EGRESO','FECHA EGRESO']),
+    fGrado:    fc(['FECHA DE GRADO','FECHA GRADO']),
+    fInact:    fc(['FECHA INACTIVIDAD','FECHA DE INACTIVIDAD']),
+    comentInact:fc(['COMENTARIO ESTADO DE INACTIVIDAD','COMENTARIO ESTADO INACTIVIDAD']),
+    semCurs:   fc(['SEMESTRES CURSADOS']),
+    credAprob: fc(['CREDITOS APROBADOS','CRÉDITOS APROBADOS']),
+    ppa:       fc(['PPA. EXPEDIENTE','PPA EXPEDIENTE','PPA']),
+    promPond:  fc(['PROMEDIO PONDERADO CAUSAL ELIM.','PROMEDIO PONDERADO']),
+    especialidad:fc(['ESPECIALIDAD']),
+    nacionalidad:fc(['NACIONALIDAD']),
+    pais:      fc(['PAIS','PAÍS']),
+    ciudad:    fc(['CIUDAD']),
+    comuna:    fc(['COMUNA']),
+    direccion: fc(['DIRECCIÓN','DIRECCION']),
+    genero:    fc(['GENERO','GÉNERO','SEXO']),
+    progCond:  fc(['PROG. CONDUCENTE A','PROGRAMA CONDUCENTE A']),
+    reglamento:fc(['REGLAMENTO']),
+    creditosScT:fc(['CRÉDITOS SCT PLAN','CREDITOS SCT PLAN']),
+    horasAcad: fc(['HORAS ACADÉMICAS PLAN','HORAS ACADEMICAS PLAN'])
   };
   if(co.sigla<0||co.id<0){ showToast('Faltan columnas SIGLA o ID EXPEDIENTE','err'); return []; }
   var recs=[];
@@ -21302,7 +21356,33 @@ function _adnParseExcel(wb){
       programa:co.prog>=0?_adnNorm(r[co.prog]):'Sin programa',
       cohorte:co.coh>=0?String(r[co.coh]||'').trim():'',
       periodoAcad:co.per>=0?String(r[co.per]||'').trim():'',
-      razonInactividad:co.raz>=0?_adnNorm(r[co.raz]):''
+      razonInactividad:co.raz>=0?_adnNorm(r[co.raz]):'',
+      // ── Campos para módulo Alumnos Finalizados ─────────────
+      avancePlan: co.avance>=0    ? _adnParseAvance(r[co.avance]) : null,
+      promGrado:  co.promGrado>=0 ? _adnParseNum(r[co.promGrado]) : null,
+      sede:       co.sede>=0      ? _adnNorm(r[co.sede])          : '',
+      emailUai:   co.email>=0     ? _adnNorm(r[co.email])         : '',
+      emailPers:  co.emailPers>=0 ? _adnNorm(r[co.emailPers])     : '',
+      fNac:       co.fNac>=0      ? _adnParseFecha(r[co.fNac])    : '',
+      fEgreso:    co.fEgreso>=0   ? _adnParseFecha(r[co.fEgreso]) : '',
+      fGrado:     co.fGrado>=0    ? _adnParseFecha(r[co.fGrado])  : '',
+      fInact:     co.fInact>=0    ? _adnParseFecha(r[co.fInact])  : '',
+      comentInact:co.comentInact>=0?_adnNorm(r[co.comentInact])   : '',
+      semCurs:    co.semCurs>=0   ? _adnParseNum(r[co.semCurs])   : null,
+      credAprob:  co.credAprob>=0 ? _adnParseNum(r[co.credAprob]) : null,
+      ppa:        co.ppa>=0       ? _adnParseNum(r[co.ppa])       : null,
+      promPond:   co.promPond>=0  ? _adnParseNum(r[co.promPond])  : null,
+      especialidad:co.especialidad>=0?_adnNorm(r[co.especialidad]): '',
+      nacionalidad:co.nacionalidad>=0?_adnNorm(r[co.nacionalidad]): '',
+      pais:       co.pais>=0      ? _adnNorm(r[co.pais])          : '',
+      ciudad:     co.ciudad>=0    ? _adnNorm(r[co.ciudad])        : '',
+      comuna:     co.comuna>=0    ? _adnNorm(r[co.comuna])        : '',
+      direccion:  co.direccion>=0 ? _adnNorm(r[co.direccion])     : '',
+      genero:     co.genero>=0    ? _adnNorm(r[co.genero])        : '',
+      progCond:   co.progCond>=0  ? _adnNorm(r[co.progCond])      : '',
+      reglamento: co.reglamento>=0? _adnNorm(r[co.reglamento])    : '',
+      creditosScT:co.creditosScT>=0?_adnParseNum(r[co.creditosScT]):null,
+      horasAcad:  co.horasAcad>=0 ? _adnParseNum(r[co.horasAcad]) : null
     });
   }
   return recs;
@@ -21364,6 +21444,1032 @@ function _adnDestroyCharts(){
   Object.values(_ADN.charts).forEach(function(ch){try{ch.destroy();}catch(e){}});
   _ADN.charts={};
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AVANCE ACADÉMICO — Auditoría de expedientes con fusión opcional ADN
+   
+   Carga 2 archivos:
+   1. ADN Académico (asignaturas por alumno) — se carga en su módulo
+   2. Expedientes (1 fila por alumno) — se carga AQUÍ
+   
+   Cruce por RUT (fallback: ID EXPEDIENTE).
+   Estado del alumno se calcula de los datos del expediente:
+   · 🟢 Finalizado: ESTADO=CERRADO + AVANCE=100% + razón válida
+   · 🔴 Abandono:   ESTADO=CERRADO pero no cumple los demás
+   · 🟡 En curso:   ESTADO=ACTIVO/VIGENTE
+   · ⚪ Otro:       sin estado claro
+═══════════════════════════════════════════════════════════════════════ */
+
+var _EXP = {
+  raw: [],          // expedientes parseados (1 por alumno)
+  byRut: {},        // índice RUT → expediente
+  byIdExp: {},      // índice ID EXPEDIENTE → expediente
+  fileName: '',
+  loaded: false,
+};
+
+var _FIN = {
+  search: '',
+  filtPrograma: '',
+  filtCohorte: '',
+  filtEstado: '',       // '' | 'finalizado' | 'abandono' | 'enCurso' | 'otro'
+  sortBy: 'nombre',
+  sortDir: 'asc',
+  expanded: {},
+};
+
+var _FIN_RAZONES_VALIDAS = ['diplomado','graduado','termino de curso','término de curso'];
+
+function _normSinTildes(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+function _expClasificarEstado(a){
+  var estado = _normSinTildes(a.estado);
+  var razon = _normSinTildes(a.razonInactividad);
+  var av = a.avancePlan;
+
+  // FINALIZADO: cerrado + 100% + razón válida
+  if (estado === 'cerrado' && av !== null && Math.round(av) === 100) {
+    var razonOk = _FIN_RAZONES_VALIDAS.some(function(v){
+      return _normSinTildes(v) === razon;
+    });
+    if (razonOk) return 'finalizado';
+    return 'abandono';   // cerrado pero no calza con razón válida
+  }
+
+  // ABANDONO: cerrado y NO finalizado
+  if (estado === 'cerrado') return 'abandono';
+
+  // EN CURSO: activo/vigente/regular
+  if (estado === 'activo' || estado === 'vigente' || estado === 'regular' || estado === 'en curso') {
+    return 'enCurso';
+  }
+
+  return 'otro';
+}
+
+function _expEstadoMeta(tipo){
+  switch(tipo){
+    case 'finalizado': return {emoji:'🟢',label:'Finalizado',c:'#10b981',bg:'rgba(16,185,129,.12)'};
+    case 'abandono':   return {emoji:'🔴',label:'Abandono',  c:'#f85149',bg:'rgba(248,81,73,.12)'};
+    case 'enCurso':    return {emoji:'🟡',label:'En curso',  c:'#f0b429',bg:'rgba(240,180,41,.12)'};
+    default:           return {emoji:'⚪',label:'Otro',      c:'#8b949e',bg:'rgba(139,148,158,.10)'};
+  }
+}
+
+/* ── Carga del archivo de Expedientes ─────────────────────────────── */
+function _expHandleFile(file){
+  if (!file) return;
+  var ext = '.'+file.name.split('.').pop().toLowerCase();
+  if (!['.xlsx','.xls','.csv'].includes(ext)) { showToast('Formato no soportado','err'); return; }
+  showToast('Procesando expedientes...','ok');
+
+  var rd = new FileReader();
+  rd.onload = function(e){
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false});
+      var sh = wb.Sheets[wb.SheetNames[0]];
+      var js2 = XLSX.utils.sheet_to_json(sh, {header:1, raw:true, defval:''});
+      if (js2.length < 2) { showToast('Archivo vacío','err'); return; }
+
+      // Normalizar headers: quitar tildes, mayúsculas, sin puntos/signos, espacios colapsados
+      function _normHead(s){
+        return String(s||'')
+          .replace(/^\uFEFF/,'')                              // BOM
+          .replace(/\u00A0/g,' ')                             // espacios no-break
+          .replace(/[\u2018\u2019\u201C\u201D]/g,'')        // comillas tipográficas
+          .toUpperCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // quitar tildes
+          .replace(/[.,;:_\-\u00BA\u00AA]/g,' ')            // signos -> espacio
+          .replace(/\s+/g,' ').trim();
+      }
+
+      // ── Buscar la fila de headers (escaneo de primeras 10 filas) ──
+      // Una fila de headers se identifica si contiene al menos 3 de estas keywords clave
+      var keywords = ['RUT','PROGRAMA','ESTADO','COHORTE','NOMBRES','EXPEDIENTE'];
+      var headerRow = -1;
+      for (var hi=0; hi<Math.min(10, js2.length); hi++){
+        var row = js2[hi] || [];
+        var normRow = row.map(_normHead);
+        var matches = keywords.filter(function(kw){
+          return normRow.some(function(h){ return h===kw; });
+        });
+        if (matches.length >= 3) { headerRow = hi; break; }
+      }
+      if (headerRow < 0) {
+        showToast('No se detectó fila de headers · primera celda: "'+String(js2[0][0]||'').substring(0,40)+'"','err');
+        console.error('Headers no detectados. Primeras 3 filas:', js2.slice(0,3));
+        return;
+      }
+      var hd = (js2[headerRow]||[]).map(_normHead);
+
+      // Log diagnóstico para que el usuario vea los headers detectados
+      console.log('[Avance Académico] Fila de headers detectada en línea '+(headerRow+1));
+      console.log('[Avance Académico] Headers normalizados:', hd);
+
+      // Ajustar el inicio de las filas de datos
+      var DATA_START = headerRow + 1;
+      // Matcher ESTRICTO: solo coincidencia exacta normalizada (sin fuzzy includes que
+      // confunden COMUNA con COMUNA COLEGIO, PROGRAMA con PROG. CONDUCENTE A, etc.)
+      function fc(ns){
+        for (var i=0;i<ns.length;i++){
+          var t = _normHead(ns[i]);
+          for (var j=0;j<hd.length;j++){
+            if (hd[j]===t) return j;
+          }
+        }
+        return -1;
+      }
+
+      var co = {
+        rut:          fc(['RUT']),
+        ap:           fc(['A PATERNO','APELLIDO PATERNO']),
+        am:           fc(['A MATERNO','APELLIDO MATERNO']),
+        nm:           fc(['NOMBRES','NOMBRE']),
+        fNac:         fc(['FECHA NACIMIENTO','FECHA DE NACIMIENTO']),
+        genero:       fc(['GENERO']),
+        sexo:         fc(['SEXO']),
+        emailUai:     fc(['EMAIL UAI']),
+        emailPers:    fc(['EMAIL PERSONAL']),
+        nacionalidad: fc(['NACIONALIDAD']),
+        tipoCol:      fc(['TIPO COLEGIO']),
+        colegio:      fc(['COLEGIO']),
+        comunaCol:    fc(['COMUNA COLEGIO']),
+        pais:         fc(['PAIS']),
+        ciudad:       fc(['CIUDAD']),
+        idExp:        fc(['ID EXPEDIENTE']),
+        prog:         fc(['PROGRAMA']),
+        progCond:     fc(['PROG CONDUCENTE A','PROGRAMA CONDUCENTE A']),
+        idCoh:        fc(['ID COHORTE']),
+        coh:          fc(['COHORTE']),
+        hcs:          fc(['HCS']),
+        estado:       fc(['ESTADO']),
+        razon:        fc(['RAZON DE INACTIVIDAD','RAZON INACTIVIDAD']),
+        comentInact:  fc(['COMENTARIO ESTADO DE INACTIVIDAD','COMENTARIO ESTADO INACTIVIDAD']),
+        fInact:       fc(['FECHA INACTIVIDAD','FECHA DE INACTIVIDAD']),
+        especialidad: fc(['ESPECIALIDAD']),
+        versEsp:      fc(['VERSION ESPECIALIDAD']),
+        sede:         fc(['SEDE']),
+        nombreUAc:    fc(['NOMBRE U ACADEMICA','NOMBRE UNIDAD ACADEMICA']),
+        uAcRamos:     fc(['U ACADEMICA INS DE RAMOS']),
+        promPond:     fc(['PROMEDIO PONDERADO CAUSAL ELIM','PROMEDIO PONDERADO']),
+        avance:       fc(['% AVANCE PLAN DE ESTUDIOS','AVANCE PLAN DE ESTUDIOS']),
+        semCurs:      fc(['SEMESTRES CURSADOS']),
+        direccion:    fc(['DIRECCION']),
+        comuna:       fc(['COMUNA']),
+        fEgreso:      fc(['FECHA DE EGRESO','FECHA EGRESO']),
+        fGrado:       fc(['FECHA DE GRADO','FECHA GRADO']),
+        semAv:        fc(['SEMESTRE AVANCE']),
+        semRec:       fc(['SEMESTRE RECUPERATIVO']),
+        anioMalla:    fc(['ANO MALLA','ANIO MALLA']),
+        perIngreso:   fc(['PERIODO INGRESO']),
+        esInter:      fc(['ES INTERCAMBIO']),
+        idVerMalla:   fc(['ID VERSION MALLA']),
+        credAprob:    fc(['CREDITOS APROBADOS']),
+        numExp:       fc(['NUMERO EXPEDIENTE']),
+        dirSost:      fc(['DIRECCION SOSTENEDOR ECONOMICO']),
+        fIniPer:      fc(['FECHA INICIO PERIODO']),
+        semAdm:       fc(['SEMESTRE ADMISION']),
+        promGrado:    fc(['PROMEDIO GRADO','PROMEDIO DE GRADO']),
+        ppa:          fc(['PPA EXPEDIENTE','PPA']),
+        reglamento:   fc(['REGLAMENTO']),
+        tipoRegl:     fc(['TIPO REGLAMENTO']),
+        fCreaExp:     fc(['FECHA CREACION EXPEDIENTE']),
+        credScT:      fc(['CREDITOS SCT PLAN']),
+        horasAcad:    fc(['HORAS ACADEMICAS PLAN']),
+        fCierre:      fc(['FECHA EFECTIVA CIERRE EXPEDIENTE','FECHA CIERRE EXPEDIENTE','FECHA EFECTIVA CIERRE']),
+      };
+
+      // ── DIAGNÓSTICO: avisar si una columna clave no se encontró ──
+      var faltantes = [];
+      if (co.rut<0) faltantes.push('RUT');
+      if (co.ap<0) faltantes.push('A. PATERNO');
+      if (co.nm<0) faltantes.push('NOMBRES');
+      if (co.prog<0) faltantes.push('PROGRAMA');
+      if (co.estado<0) faltantes.push('ESTADO');
+      if (faltantes.length){
+        console.error('[Avance Académico] Columnas faltantes:', faltantes);
+        console.error('[Avance Académico] Headers detectados (revisa diferencias):', hd);
+        showToast('Faltan: '+faltantes.join(', ')+' · Revisa la consola (F12) para ver headers detectados','err');
+        return;
+      }
+
+      var recs = [];
+      for (var i=DATA_START;i<js2.length;i++){
+        var r = js2[i]; if (!r) continue;
+        var rec = {
+          rut:          co.rut>=0       ? String(r[co.rut]||'').trim() : '',
+          apPaterno:    co.ap>=0        ? _adnNorm(r[co.ap]) : '',
+          apMaterno:    co.am>=0        ? _adnNorm(r[co.am]) : '',
+          nombres:      co.nm>=0        ? _adnNorm(r[co.nm]) : '',
+          fNac:         co.fNac>=0      ? _adnParseFecha(r[co.fNac]) : '',
+          genero:       co.genero>=0    ? _adnNorm(r[co.genero]) : '',
+          sexo:         co.sexo>=0      ? _adnNorm(r[co.sexo]) : '',
+          emailUai:     co.emailUai>=0  ? _adnNorm(r[co.emailUai]) : '',
+          emailPers:    co.emailPers>=0 ? _adnNorm(r[co.emailPers]) : '',
+          nacionalidad: co.nacionalidad>=0?_adnNorm(r[co.nacionalidad]) : '',
+          tipoColegio:  co.tipoCol>=0   ? _adnNorm(r[co.tipoCol]) : '',
+          colegio:      co.colegio>=0   ? _adnNorm(r[co.colegio]) : '',
+          comunaColegio:co.comunaCol>=0 ? _adnNorm(r[co.comunaCol]) : '',
+          pais:         co.pais>=0      ? _adnNorm(r[co.pais]) : '',
+          ciudad:       co.ciudad>=0    ? _adnNorm(r[co.ciudad]) : '',
+          idExpediente: co.idExp>=0     ? String(r[co.idExp]||'').trim() : '',
+          programa:     co.prog>=0      ? _adnNorm(r[co.prog]) : '',
+          progConducente:co.progCond>=0 ? _adnNorm(r[co.progCond]) : '',
+          idCohorte:    co.idCoh>=0     ? String(r[co.idCoh]||'').trim() : '',
+          cohorte:      co.coh>=0       ? String(r[co.coh]||'').trim() : '',
+          hcs:          co.hcs>=0       ? _adnParseNum(r[co.hcs]) : null,
+          estado:       co.estado>=0    ? _adnNorm(r[co.estado]) : '',
+          razonInactividad: co.razon>=0 ? _adnNorm(r[co.razon]) : '',
+          comentInact:  co.comentInact>=0?_adnNorm(r[co.comentInact]) : '',
+          fInactividad: co.fInact>=0    ? _adnParseFecha(r[co.fInact]) : '',
+          especialidad: co.especialidad>=0?_adnNorm(r[co.especialidad]) : '',
+          versionEsp:   co.versEsp>=0   ? _adnNorm(r[co.versEsp]) : '',
+          sede:         co.sede>=0      ? _adnNorm(r[co.sede]) : '',
+          nombreUAcademica: co.nombreUAc>=0 ? _adnNorm(r[co.nombreUAc]) : '',
+          uAcademicaRamos: co.uAcRamos>=0 ? _adnNorm(r[co.uAcRamos]) : '',
+          promPonderado:co.promPond>=0  ? _adnParseNum(r[co.promPond]) : null,
+          avancePlan:   co.avance>=0    ? _adnParseAvance(r[co.avance]) : null,
+          semestresCursados: co.semCurs>=0 ? _adnParseNum(r[co.semCurs]) : null,
+          direccion:    co.direccion>=0 ? _adnNorm(r[co.direccion]) : '',
+          comuna:       co.comuna>=0    ? _adnNorm(r[co.comuna]) : '',
+          fEgreso:      co.fEgreso>=0   ? _adnParseFecha(r[co.fEgreso]) : '',
+          fGrado:       co.fGrado>=0    ? _adnParseFecha(r[co.fGrado]) : '',
+          semestreAvance: co.semAv>=0   ? String(r[co.semAv]||'').trim() : '',
+          semestreRecuperativo: co.semRec>=0 ? String(r[co.semRec]||'').trim() : '',
+          anioMalla:    co.anioMalla>=0 ? String(r[co.anioMalla]||'').trim() : '',
+          periodoIngreso: co.perIngreso>=0 ? String(r[co.perIngreso]||'').trim() : '',
+          esIntercambio: co.esInter>=0  ? _adnNorm(r[co.esInter]) : '',
+          idVersionMalla: co.idVerMalla>=0 ? String(r[co.idVerMalla]||'').trim() : '',
+          creditosAprobados: co.credAprob>=0 ? _adnParseNum(r[co.credAprob]) : null,
+          numeroExpediente: co.numExp>=0 ? String(r[co.numExp]||'').trim() : '',
+          direccionSost:co.dirSost>=0   ? _adnNorm(r[co.dirSost]) : '',
+          fInicioPeriodo: co.fIniPer>=0 ? _adnParseFecha(r[co.fIniPer]) : '',
+          semestreAdm:  co.semAdm>=0    ? String(r[co.semAdm]||'').trim() : '',
+          promGrado:    co.promGrado>=0 ? _adnParseNum(r[co.promGrado]) : null,
+          ppa:          co.ppa>=0       ? _adnParseNum(r[co.ppa]) : null,
+          reglamento:   co.reglamento>=0? _adnNorm(r[co.reglamento]) : '',
+          tipoReglamento: co.tipoRegl>=0? _adnNorm(r[co.tipoRegl]) : '',
+          fCreacionExp: co.fCreaExp>=0  ? _adnParseFecha(r[co.fCreaExp]) : '',
+          creditosScT:  co.credScT>=0   ? _adnParseNum(r[co.credScT]) : null,
+          horasAcademicas: co.horasAcad>=0 ? _adnParseNum(r[co.horasAcad]) : null,
+          fCierreExp:   co.fCierre>=0   ? _adnParseFecha(r[co.fCierre]) : '',
+        };
+        // Filtrar filas vacías (sin RUT y sin ID)
+        if (!rec.rut && !rec.idExpediente) continue;
+        recs.push(rec);
+      }
+
+      if (!recs.length) { showToast('No se encontraron expedientes válidos','err'); return; }
+
+      // ── DEDUPLICACIÓN: agrupar múltiples filas del mismo alumno ───
+      // Un alumno puede tener varios expedientes (diplomados, magíster, distintos programas).
+      // Para la tabla principal mostramos UNA fila por RUT, eligiendo el "mejor" expediente
+      // según prioridad: FINALIZADO > EN CURSO > ABANDONO > OTRO. Si empatan, el más reciente.
+      var dedupMap = {};
+      var byRutAll = {};   // para guardar TODOS los expedientes de cada RUT (cruzar después)
+
+      function _scoreEstado(estado, razon, avance){
+        var est = String(estado||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+        var raz = String(razon||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+        var validas = ['diplomado','graduado','termino de curso'];
+        if (est==='cerrado' && avance!==null && Math.round(avance)===100 && validas.indexOf(raz)>=0) return 4; // finalizado
+        if (est==='activo'||est==='vigente'||est==='regular'||est==='en curso') return 3; // en curso
+        if (est==='cerrado') return 2; // abandono
+        return 1; // otro
+      }
+
+      function _fechaScore(rec){
+        // Devuelve un timestamp para ordenar (más reciente primero)
+        var f = rec.fCierreExp || rec.fGrado || rec.fEgreso || rec.fInactividad || rec.fCreacionExp || '';
+        if (!f) return 0;
+        var d = new Date(f);
+        return isNaN(d) ? 0 : d.getTime();
+      }
+
+      recs.forEach(function(r){
+        var key = r.rut || ('idexp:'+r.idExpediente);
+        if (!byRutAll[key]) byRutAll[key] = [];
+        byRutAll[key].push(r);
+
+        var sc = _scoreEstado(r.estado, r.razonInactividad, r.avancePlan);
+        var fec = _fechaScore(r);
+        var existing = dedupMap[key];
+
+        if (!existing) {
+          dedupMap[key] = Object.assign({}, r, {_score:sc, _fec:fec});
+          return;
+        }
+        // Mantener el de mejor score; si empata, el de fecha más reciente
+        if (sc > existing._score || (sc === existing._score && fec > existing._fec)) {
+          dedupMap[key] = Object.assign({}, r, {_score:sc, _fec:fec});
+        }
+      });
+
+      var dedup = Object.values(dedupMap).map(function(r){
+        // Quitar campos auxiliares
+        delete r._score; delete r._fec;
+        return r;
+      });
+
+      var totalAntes = recs.length, totalDespues = dedup.length;
+      var duplicados = totalAntes - totalDespues;
+
+      _EXP.raw = dedup;
+      _EXP.rawAll = recs;          // dataset completo (sin dedupe) por si se necesita
+      _EXP.byRut = {};
+      _EXP.byIdExp = {};
+      _EXP.byRutAll = byRutAll;    // todos los expedientes por RUT (para mostrar historial)
+      dedup.forEach(function(r){
+        if (r.rut) _EXP.byRut[r.rut] = r;
+        if (r.idExpediente) _EXP.byIdExp[r.idExpediente] = r;
+      });
+      _EXP.fileName = file.name;
+      _EXP.loaded = true;
+
+      // Reset filtros al cargar
+      _FIN.search=''; _FIN.filtPrograma=''; _FIN.filtCohorte=''; _FIN.filtEstado='';
+      _FIN.expanded={};
+
+      var msg = totalDespues+' alumnos únicos cargados';
+      if (duplicados>0) msg += ' (de '+totalAntes+' filas; '+duplicados+' duplicados fusionados)';
+      showToast(msg,'ok');
+      renderAlumnosFinalizados();
+    } catch(err){
+      showToast('Error: '+err.message,'err');
+    }
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* ── Cruce con ADN (asignaturas) por alumno ──────────────────────── */
+function _expGetAsignaturasDeAlumno(expediente){
+  if (!_ADN.raw.length) return [];
+  // Buscar todos los registros del ADN del alumno (por RUT o ID expediente)
+  var todas = _ADN.raw.filter(function(r){
+    if (expediente.rut && r.rut && r.rut.trim() === expediente.rut.trim()) return true;
+    if (expediente.idExpediente && r.idExpediente === expediente.idExpediente) return true;
+    return false;
+  });
+
+  // Deduplicar por sigla: si el alumno cursó la misma asignatura varias veces (recursar),
+  // mantener la mejor nota aprobada, o la más reciente.
+  var bySigla = {};
+  todas.forEach(function(r){
+    var k = (r.sigla||'') + '|' + (r.periodoAcad||'');
+    // Primera clave: sigla + periodo (mismo periodo no debería duplicarse)
+    if (!bySigla[k]) bySigla[k] = r;
+  });
+
+  // Segunda pasada: si una sigla aparece en múltiples periodos, mantener la última aprobada
+  // (o la última cursada si no hay aprobadas)
+  var porSigla = {};
+  Object.values(bySigla).forEach(function(r){
+    var sg = r.sigla||'';
+    if (!porSigla[sg]) { porSigla[sg] = r; return; }
+    var prev = porSigla[sg];
+    var prevAprob = prev.nota!=null && prev.nota>=4;
+    var curAprob  = r.nota!=null && r.nota>=4;
+    // Prioridad: aprobada > reprobada > sin nota
+    if (curAprob && !prevAprob) { porSigla[sg] = r; return; }
+    if (curAprob === prevAprob) {
+      // Misma categoría: mantener la más reciente por periodo
+      var pPrev = String(prev.periodoAcad||'');
+      var pCur  = String(r.periodoAcad||'');
+      if (pCur > pPrev) porSigla[sg] = r;
+    }
+  });
+
+  return Object.values(porSigla);
+}
+
+/* ═══ MAIN RENDER ════════════════════════════════════════════════ */
+function renderAlumnosFinalizados(){
+  var pg = $('page'); if (!pg) return;
+
+  // ── Caso 1: Sin expedientes cargados ─────────────────────────
+  if (!_EXP.loaded){
+    pg.innerHTML =
+      '<div class="pg-title">📊 Avance Académico <span style="font-size:12px;font-weight:500;color:#8b949e;margin-left:8px">Fusión Expediente + Asignaturas</span></div>'+
+
+      // Banner de estado de ADN
+      '<div style="background:'+(_ADN.raw.length?'rgba(16,185,129,.08)':'rgba(240,180,41,.08)')+';border:1px solid '+(_ADN.raw.length?'rgba(16,185,129,.3)':'rgba(240,180,41,.3)')+';border-radius:8px;padding:10px 14px;margin:14px 0;display:flex;align-items:center;gap:10px;font-size:11px">'+
+        '<span style="font-size:16px">'+(_ADN.raw.length?'✅':'⚠️')+'</span>'+
+        '<div style="flex:1">'+
+          '<div style="font-weight:700;color:'+(_ADN.raw.length?'#10b981':'#f0b429')+'">'+
+            (_ADN.raw.length?'ADN Académico cargado':'ADN Académico no cargado (opcional)')+
+          '</div>'+
+          '<div style="color:#8b949e;font-size:10px;margin-top:2px">'+
+            (_ADN.raw.length?
+              _ADN.raw.length+' asignaturas · al expandir un alumno verás sus ramos':
+              'Carga las asignaturas en ADN Académico para ver el detalle de ramos por alumno')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+
+      // Zona de carga del archivo de Expedientes
+      '<div style="background:#161b22;border:2px dashed #30363d;border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s" '+
+        'onclick="document.getElementById(\'expFileInp\').click()" '+
+        'ondragover="event.preventDefault();this.style.borderColor=\'#388bfd\';this.style.background=\'rgba(56,139,253,.04)\'" '+
+        'ondragleave="this.style.borderColor=\'#30363d\';this.style.background=\'#161b22\'" '+
+        'ondrop="event.preventDefault();this.style.borderColor=\'#30363d\';this.style.background=\'#161b22\';_expHandleFile(event.dataTransfer.files[0])">'+
+        '<div style="font-size:48px;margin-bottom:14px">📂</div>'+
+        '<div style="font-size:15px;font-weight:800;color:#e6edf3;margin-bottom:8px">Carga el archivo de Expedientes</div>'+
+        '<div style="font-size:11px;color:#8b949e;line-height:1.6">Excel con columnas: RUT, ESTADO, % AVANCE PLAN DE ESTUDIOS,<br>RAZON DE INACTIVIDAD, PROMEDIO GRADO, etc.</div>'+
+        '<div style="margin-top:14px;padding:6px 16px;background:#388bfd;color:#fff;display:inline-block;border-radius:6px;font-size:11px;font-weight:700">Seleccionar archivo</div>'+
+      '</div>'+
+      '<input type="file" id="expFileInp" accept=".xlsx,.xls,.csv" style="display:none" onchange="if(this.files[0])_expHandleFile(this.files[0])">';
+    return;
+  }
+
+  // ── Caso 2: Expedientes cargados, mostrar tabla ──────────────
+  // Clasificar cada expediente
+  var alumnos = _EXP.raw.map(function(a){
+    return Object.assign({}, a, { _estado: _expClasificarEstado(a) });
+  });
+
+  // KPIs globales por estado
+  var byEstado = { finalizado:0, abandono:0, enCurso:0, otro:0 };
+  alumnos.forEach(function(a){ byEstado[a._estado] = (byEstado[a._estado]||0)+1; });
+
+  // Aplicar filtros
+  var arr = _finAplicarFiltros(alumnos);
+
+  // Stats sobre filtrado
+  var promG = arr.filter(function(a){return a.promGrado!=null;});
+  var promGAvg = promG.length ? promG.reduce(function(s,a){return s+a.promGrado;},0)/promG.length : null;
+  var avgAv = arr.filter(function(a){return a.avancePlan!=null;});
+  var avgAvVal = avgAv.length ? avgAv.reduce(function(s,a){return s+a.avancePlan;},0)/avgAv.length : null;
+  var progsUni = new Set(arr.map(function(a){return a.programa;}).filter(Boolean)).size;
+
+  pg.innerHTML =
+    '<div class="pg-title">📊 Avance Académico <span style="font-size:12px;font-weight:500;color:#8b949e;margin-left:8px">'+_EXP.raw.length+' expedientes</span></div>'+
+
+    // KPIs
+    _expKpisHTML(alumnos.length, byEstado, progsUni, promGAvg, avgAvVal)+
+
+    // Banner estado ADN
+    '<div style="background:'+(_ADN.raw.length?'rgba(16,185,129,.06)':'rgba(139,148,158,.06)')+';border:1px solid '+(_ADN.raw.length?'rgba(16,185,129,.25)':'#21262d')+';border-radius:8px;padding:8px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:11px">'+
+      '<span style="font-size:14px">'+(_ADN.raw.length?'🧬':'⚪')+'</span>'+
+      '<div style="flex:1;color:#8b949e">'+
+        (_ADN.raw.length?
+          'ADN Académico cargado · '+_ADN.raw.length+' asignaturas disponibles para detalle expandido':
+          'ADN Académico no cargado · el detalle no incluirá los ramos del alumno')+
+      '</div>'+
+      '<button onclick="_EXP.loaded=false;_EXP.raw=[];_EXP.byRut={};_EXP.byIdExp={};renderAlumnosFinalizados()" '+
+        'style="padding:4px 10px;border:1px solid #30363d;background:transparent;color:#8b949e;border-radius:5px;font-size:10px;cursor:pointer">'+
+        '📂 Cargar otro archivo'+
+      '</button>'+
+    '</div>'+
+
+    // Filtros
+    _expFiltrosBarHTML(alumnos)+
+
+    // Tabla
+    _expTablaHTML(arr)+
+
+    // Footer
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#0d1117;border:1px solid #21262d;border-top:none;border-radius:0 0 10px 10px;font-size:11px;color:#8b949e">'+
+      '<div>Mostrando <strong style="color:#e6edf3">'+arr.length+'</strong> de <strong style="color:#e6edf3">'+alumnos.length+'</strong> alumnos</div>'+
+      '<button onclick="_expExportar()" style="padding:6px 14px;background:#388bfd;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📥 Exportar Excel</button>'+
+    '</div>';
+
+  window._EXPCurrent = arr;
+}
+
+function _expKpisHTML(total, byEstado, progsUni, promGAvg, avgAvVal){
+  var cards = [
+    {ico:'👥',lbl:'Total Alumnos',val:total,c:'#388bfd',bg:'rgba(56,139,253,.06)'},
+    {ico:'🟢',lbl:'Finalizados',val:byEstado.finalizado||0,sub:'cierre efectivo',c:'#10b981',bg:'rgba(16,185,129,.08)'},
+    {ico:'🟡',lbl:'En curso',val:byEstado.enCurso||0,sub:'activos',c:'#f0b429',bg:'rgba(240,180,41,.08)'},
+    {ico:'🔴',lbl:'Abandono',val:byEstado.abandono||0,sub:'cerrados sin grado',c:'#f85149',bg:'rgba(248,81,73,.08)'},
+    {ico:'📚',lbl:'Programas',val:progsUni,c:'#a78bfa',bg:'rgba(167,139,250,.06)'},
+  ];
+  if (promGAvg!=null) cards.push({ico:'🏆',lbl:'Prom. Grado',val:promGAvg.toFixed(2),sub:'media filtrados',c:'#f59e0b',bg:'rgba(245,158,11,.06)'});
+  if (avgAvVal!=null) cards.push({ico:'📈',lbl:'Avance prom.',val:avgAvVal.toFixed(1)+'%',sub:'media filtrados',c:'#22d3ee',bg:'rgba(34,211,238,.06)'});
+
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0">'+
+    cards.map(function(k){
+      return '<div style="background:'+k.bg+';border:1px solid #21262d;border-left:3px solid '+k.c+';border-radius:10px;padding:12px 14px">'+
+        '<div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">'+k.ico+' '+k.lbl+'</div>'+
+        '<div style="font-size:22px;font-weight:900;color:'+k.c+';line-height:1">'+k.val+'</div>'+
+        (k.sub?'<div style="font-size:9px;color:#8b949e;margin-top:3px">'+k.sub+'</div>':'')+
+      '</div>';
+    }).join('')+
+  '</div>';
+}
+
+function _finAplicarFiltros(arr){
+  var q = (_FIN.search||'').toLowerCase().trim();
+  var fp = (_FIN.filtPrograma||'').toLowerCase();
+  var fc = (_FIN.filtCohorte||'').toString();
+  var fe = (_FIN.filtEstado||'');
+
+  var out = arr.filter(function(a){
+    if (fe && a._estado !== fe) return false;
+    if (fp && (a.programa+'').toLowerCase() !== fp) return false;
+    if (fc && String(a.cohorte||'').trim() !== String(fc).trim()) return false;
+    if (q){
+      var hay = (a.rut||'').toLowerCase().indexOf(q)>=0 ||
+                (a.apPaterno||'').toLowerCase().indexOf(q)>=0 ||
+                (a.apMaterno||'').toLowerCase().indexOf(q)>=0 ||
+                (a.nombres||'').toLowerCase().indexOf(q)>=0 ||
+                (a.programa||'').toLowerCase().indexOf(q)>=0 ||
+                (a.idExpediente||'').toLowerCase().indexOf(q)>=0;
+      if (!hay) return false;
+    }
+    return true;
+  });
+
+  var dir = _FIN.sortDir==='desc' ? -1 : 1;
+  out.sort(function(a,b){
+    var va, vb;
+    switch(_FIN.sortBy){
+      case 'programa': va=a.programa||''; vb=b.programa||''; break;
+      case 'cohorte':  va=a.cohorte||'';  vb=b.cohorte||'';  break;
+      case 'avance':   va=a.avancePlan||0; vb=b.avancePlan||0; break;
+      case 'promedio': va=a.promGrado||0;  vb=b.promGrado||0;  break;
+      case 'estado':   va=a._estado||'';   vb=b._estado||''; break;
+      default: va=(a.apPaterno||'')+' '+(a.nombres||''); vb=(b.apPaterno||'')+' '+(b.nombres||'');
+    }
+    if (va<vb) return -1*dir;
+    if (va>vb) return 1*dir;
+    return 0;
+  });
+  return out;
+}
+
+function _expFiltrosBarHTML(all){
+  var progs = [...new Set(all.map(function(a){return a.programa;}).filter(Boolean))].sort();
+  var cohortes = [...new Set(all.map(function(a){return String(a.cohorte||'').trim();}).filter(Boolean))];
+  // Ordenar: si todas son numéricas, numérico; si no, alfabético
+  var allNum = cohortes.every(function(c){return /^\d+$/.test(c);});
+  if (allNum) cohortes.sort(function(a,b){return parseInt(b)-parseInt(a);}); // más reciente primero
+  else cohortes.sort();
+
+  var sel = 'padding:6px 10px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:11px;cursor:pointer';
+  var inp = 'padding:6px 12px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3;font-size:11px;min-width:260px';
+  var lbl = 'font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:block';
+
+  var estadoOpts = [
+    {v:'',label:'Todos los estados'},
+    {v:'finalizado',label:'🟢 Finalizado'},
+    {v:'enCurso',label:'🟡 En curso'},
+    {v:'abandono',label:'🔴 Abandono'},
+    {v:'otro',label:'⚪ Otro'},
+  ];
+
+  return '<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px">'+
+
+    '<div><label style="'+lbl+'">🔍 Buscar</label>'+
+      '<input id="expSearchInp" type="text" placeholder="RUT, apellido, nombre, programa o ID expediente..." value="'+esc(_FIN.search)+'" '+
+        'oninput="_FIN.search=this.value;clearTimeout(window._finT);window._finT=setTimeout(renderAlumnosFinalizados,180);" '+
+        'style="'+inp+'"></div>'+
+
+    '<div><label style="'+lbl+'">Estado</label>'+
+      '<select onchange="_FIN.filtEstado=this.value;renderAlumnosFinalizados()" style="'+sel+'">'+
+        estadoOpts.map(function(o){return '<option value="'+esc(o.v)+'"'+(_FIN.filtEstado===o.v?' selected':'')+'>'+o.label+'</option>';}).join('')+
+      '</select></div>'+
+
+    '<div><label style="'+lbl+'">Programa ('+progs.length+')</label>'+
+      '<select onchange="_FIN.filtPrograma=this.value;renderAlumnosFinalizados()" style="'+sel+';max-width:240px">'+
+        '<option value="">Todos los programas</option>'+
+        progs.map(function(p){
+          var n = all.filter(function(a){return (a.programa||'')===p;}).length;
+          return '<option value="'+esc(p)+'"'+(_FIN.filtPrograma===p?' selected':'')+'>'+esc(abbr(p,32))+' ('+n+')</option>';
+        }).join('')+
+      '</select></div>'+
+
+    '<div><label style="'+lbl+'">Cohorte ('+cohortes.length+')</label>'+
+      '<select onchange="_FIN.filtCohorte=this.value;renderAlumnosFinalizados()" style="'+sel+'">'+
+        '<option value="">Todas las cohortes</option>'+
+        cohortes.map(function(p){
+          // Contar alumnos en esa cohorte
+          var n = all.filter(function(a){return String(a.cohorte||'')===String(p);}).length;
+          return '<option value="'+esc(p)+'"'+(String(_FIN.filtCohorte)===String(p)?' selected':'')+'>'+esc(p)+' ('+n+')</option>';
+        }).join('')+
+      '</select></div>'+
+
+    ((_FIN.search||_FIN.filtPrograma||_FIN.filtCohorte||_FIN.filtEstado)?
+      '<button onclick="_FIN.search=\'\';_FIN.filtPrograma=\'\';_FIN.filtCohorte=\'\';_FIN.filtEstado=\'\';renderAlumnosFinalizados()" '+
+        'style="padding:7px 12px;border:1px solid #30363d;background:transparent;color:#8b949e;border-radius:6px;font-size:10px;cursor:pointer;margin-left:auto">'+
+        '✕ Limpiar'+
+      '</button>'
+    :'')+
+  '</div>';
+}
+
+function _finTh(key, label, align){
+  var active = _FIN.sortBy===key;
+  var arrow = active ? (_FIN.sortDir==='asc'?' ▲':' ▼') : '';
+  return '<th style="padding:9px 12px;font-size:9px;font-weight:700;color:'+(active?'#388bfd':'#8b949e')+';text-transform:uppercase;letter-spacing:.3px;'+
+    'text-align:'+(align||'left')+';cursor:pointer;user-select:none;border-bottom:2px solid #21262d;background:#0d1117;white-space:nowrap" '+
+    'onclick="_finSort(\''+key+'\')">'+label+arrow+'</th>';
+}
+
+function _finSort(key){
+  if (_FIN.sortBy===key) _FIN.sortDir = _FIN.sortDir==='asc'?'desc':'asc';
+  else { _FIN.sortBy = key; _FIN.sortDir = 'asc'; }
+  renderAlumnosFinalizados();
+}
+
+function _finToggleRow(key){
+  _FIN.expanded[key] = !_FIN.expanded[key];
+  renderAlumnosFinalizados();
+}
+
+function _expTablaHTML(arr){
+  var S = 'padding:8px 12px;font-size:11px;color:#e6edf3;border-bottom:1px solid #161b22;vertical-align:top';
+  var THfix = 'padding:9px 12px;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #21262d;background:#0d1117;white-space:nowrap';
+
+  return '<div style="background:#161b22;border:1px solid #21262d;border-radius:10px 10px 0 0;overflow:auto;max-height:62vh">'+
+    '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<thead style="position:sticky;top:0;z-index:1">'+
+      '<tr>'+
+        '<th style="padding:9px 8px;background:#0d1117;border-bottom:2px solid #21262d;width:24px"></th>'+
+        _finTh('nombre',  'Alumno')+
+        '<th style="'+THfix+';text-align:left">RUT</th>'+
+        _finTh('cohorte',     'Cohorte','center')+
+        '<th style="'+THfix+';text-align:center">Periodo Ingreso</th>'+
+        _finTh('avance',      '% Avance','center')+
+        '<th style="'+THfix+';text-align:center">Fecha Grado</th>'+
+        '<th style="'+THfix+';text-align:center">Fecha Cierre</th>'+
+        _finTh('estado',      'Estado','center')+
+        '<th style="'+THfix+';text-align:left">Razón Inactividad</th>'+
+        _finTh('programa',    'Programa')+
+      '</tr>'+
+    '</thead>'+
+    '<tbody>'+
+      arr.map(function(a, i){
+        var rowKey = a.rut || a.idExpediente || ('row'+i);
+        var expandido = _FIN.expanded[rowKey];
+        var bg = i%2 ? 'transparent' : 'rgba(255,255,255,.012)';
+
+        var em = _expEstadoMeta(a._estado);
+        var av = a.avancePlan;
+        var avPct = av!=null ? Math.round(av) : null;
+        var barColor = avPct>=100 ? '#10b981' : avPct>=60 ? '#22d3ee' : avPct>=30 ? '#f0b429' : '#f85149';
+
+        // Color de la razón
+        var razLow = (a.razonInactividad||'').toLowerCase();
+        var razC = '#8b949e';
+        if (razLow.indexOf('graduado')>=0) razC = '#10b981';
+        else if (razLow.indexOf('diplomado')>=0) razC = '#388bfd';
+        else if (razLow.indexOf('termino')>=0||razLow.indexOf('término')>=0) razC = '#a78bfa';
+        else if (razLow.indexOf('aband')>=0||razLow.indexOf('elimin')>=0) razC = '#f85149';
+
+        var row =
+          '<tr style="background:'+bg+';cursor:pointer" onclick="_finToggleRow(\''+esc(rowKey).replace(/\'/g,"\\'")+'\')">'+
+            // Indicador expandir
+            '<td style="'+S+';text-align:center;color:#8b949e;font-size:10px">'+(expandido?'▼':'▶')+'</td>'+
+
+            // Alumno
+            '<td style="'+S+'">'+
+              '<div style="font-weight:700;color:#f0f6ff;display:flex;align-items:center;gap:6px">'+
+                '<span>'+esc(a.apPaterno)+' '+esc(a.apMaterno)+'</span>'+
+                (function(){
+                  var k=a.rut||('idexp:'+a.idExpediente);
+                  var n=(_EXP.byRutAll&&_EXP.byRutAll[k])?_EXP.byRutAll[k].length:1;
+                  return n>1?'<span style="padding:1px 6px;background:rgba(56,139,253,.15);color:#388bfd;border-radius:8px;font-size:9px;font-weight:700" title="'+n+' expedientes">📂'+n+'</span>':'';
+                })()+
+              '</div>'+
+              '<div style="font-size:10px;color:#8b949e;margin-top:2px">'+esc(a.nombres)+'</div>'+
+            '</td>'+
+
+            // RUT
+            '<td style="'+S+';font-family:monospace;color:#8b949e;font-size:10px">'+esc(a.rut||'—')+'</td>'+
+
+            // Cohorte
+            '<td style="'+S+';text-align:center;font-weight:700;color:#22d3ee">'+esc(a.cohorte||'—')+'</td>'+
+
+            // Periodo Ingreso
+            '<td style="'+S+';text-align:center;color:#e6edf3">'+esc(a.periodoIngreso||'—')+'</td>'+
+
+            // % Avance
+            '<td style="'+S+';text-align:center">'+
+              (avPct!==null?
+                '<div style="display:flex;align-items:center;justify-content:center;gap:6px">'+
+                  '<div style="width:50px;height:5px;background:#21262d;border-radius:3px;overflow:hidden">'+
+                    '<div style="height:100%;width:'+Math.min(avPct,100)+'%;background:'+barColor+';border-radius:3px"></div>'+
+                  '</div>'+
+                  '<span style="font-weight:700;color:'+barColor+';font-size:11px;min-width:36px;text-align:right">'+avPct+'%</span>'+
+                '</div>'
+              :'<span style="color:#6e7681">—</span>')+
+            '</td>'+
+
+            // Fecha Grado
+            '<td style="'+S+';text-align:center;color:'+(a.fGrado?'#10b981':'#6e7681')+';font-size:10px;font-family:monospace">'+
+              esc(a.fGrado||'—')+'</td>'+
+
+            // Fecha Cierre Efectiva
+            '<td style="'+S+';text-align:center;color:'+(a.fCierreExp?'#a78bfa':'#6e7681')+';font-size:10px;font-family:monospace">'+
+              esc(a.fCierreExp||'—')+'</td>'+
+
+            // Estado
+            '<td style="'+S+';text-align:center">'+
+              '<span style="display:inline-block;padding:3px 9px;background:'+em.bg+';color:'+em.c+';border-radius:11px;font-size:10px;font-weight:700;white-space:nowrap">'+em.emoji+' '+em.label+'</span>'+
+            '</td>'+
+
+            // Razón Inactividad
+            '<td style="'+S+';text-transform:capitalize">'+
+              (a.razonInactividad?
+                '<span style="color:'+razC+';font-weight:600">'+esc(a.razonInactividad)+'</span>'
+              :'<span style="color:#6e7681">—</span>')+
+            '</td>'+
+
+            // Programa
+            '<td style="'+S+'" title="'+esc(a.programa)+'">'+
+              '<div style="font-size:11px;color:#e6edf3">'+esc(abbr(a.programa,38))+'</div>'+
+              (a.sede?'<div style="font-size:9px;color:#8b949e;margin-top:1px">🏛 '+esc(a.sede)+'</div>':'')+
+            '</td>'+
+          '</tr>';
+
+        if (expandido){
+          row += _expFilaDetalle(a, S, rowKey);
+        }
+        return row;
+      }).join('')+
+    '</tbody></table>'+
+    (arr.length===0?
+      '<div style="padding:40px;text-align:center;color:#6e7681;font-size:12px">'+
+        '<div style="font-size:24px;margin-bottom:10px">🔍</div>'+
+        'No hay resultados con los filtros aplicados'+
+      '</div>'
+    :'')+
+  '</div>';
+}
+
+
+function _expFilaDetalle(a, S, rowKey){
+  var nombreCompleto = ((a.nombres||'')+' '+(a.apPaterno||'')+' '+(a.apMaterno||'')).trim();
+  var em = _expEstadoMeta(a._estado);
+  var lblS = 'font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;display:block';
+  var valS = 'font-size:11px;color:#f0f6ff;font-weight:500;word-break:break-word';
+
+  function f(lbl, val, mono){
+    var v = (val==null||val===''||val===undefined) ? '—' : String(val);
+    return '<div style="padding:6px 0">'+
+      '<span style="'+lblS+'">'+lbl+'</span>'+
+      '<span style="'+valS+(mono?';font-family:monospace':'')+'">'+esc(v)+'</span>'+
+    '</div>';
+  }
+
+  // Cruzar con ADN para obtener asignaturas
+  var asignaturas = _expGetAsignaturasDeAlumno(a);
+  var aprobadas = asignaturas.filter(function(r){return r.nota!=null && r.nota>=4;}).length;
+  var reprobadas = asignaturas.filter(function(r){return r.nota!=null && r.nota<4;}).length;
+  var enCursoR = asignaturas.filter(function(r){return r.nota==null;}).length;
+
+  return '<tr style="background:#0d1117"><td colspan="11" style="padding:14px 24px;border-bottom:2px solid #21262d">'+
+    '<div style="background:#161b22;border:1px solid #21262d;border-radius:8px;overflow:hidden">'+
+
+      // Header del detalle
+      '<div style="background:linear-gradient(135deg,'+em.bg+',rgba(13,17,23,.6));padding:14px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #21262d">'+
+        '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,'+em.c+',#22d3ee);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff">'+
+          esc(((a.nombres||'')[0]||'')+((a.apPaterno||'')[0]||''))+
+        '</div>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:15px;font-weight:800;color:#f0f6ff">'+esc(nombreCompleto)+'</div>'+
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Expediente #'+esc(a.idExpediente||'—')+' · '+esc(a.programa||'')+'</div>'+
+        '</div>'+
+        '<span style="padding:6px 14px;background:'+em.bg+';color:'+em.c+';border-radius:14px;font-size:11px;font-weight:800">'+em.emoji+' '+em.label+'</span>'+
+      '</div>'+
+
+      // Grid con todas las secciones
+      '<div style="padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 24px">'+
+
+        // Identificación
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#388bfd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">👤 Identificación</div>'+
+          f('RUT', a.rut, true)+
+          f('Nombres', a.nombres)+
+          f('Apellido paterno', a.apPaterno)+
+          f('Apellido materno', a.apMaterno)+
+          f('Fecha nacimiento', a.fNac)+
+          f('Género / Sexo', (a.genero||'')+(a.sexo?' / '+a.sexo:''))+
+          f('Nacionalidad', a.nacionalidad)+
+        '</div>'+
+
+        // Contacto
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">📧 Contacto</div>'+
+          f('Email UAI', a.emailUai, true)+
+          f('Email Personal', a.emailPers, true)+
+          f('Dirección', a.direccion)+
+          f('Comuna', a.comuna)+
+          f('País / Ciudad', (a.pais||'')+(a.ciudad?' / '+a.ciudad:''))+
+          f('Dirección Sostenedor Econ.', a.direccionSost)+
+        '</div>'+
+
+        // Colegio de procedencia
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">🏫 Procedencia</div>'+
+          f('Tipo Colegio', a.tipoColegio)+
+          f('Colegio', a.colegio)+
+          f('Comuna Colegio', a.comunaColegio)+
+        '</div>'+
+
+        // Programa
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#10b981;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">🎓 Programa</div>'+
+          f('Programa', a.programa)+
+          f('Conducente a', a.progConducente)+
+          f('Especialidad', a.especialidad)+
+          f('Versión Especialidad', a.versionEsp)+
+          f('Sede', a.sede)+
+          f('Cohorte', a.cohorte)+
+          f('ID Cohorte', a.idCohorte, true)+
+          f('Periodo Ingreso', a.periodoIngreso)+
+          f('Año Malla', a.anioMalla)+
+          f('Semestre Admisión', a.semestreAdm)+
+          f('Es intercambio', a.esIntercambio)+
+        '</div>'+
+
+        // Académico
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#f0b429;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">📊 Avance</div>'+
+          f('% Avance Plan', a.avancePlan!=null?a.avancePlan.toFixed(1)+'%':null)+
+          f('Semestres Cursados', a.semestresCursados)+
+          f('Semestre Avance', a.semestreAvance)+
+          f('Semestre Recuperativo', a.semestreRecuperativo)+
+          f('Créditos Aprobados', a.creditosAprobados)+
+          f('Créditos SCT Plan', a.creditosScT)+
+          f('Horas Académicas Plan', a.horasAcademicas)+
+          f('HCS', a.hcs)+
+        '</div>'+
+
+        // Calificaciones
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">🏆 Calificaciones</div>'+
+          f('Promedio Grado', a.promGrado!=null?a.promGrado.toFixed(2):null)+
+          f('PPA Expediente', a.ppa!=null?a.ppa.toFixed(2):null)+
+          f('Prom. Pond. Causal Elim.', a.promPonderado!=null?a.promPonderado.toFixed(2):null)+
+        '</div>'+
+
+        // Estado y cierre
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:'+em.c+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">🏁 Estado y Cierre</div>'+
+          f('Estado', a.estado)+
+          f('Razón inactividad', a.razonInactividad)+
+          f('Comentario inact.', a.comentInact)+
+          f('Fecha inactividad', a.fInactividad)+
+          f('Fecha egreso', a.fEgreso)+
+          f('Fecha grado', a.fGrado)+
+          f('Fecha efectiva cierre', a.fCierreExp)+
+          f('Fecha inicio periodo', a.fInicioPeriodo)+
+          f('Fecha creación exp.', a.fCreacionExp)+
+        '</div>'+
+
+        // Administrativo
+        '<div>'+
+          '<div style="font-size:10px;font-weight:800;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">📋 Administrativo</div>'+
+          f('ID Expediente', a.idExpediente, true)+
+          f('Número Expediente', a.numeroExpediente, true)+
+          f('ID Versión Malla', a.idVersionMalla, true)+
+          f('Reglamento', a.reglamento)+
+          f('Tipo Reglamento', a.tipoReglamento)+
+          f('Nombre U. Académica', a.nombreUAcademica)+
+          f('U. Acad. Ins. Ramos', a.uAcademicaRamos)+
+        '</div>'+
+      '</div>'+
+
+      // ── Otros expedientes del mismo alumno (si los hay) ──────
+      (function(){
+        var key = a.rut || ('idexp:'+a.idExpediente);
+        var todos = (_EXP.byRutAll && _EXP.byRutAll[key]) || [];
+        if (todos.length <= 1) return '';
+        // Mostrar los OTROS (que no son el canónico)
+        var otros = todos.filter(function(r){ return r.idExpediente !== a.idExpediente; });
+        if (!otros.length) return '';
+        return '<div style="padding:14px 18px;border-top:1px solid #21262d;background:rgba(56,139,253,.04)">'+
+          '<div style="font-size:11px;font-weight:800;color:#388bfd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">'+
+            '📂 Otros expedientes del alumno ('+otros.length+')'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px">'+
+            otros.map(function(o){
+              var emO = _expEstadoMeta(_expClasificarEstado(o));
+              return '<div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px 12px">'+
+                '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+                  '<span style="font-family:monospace;font-size:9px;color:#8b949e">Exp. #'+esc(o.idExpediente||'—')+'</span>'+
+                  '<span style="padding:2px 8px;background:'+emO.bg+';color:'+emO.c+';border-radius:8px;font-size:9px;font-weight:700">'+emO.emoji+' '+emO.label+'</span>'+
+                '</div>'+
+                '<div style="font-size:11px;color:#e6edf3;font-weight:600;margin-bottom:3px">'+esc(abbr(o.programa||'—',40))+'</div>'+
+                '<div style="font-size:10px;color:#8b949e">'+
+                  'Cohorte '+esc(o.cohorte||'—')+' · '+
+                  'Avance '+(o.avancePlan!=null?Math.round(o.avancePlan)+'%':'—')+' · '+
+                  'Prom '+(o.promGrado!=null?o.promGrado.toFixed(2):'—')+
+                '</div>'+
+                (o.razonInactividad?'<div style="font-size:9px;color:#8b949e;margin-top:3px;font-style:italic">🏁 '+esc(o.razonInactividad)+'</div>':'')+
+              '</div>';
+            }).join('')+
+          '</div>'+
+        '</div>';
+      })()+
+
+      // ── Asignaturas (cruce con ADN) ──────────────────────────
+      '<div style="padding:14px 18px;border-top:1px solid #21262d;background:rgba(13,17,23,.4)">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+          '<div style="font-size:11px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:.5px">🧬 Asignaturas del alumno (ADN)</div>'+
+          (asignaturas.length>0?
+            '<div style="font-size:10px;color:#8b949e">'+
+              '<span style="color:#10b981;font-weight:700">'+aprobadas+' aprobadas</span> · '+
+              '<span style="color:#f85149;font-weight:700">'+reprobadas+' reprobadas</span> · '+
+              '<span style="color:#f0b429;font-weight:700">'+enCursoR+' sin nota</span> · '+
+              '<span style="color:#e6edf3;font-weight:700">'+asignaturas.length+' total</span>'+
+            '</div>'
+          :'')+
+        '</div>'+
+        (asignaturas.length>0?
+          _expAsignaturasTablaHTML(asignaturas)
+        :
+          '<div style="padding:20px;text-align:center;color:#6e7681;font-size:11px;background:#0d1117;border:1px dashed #21262d;border-radius:6px">'+
+            (_ADN.raw.length?
+              'No se encontraron asignaturas para este alumno en el ADN cargado':
+              'Carga el archivo de asignaturas en ADN Académico para ver el detalle de ramos'
+            )+
+          '</div>')+
+      '</div>'+
+
+    '</div>'+
+  '</td></tr>';
+}
+
+function _expAsignaturasTablaHTML(asigs){
+  // Ordenar por periodo académico desc, luego sigla
+  asigs.sort(function(a,b){
+    var pa=a.periodoAcad||'', pb=b.periodoAcad||'';
+    if (pa!==pb) return pb.localeCompare(pa);
+    return (a.sigla||'').localeCompare(b.sigla||'');
+  });
+
+  var tdS = 'padding:6px 10px;font-size:10px;color:#e6edf3;border-bottom:1px solid #21262d';
+  var thS = 'padding:7px 10px;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #30363d;background:#0d1117';
+
+  return '<div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;overflow:auto;max-height:280px">'+
+    '<table style="width:100%;border-collapse:collapse">'+
+      '<thead style="position:sticky;top:0;z-index:1"><tr>'+
+        '<th style="'+thS+';text-align:left">Sigla</th>'+
+        '<th style="'+thS+';text-align:left">Asignatura</th>'+
+        '<th style="'+thS+';text-align:center">Periodo</th>'+
+        '<th style="'+thS+';text-align:center">Estado</th>'+
+        '<th style="'+thS+';text-align:center">Nota</th>'+
+      '</tr></thead>'+
+      '<tbody>'+
+        asigs.map(function(r){
+          var notaColor = '#6e7681';
+          var notaTxt = '—';
+          if (r.nota!=null){
+            notaColor = r.nota>=6 ? '#10b981' : r.nota>=5 ? '#22d3ee' : r.nota>=4 ? '#f0b429' : '#f85149';
+            notaTxt = r.nota.toFixed(1);
+          }
+          var estLow = (r.estado||'').toLowerCase();
+          var estBg, estC;
+          if (estLow.indexOf('aprob')>=0) { estBg='rgba(16,185,129,.12)'; estC='#10b981'; }
+          else if (estLow.indexOf('reprob')>=0) { estBg='rgba(248,81,73,.12)'; estC='#f85149'; }
+          else if (estLow.indexOf('pendiente')>=0||estLow.indexOf('curso')>=0) { estBg='rgba(240,180,41,.12)'; estC='#f0b429'; }
+          else { estBg='rgba(139,148,158,.08)'; estC='#8b949e'; }
+
+          return '<tr>'+
+            '<td style="'+tdS+';font-family:monospace;color:#a78bfa;font-weight:700">'+esc(r.sigla||'')+'</td>'+
+            '<td style="'+tdS+'" title="'+esc(r.nombreAsig||'')+'">'+esc(abbr(r.nombreAsig||'',46))+'</td>'+
+            '<td style="'+tdS+';text-align:center;color:#22d3ee">'+esc(r.periodoAcad||'—')+'</td>'+
+            '<td style="'+tdS+';text-align:center">'+
+              '<span style="padding:2px 8px;background:'+estBg+';color:'+estC+';border-radius:8px;font-size:9px;font-weight:700">'+esc(r.estado||'—')+'</span>'+
+            '</td>'+
+            '<td style="'+tdS+';text-align:center;font-weight:800;color:'+notaColor+'">'+notaTxt+'</td>'+
+          '</tr>';
+        }).join('')+
+      '</tbody>'+
+    '</table>'+
+  '</div>';
+}
+
+function _expExportar(){
+  if (typeof XLSX==='undefined' || !window._EXPCurrent) return;
+  var rows = window._EXPCurrent.map(function(a){
+    var em = _expEstadoMeta(a._estado);
+    return {
+      'ESTADO CALCULADO':em.label,
+      'RUT':a.rut, 'A. PATERNO':a.apPaterno, 'A. MATERNO':a.apMaterno, 'NOMBRES':a.nombres,
+      'PROGRAMA':a.programa, 'COHORTE':a.cohorte, 'SEDE':a.sede,
+      'ESTADO':a.estado, 'RAZON DE INACTIVIDAD':a.razonInactividad,
+      '% AVANCE PLAN':a.avancePlan, 'PROMEDIO GRADO':a.promGrado, 'PPA':a.ppa,
+      'SEMESTRES CURSADOS':a.semestresCursados, 'CREDITOS APROBADOS':a.creditosAprobados,
+      'FECHA EGRESO':a.fEgreso, 'FECHA GRADO':a.fGrado, 'FECHA CIERRE':a.fCierreExp,
+      'FECHA INACTIVIDAD':a.fInactividad, 'COMENTARIO INACT.':a.comentInact,
+      'ID EXPEDIENTE':a.idExpediente, 'NÚMERO EXPEDIENTE':a.numeroExpediente,
+      'EMAIL UAI':a.emailUai, 'EMAIL PERSONAL':a.emailPers,
+      'ESPECIALIDAD':a.especialidad, 'REGLAMENTO':a.reglamento,
+    };
+  });
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Avance Académico');
+  XLSX.writeFile(wb, 'AvanceAcademico_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Exportado · '+rows.length+' alumnos','ok');
+}
+
 
 function renderAdnAcademico(){
   var pg=$('page'); if(!pg) return;
