@@ -21408,7 +21408,12 @@ function _adnProcess(){
     var k=r.idExpediente;
     if(!map[k]) map[k]={id:k,rut:r.rut||k,apPaterno:r.apPaterno,apMaterno:r.apMaterno,nombres:r.nombres,periodos:new Set(),
       fullName:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' '),
-      cohorte:r.cohorte,cursos:{},razon:''};
+      cohorte:r.cohorte,cursos:{},razon:'',periodoIngreso:''};
+    // Capturar periodoIngreso del expediente cruzado (si está cargado)
+    if (!map[k].periodoIngreso && typeof _EXP!=='undefined' && _EXP.loaded){
+      var exp = (r.rut && _EXP.byRut[r.rut.trim()]) || (r.idExpediente && _EXP.byIdExp[r.idExpediente]);
+      if (exp && exp.periodoIngreso) map[k].periodoIngreso = exp.periodoIngreso;
+    }
     if(r.periodoAcad) map[k].periodos.add(r.periodoAcad);
     var ri=r.razonInactividad;
     if(ri==='Abandono') map[k].razon='Abandono';
@@ -22332,6 +22337,46 @@ function _expFilaDetalle(a, S, rowKey){
           f('Nombre U. Académica', a.nombreUAcademica)+
           f('U. Acad. Ins. Ramos', a.uAcademicaRamos)+
         '</div>'+
+
+        // ── Primeros 10 cursos (columna integrada en el grid) ─────
+        (function(){
+          // Cruzar con ADN para obtener las asignaturas
+          var asigs = _expGetAsignaturasDeAlumno(a);
+          if (!asigs.length) return '';
+          var primeros = _primerosCursosAlumno(asigs, a.periodoIngreso||'', 10);
+          if (!primeros.length) return '';
+
+          function badge(comp){
+            var cfg = {
+              igual:     {ico:'🟢',c:'#10b981',bg:'rgba(16,185,129,.15)'},
+              posterior: {ico:'🟡',c:'#f0b429',bg:'rgba(240,180,41,.15)'},
+              anterior:  {ico:'🔴',c:'#f85149',bg:'rgba(248,81,73,.15)'},
+              sinData:   {ico:'⚪',c:'#8b949e',bg:'rgba(139,148,158,.10)'},
+            }[comp] || {ico:'⚪',c:'#8b949e',bg:'transparent'};
+            return '<span title="'+(comp==='igual'?'Coincide con período de ingreso':comp==='posterior'?'Posterior al ingreso':comp==='anterior'?'Anterior al ingreso':'Sin dato')+'" style="font-size:9px">'+cfg.ico+'</span>';
+          }
+
+          return '<div>'+
+            '<div style="font-size:10px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #21262d">📚 Primeros 10 cursos</div>'+
+            (a.periodoIngreso?
+              '<div style="font-size:8px;color:#8b949e;margin-bottom:6px">Ingreso: <strong style="color:#e6edf3;font-family:monospace">'+esc(a.periodoIngreso)+'</strong></div>'
+            :'<div style="font-size:8px;color:#6e7681;margin-bottom:6px;font-style:italic">Sin período de ingreso</div>')+
+            '<div style="display:flex;flex-direction:column;gap:3px">'+
+            primeros.map(function(c, i){
+              var nc = (c.nota!=null && c.nota>0) ? (c.nota>=4 ? '#10b981' : '#f85149') : '#8b949e';
+              var notaTxt = c.nota!=null && c.nota>0 ? c.nota.toFixed(1) : '—';
+              return '<div style="display:grid;grid-template-columns:14px 1fr auto auto 14px;gap:5px;align-items:center;padding:3px 5px;background:rgba(56,139,253,.04);border-radius:4px">'+
+                '<div style="font-size:7px;color:#6e7681;text-align:center">'+(i+1)+'</div>'+
+                '<div style="font-size:9px;color:#e6edf3;font-family:monospace;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(c.nombre||c.sigla)+'">'+esc(c.sigla||'—')+'</div>'+
+                '<div style="font-size:8px;color:#8b949e;font-family:monospace">'+esc(c.periodo||'—')+'</div>'+
+                '<div style="font-size:9px;font-weight:800;color:'+nc+';min-width:18px;text-align:right">'+notaTxt+'</div>'+
+                badge(c.comparacion)+
+              '</div>';
+            }).join('')+
+            '</div>'+
+          '</div>';
+        })()+
+
       '</div>'+
 
       // ── Otros expedientes del mismo alumno (si los hay) ──────
@@ -22844,6 +22889,124 @@ function _adnRenderHM(st){
 }
 
 
+
+/* ── HELPER: Primeros N cursos de un alumno + comparación con periodo ingreso ── */
+function _periodoKey(p){
+  // Convierte "2023-1", "2023/1", "2023 1" → 20231 numérico para ordenar
+  if(!p) return 9999999;
+  var m = String(p).match(/(\d{4})\D+(\d{1,2})/);
+  if(m) return parseInt(m[1])*10 + parseInt(m[2]);
+  m = String(p).match(/(\d{4})/);
+  if(m) return parseInt(m[1])*10;
+  return 9999999;
+}
+
+function _compararPeriodos(pCurso, pIngreso){
+  // Devuelve 'igual' | 'posterior' | 'anterior' | 'sinData'
+  if(!pCurso || !pIngreso) return 'sinData';
+  var pc = String(pCurso).trim(), pi = String(pIngreso).trim();
+  if(pc === pi) return 'igual';
+  var kc = _periodoKey(pc), ki = _periodoKey(pi);
+  if(kc === ki) return 'igual';
+  return kc > ki ? 'posterior' : 'anterior';
+}
+
+function _primerosCursosAlumno(asignaturas, periodoIngreso, n){
+  // Ordena por periodoAcad ascendente y devuelve los N primeros
+  // asignaturas: array de objetos del ADN raw o cursos del student
+  if(!asignaturas || !asignaturas.length) return [];
+  var arr = asignaturas.slice().sort(function(a,b){
+    var pa = a.periodoAcad || a.periodo || '';
+    var pb = b.periodoAcad || b.periodo || '';
+    return _periodoKey(pa) - _periodoKey(pb);
+  }).slice(0, n||10);
+  return arr.map(function(r){
+    var periodoCurso = r.periodoAcad || r.periodo || '';
+    return {
+      sigla: r.sigla || '',
+      nombre: r.nombreAsig || r.nombre || '',
+      periodo: periodoCurso,
+      nota: r.nota != null ? r.nota : null,
+      estado: r.estado || '',
+      comparacion: _compararPeriodos(periodoCurso, periodoIngreso),
+    };
+  });
+}
+
+function _renderPrimerosCursosHTML(asignaturas, periodoIngreso, opts){
+  opts = opts || {};
+  var darkMode = opts.darkMode !== false;
+  var primeros = _primerosCursosAlumno(asignaturas, periodoIngreso, 10);
+  if (!primeros.length) return '';
+
+  var conPeriodo = primeros.filter(function(c){return c.periodo;});
+  if (!conPeriodo.length) return '';
+
+  // Estadísticas de comparación
+  var nIgual     = primeros.filter(function(c){return c.comparacion==='igual';}).length;
+  var nPosterior = primeros.filter(function(c){return c.comparacion==='posterior';}).length;
+  var nAnterior  = primeros.filter(function(c){return c.comparacion==='anterior';}).length;
+
+  // Estilos según tema
+  var P = darkMode ? {
+    bg:'rgba(0,20,40,.4)', border:'rgba(0,100,150,.15)',
+    titulo:'rgba(0,150,255,.5)', label:'rgba(150,200,255,.7)',
+    val:'#e8f4ff', sub:'rgba(100,150,200,.5)',
+    rowBg:'rgba(0,80,150,.08)', rowBorder:'rgba(0,80,150,.15)',
+  } : {
+    bg:'#f8fafc', border:'#e5e7eb',
+    titulo:'#374151', label:'#6b7280',
+    val:'#111827', sub:'#9ca3af',
+    rowBg:'#ffffff', rowBorder:'#e5e7eb',
+  };
+
+  function badge(comp){
+    var cfg = {
+      igual:     {ico:'🟢',txt:'Coincide',c:'#10b981',bg:'rgba(16,185,129,.15)'},
+      posterior: {ico:'🟡',txt:'Posterior',c:'#f0b429',bg:'rgba(240,180,41,.15)'},
+      anterior:  {ico:'🔴',txt:'Anterior', c:'#f85149',bg:'rgba(248,81,73,.15)'},
+      sinData:   {ico:'⚪',txt:'Sin dato', c:'#8b949e',bg:'rgba(139,148,158,.10)'},
+    }[comp] || {ico:'⚪',txt:'—',c:'#8b949e',bg:'transparent'};
+    return '<span style="padding:2px 7px;background:'+cfg.bg+';color:'+cfg.c+';border-radius:8px;font-size:8px;font-weight:700;white-space:nowrap">'+cfg.ico+' '+cfg.txt+'</span>';
+  }
+
+  return '<div style="background:'+P.bg+';border:1px solid '+P.border+';border-radius:10px;padding:12px;margin-top:10px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'+
+      '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:'+P.titulo+'">📚 PRIMEROS 10 CURSOS · INICIO DE LA TRAYECTORIA</div>'+
+      (periodoIngreso?
+        '<div style="font-size:9px;color:'+P.label+'">Ingreso: <strong style="color:'+P.val+';font-family:monospace">'+esc(periodoIngreso)+'</strong></div>'
+      :'<div style="font-size:9px;color:'+P.sub+';font-style:italic">Sin período de ingreso registrado</div>')+
+    '</div>'+
+
+    (periodoIngreso?
+      '<div style="display:flex;gap:8px;margin-bottom:10px;font-size:9px">'+
+        '<span style="padding:2px 7px;background:rgba(16,185,129,.12);color:#10b981;border-radius:8px;font-weight:700">🟢 '+nIgual+' coinciden</span>'+
+        (nPosterior?'<span style="padding:2px 7px;background:rgba(240,180,41,.12);color:#f0b429;border-radius:8px;font-weight:700">🟡 '+nPosterior+' posteriores</span>':'')+
+        (nAnterior?'<span style="padding:2px 7px;background:rgba(248,81,73,.12);color:#f85149;border-radius:8px;font-weight:700">🔴 '+nAnterior+' anteriores</span>':'')+
+      '</div>'
+    :'')+
+
+    '<div style="display:flex;flex-direction:column;gap:4px">'+
+    primeros.map(function(c, i){
+      var nc = (c.nota!=null && c.nota>0) ?
+        (c.nota>=4 ? '#10b981' : '#f85149') : P.sub;
+      var notaTxt = c.nota!=null && c.nota>0 ? c.nota.toFixed(1) :
+                    c.estado ? (c.estado.length>3?c.estado.substring(0,3):c.estado) : '—';
+      return '<div style="display:grid;grid-template-columns:18px 1fr auto auto auto;gap:8px;align-items:center;padding:5px 8px;background:'+P.rowBg+';border:1px solid '+P.rowBorder+';border-radius:6px">'+
+        '<div style="font-size:8px;font-weight:700;color:'+P.sub+';text-align:center">'+(i+1)+'</div>'+
+        '<div style="min-width:0">'+
+          '<div style="font-size:10px;font-weight:700;color:'+P.val+';font-family:monospace">'+esc(c.sigla||'—')+'</div>'+
+          (c.nombre?'<div style="font-size:8px;color:'+P.label+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px" title="'+esc(c.nombre)+'">'+esc(c.nombre)+'</div>':'')+
+        '</div>'+
+        '<div style="font-size:9px;color:'+P.label+';font-family:monospace">'+esc(c.periodo||'—')+'</div>'+
+        '<div style="font-size:10px;font-weight:800;color:'+nc+';min-width:24px;text-align:right">'+notaTxt+'</div>'+
+        badge(c.comparacion)+
+      '</div>';
+    }).join('')+
+    '</div>'+
+  '</div>';
+}
+
 function adnOpenDet(id){
   var s=_ADN.students.find(function(x){return x.id===id;});
   if(!s) return;
@@ -23017,6 +23180,27 @@ function adnOpenDet(id){
             }).join('')
           : '<div style="font-size:11px;color:rgba(100,150,200,.4);text-align:center;padding:20px">Sin notas registradas</div>')+
         '</div>'+
+
+        // ── Primeros 10 cursos (cronológico) ─────────────────
+        (function(){
+          // Construir lista desde el historial (todas las instancias) o cursos (canónico)
+          var asigArr = [];
+          if (s.historial){
+            Object.entries(s.historial).forEach(function(e){
+              var sig = e[0];
+              e[1].forEach(function(it){
+                asigArr.push({
+                  sigla: sig,
+                  nombreAsig: _ADN.cnames[sig] || '',
+                  periodoAcad: it.periodo || '',
+                  nota: it.nota,
+                  estado: it.estado || '',
+                });
+              });
+            });
+          }
+          return _renderPrimerosCursosHTML(asigArr, s.periodoIngreso||'', {darkMode:true});
+        })()+
 
         // Alertas
         '<div style="background:rgba(0,20,40,.4);border:1px solid rgba(0,100,150,.15);border-radius:10px;padding:12px">'+
