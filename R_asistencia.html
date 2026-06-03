@@ -1,826 +1,1316 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia por Curso - Gestión Completa</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
-        body { background: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .header { background: linear-gradient(135deg, #1e3c72, #2b4c7c); color: white; padding: 1rem 1.5rem; border-radius: 24px; margin-bottom: 25px; }
-        .header h1 { margin: 0; font-size: 1.8rem; }
-        .header p { margin: 5px 0 0; opacity: 0.9; }
-        .global-message { background: #e6f7e6; border-left: 6px solid #2c6e9e; padding: 12px 18px; border-radius: 20px; margin-bottom: 25px; font-weight: 500; display: none; }
-        .global-message.success { background: #dff0e5; color: #0e5e2e; border-left-color: #2c6e9e; }
-        .global-message.warning { background: #ffe0b5; color: #a45d00; border-left-color: #e67e22; }
-        .global-message.error { background: #ffe5e5; color: #b00020; border-left-color: #c95a5a; }
-        .kpi-grid { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
-        .kpi-card { background: white; border-radius: 20px; padding: 18px 22px; flex: 1 1 200px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border-left: 6px solid #2b4c7c; }
-        .kpi-card h3 { margin: 0 0 8px; font-size: 0.9rem; color: #4a5568; text-transform: uppercase; }
-        .kpi-value { font-size: 2.2rem; font-weight: 700; color: #1e3c72; }
-        .badge { font-size: 0.8rem; background: #e2e8f0; border-radius: 30px; padding: 4px 10px; display: inline-block; margin-top: 8px; }
-        .panel { background: white; border-radius: 24px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .panel-title { font-size: 1.4rem; font-weight: 600; margin-bottom: 18px; border-left: 5px solid #2b4c7c; padding-left: 15px; }
-        .form-row { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; margin-bottom: 15px; }
-        .form-group { flex: 1; min-width: 150px; }
-        .form-group label { display: block; font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; }
-        input, select { width: 100%; padding: 8px 12px; border-radius: 30px; border: 1px solid #ccc; }
-        .dias-check { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px 6px; text-align: center; vertical-align: middle; }
-        th { background: #eef2f7; font-weight: 600; }
-        button, .file-label { background: #2c6e9e; border: none; color: white; padding: 8px 16px; border-radius: 40px; cursor: pointer; font-weight: 500; margin: 5px 5px 0 0; display: inline-block; font-size: 0.85rem; }
-        button:hover, .file-label:hover { background: #1e4a6e; }
-        .file-label { background: #4a6f8f; cursor: pointer; }
-        input[type="file"] { display: none; }
-        .heatmap-container { overflow-x: auto; margin-top: 20px; }
-        canvas#heatmapChart { max-height: 600px; width: 100%; }
-        .leyenda { display: flex; justify-content: center; gap: 20px; margin-top: 15px; }
-        .leyenda span { display: inline-block; width: 20px; height: 20px; margin-right: 5px; border-radius: 4px; }
-        .selector-curso { background: #f8fafc; padding: 12px; border-radius: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .selector-curso label { font-weight: 600; }
-        #cursosLista { flex: 1; min-width: 200px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asistencia · Plataforma de Registro por Curso</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f5f2ea; --paper-2:#efe9dc; --card:#fffdf8; --ink:#16202a; --ink-soft:#41505d;
+  --line:#ddd5c5; --line-strong:#c9bfa9;
+  --accent:#0d6e63; --accent-soft:#e3f0ed; --accent-ink:#0a4f47;
+  --ok:#1f7a52; --ok-bg:#d9efe1; --warn:#a96510; --warn-bg:#f8e9cf; --bad:#a83a3a; --bad-bg:#f6dcdc;
+  --online:#2c6e9e; --online-bg:#dcebf5;
+  --shadow:0 1px 2px rgba(22,32,42,.06),0 8px 24px -12px rgba(22,32,42,.18);
+  --r:14px; --r-sm:9px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(1200px 600px at 110% -10%, #fbf7ee 0%, transparent 60%),
+    var(--paper);
+  color:var(--ink); font-family:'IBM Plex Sans',sans-serif; font-size:14px; line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0}
+button{font-family:inherit}
+a{color:var(--accent-ink)}
+
+/* layout */
+.app{display:grid; grid-template-columns:248px 1fr; min-height:100vh}
+.side{
+  background:var(--ink); color:#e9eef2; padding:22px 16px; position:sticky; top:0; height:100vh;
+  display:flex; flex-direction:column; gap:6px;
+}
+.brand{display:flex; gap:11px; align-items:center; padding:4px 8px 18px}
+.brand .mark{
+  width:38px;height:38px;border-radius:11px;flex:none;
+  background:linear-gradient(150deg,var(--accent),#0a4f47);
+  display:grid;place-items:center;font-size:20px;box-shadow:0 4px 14px -4px rgba(13,110,99,.7)
+}
+.brand .name{font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:.2px;line-height:1.1}
+.brand .sub{font-size:11px;color:#8ea0ac;letter-spacing:.5px;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.nav button{
+  display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border:none;
+  color:#bcc7cf;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13.5px;font-weight:500;transition:.15s
+}
+.nav button .ic{width:18px;text-align:center;font-size:15px}
+.nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav button.active{background:var(--accent);color:#fff;box-shadow:0 6px 16px -8px rgba(13,110,99,.9)}
+.side-foot{margin-top:auto;font-size:11px;color:#7f919d;padding:12px 8px 2px;border-top:1px solid rgba(255,255,255,.08)}
+.save-pill{display:flex;align-items:center;gap:8px;font-size:12px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.05);margin-bottom:10px}
+.save-dot{width:8px;height:8px;border-radius:50%;background:#5fd29b;flex:none}
+.save-dot.saving{background:#f4c64a;animation:pulse 1s infinite}
+.save-dot.error{background:#ec6a6a}
+@keyframes pulse{50%{opacity:.3}}
+
+.main{padding:26px 30px 70px;max-width:1280px}
+.topbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;margin-bottom:22px}
+.course-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 8px 8px 16px;box-shadow:var(--shadow)}
+.course-pick label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);font-weight:600}
+.course-pick select{font-size:14.5px;font-weight:600;border:none;background:transparent;color:var(--ink);max-width:340px;padding:4px 2px;cursor:pointer}
+.course-pick select:focus{outline:none}
+
+h2.page-title{font-family:'Fraunces',serif;font-weight:600;font-size:27px;letter-spacing:.2px}
+.page-title small{display:block;font-family:'IBM Plex Sans';font-size:13px;font-weight:400;color:var(--ink-soft);margin-top:3px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#fff;border:none;padding:9px 15px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{background:var(--accent-ink)}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-strong)}
+.btn.ghost:hover{background:var(--paper-2)}
+.btn.subtle{background:var(--accent-soft);color:var(--accent-ink)}
+.btn.subtle:hover{background:#d2e7e2}
+.btn.danger{background:var(--bad)}
+.btn.danger:hover{background:#8e2f2f}
+.btn.sm{padding:6px 11px;font-size:12px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* cards / panels */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:20px 22px;margin-bottom:20px}
+.card h3{font-size:15px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:9px;margin-bottom:4px}
+.card .hint{color:var(--ink-soft);font-size:12.5px;margin:2px 0 16px}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent)}
+.kpi.ok::before{background:var(--ok)} .kpi.warn::before{background:var(--warn)} .kpi.bad::before{background:var(--bad)}
+.kpi .k-label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-soft);font-weight:600}
+.kpi .k-val{font-family:'Fraunces',serif;font-weight:600;font-size:32px;line-height:1.1;margin-top:6px}
+.kpi .k-sub{font-size:11.5px;color:var(--ink-soft);margin-top:4px}
+
+/* forms */
+.grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.field label{display:block;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:9px;background:#fff;font-family:inherit;font-size:13.5px;color:var(--ink)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dias{display:flex;flex-wrap:wrap;gap:8px}
+.dias label{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line-strong);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer;font-weight:500}
+.dias label:has(input:checked){background:var(--accent);color:#fff;border-color:var(--accent)}
+.dias input{accent-color:#fff}
+
+/* calendario de asistencia */
+.asist-layout{display:grid;grid-template-columns:360px 1fr;gap:24px;align-items:start}
+.cal{background:#fff;border:1px solid var(--line-strong);border-radius:13px;padding:14px 14px 12px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-head .m{font-weight:700;font-size:14.5px;text-transform:capitalize;font-family:'Fraunces',serif}
+.cal-nav{display:flex;gap:6px}
+.cal-nav button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line-strong);background:var(--card);cursor:pointer;font-size:15px;line-height:1;color:var(--ink)}
+.cal-nav button:hover{background:var(--paper-2)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-grid .dow{text-align:center;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;padding-bottom:4px}
+.cal-day{position:relative;aspect-ratio:1;border:1px solid transparent;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--ink);user-select:none}
+.cal-day:hover{background:var(--paper-2)}
+.cal-day.other{color:#c4bda9}
+.cal-day.clase{border-color:var(--accent);color:var(--accent-ink);font-weight:600;background:var(--accent-soft)}
+.cal-day.sel{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)}
+.cal-day.today{box-shadow:0 0 0 2px var(--warn) inset}
+.cal-day .dot{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--ok)}
+.cal-day.sel .dot{background:#fff}
+.cal-legend{margin-top:11px;display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft)}
+.cal-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+#fechaSelTitle{margin-bottom:12px;font-size:15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+@media(max-width:760px){.asist-layout{grid-template-columns:1fr}.cal{max-width:380px}}
+
+/* tables */
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:11px;max-height:560px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{position:sticky;top:0;background:var(--paper-2);z-index:2;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);font-weight:700;padding:10px 12px;text-align:left;border-bottom:1px solid var(--line-strong);white-space:nowrap}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fbf9f3}
+table select,table input{padding:6px 8px;border:1px solid var(--line-strong);border-radius:7px;font-family:inherit;font-size:12.5px;background:#fff}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:30px;font-size:11.5px;font-weight:600}
+.tag.ok{background:var(--ok-bg);color:var(--ok)} .tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)} .tag.on{background:var(--online-bg);color:var(--online)}
+.tag.muted{background:var(--paper-2);color:var(--ink-soft)}
+.empty{padding:34px;text-align:center;color:var(--ink-soft);font-size:13px}
+
+/* heatmap */
+.hm-wrap{overflow:auto;border:1px solid var(--line);border-radius:11px;max-height:520px}
+.hm{border-collapse:separate;border-spacing:0;font-size:11px}
+.hm th.name,.hm td.name{position:sticky;left:0;background:var(--card);text-align:left;min-width:170px;max-width:170px;border-right:1px solid var(--line-strong);font-weight:500;font-size:12px;z-index:3}
+.hm thead th{position:sticky;top:0;background:var(--paper-2);font-size:10px;white-space:nowrap;padding:6px 5px;text-align:center;z-index:2}
+.hm thead th.name{z-index:4}
+.hm td.cell{width:26px;height:26px;text-align:center;padding:0;border:1px solid #fff;cursor:default}
+.hm-leg{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--ink-soft)}
+.hm-leg span{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:6px;vertical-align:-2px}
+
+/* charts */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.chart-box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px 20px}
+.chart-box h3{margin-bottom:14px;font-size:14px}
+.chart-canvas{position:relative;height:260px}
+
+/* toast */
+#toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:10px;z-index:9999;max-width:360px}
+.toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:11px;font-size:13px;box-shadow:0 12px 30px -10px rgba(0,0,0,.4);display:flex;gap:10px;align-items:flex-start;animation:slidein .25s ease}
+.toast.ok{background:#16513c}.toast.warn{background:#7a4a0c}.toast.error{background:#7a2626}
+@keyframes slidein{from{transform:translateY(12px);opacity:0}}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(22,32,42,.42);backdrop-filter:blur(2px);display:none;place-items:center;z-index:9000;padding:20px}
+.modal-bg.show{display:grid}
+.modal{background:var(--card);border-radius:18px;box-shadow:0 30px 70px -20px rgba(0,0,0,.45);width:100%;max-width:520px;animation:slidein .2s ease;max-height:90vh;overflow:auto}
+.modal-h{padding:20px 24px 0}
+.modal-h h3{font-family:'Fraunces',serif;font-weight:600;font-size:20px}
+.modal-h p{color:var(--ink-soft);font-size:13px;margin:6px 0 0}
+.modal-b{padding:18px 24px}
+.modal-f{padding:14px 24px 22px;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.modal .grid-form{grid-template-columns:1fr 1fr}
+
+.notice{background:var(--accent-soft);border:1px solid #bcdcd5;color:var(--accent-ink);border-radius:11px;padding:12px 15px;font-size:12.5px;display:flex;gap:10px;align-items:flex-start;margin-bottom:18px}
+.notice .ic{font-size:16px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.fileinput{display:none}
+.snap-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:13px}
+.muted-txt{color:var(--ink-soft);font-size:12px}
+.hidden{display:none!important}
+
+@media(max-width:880px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px}
+  .brand{padding:4px}.side-foot,.save-pill{display:none}
+  .nav{flex-direction:row;flex-wrap:wrap;margin:0}
+  .nav button{padding:8px 12px}
+  .charts,.split{grid-template-columns:1fr}
+  .main{padding:18px}
+}
+</style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>📋 ASISTENCIA POR CURSO - MAPA DE CALOR</h1>
-        <p>✅ Regla: 75% asistencia + distribución Presencial/Online según tipo (Normal o Región)</p>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">▦</div>
+      <div>
+        <div class="name">Asistencia</div>
+        <div class="sub">Registro por curso</div>
+      </div>
     </div>
-    <div id="globalMessage" class="global-message"></div>
+    <nav class="nav" id="nav">
+      <button data-tab="asistencia" class="active"><span class="ic">📝</span> Registrar</button>
+      <button data-tab="alumnos"><span class="ic">👥</span> Alumnos</button>
+      <button data-tab="resumen"><span class="ic">📊</span> Resumen</button>
+      <button data-tab="reportes"><span class="ic">📈</span> Reportes</button>
+      <button data-tab="config"><span class="ic">📅</span> Configuración</button>
+      <button data-tab="datos"><span class="ic">💾</span> Datos y respaldo</button>
+    </nav>
+    <div class="side-foot">
+      <div class="save-pill"><span class="save-dot" id="saveDot"></span><span id="saveTxt">Guardado</span></div>
+      Datos guardados en este navegador.<br>Para no perderlos nunca, vincula un archivo en <b>Datos y respaldo</b>.
+    </div>
+  </aside>
 
-    <!-- SELECCIONAR CURSO -->
-    <div class="panel">
-        <div class="panel-title">📌 Seleccionar Curso</div>
-        <div class="selector-curso">
-            <label>Curso activo:</label>
-            <select id="cursosLista"></select>
-            <button id="btnNuevoCurso">➕ Nuevo curso</button>
-            <button id="btnEliminarCurso" style="background:#a94442;">🗑️ Eliminar curso</button>
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div class="course-pick">
+        <label>Curso</label>
+        <select id="cursoSelect"></select>
+        <button class="btn sm subtle" id="btnNuevoCurso">＋ Nuevo</button>
+      </div>
+      <div class="row-actions">
+        <button class="btn sm ghost" id="btnEditarCurso">⚙︎ Editar curso</button>
+        <button class="btn sm ghost" id="btnImportTop">📎 Importar Excel</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <!-- TAB: ASISTENCIA -->
+    <section data-panel="asistencia">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>📝 Registrar asistencia</h3>
+            <div class="hint">Haz clic en un día del calendario para registrar. Puedes elegir cualquier día; si no estaba en el calendario, se agrega al guardar.</div>
+          </div>
         </div>
-    </div>
-
-    <!-- CONFIGURACIÓN DEL CURSO ACTUAL -->
-    <div class="panel">
-        <div class="panel-title">📅 Configurar Calendario del Curso</div>
-        <div class="form-row">
-            <div class="form-group" style="flex:2;">
-                <label>Nombre del curso *</label>
-                <input type="text" id="cursoNombre" placeholder="Ej: Diplomado Compliance 2026">
+        <div class="asist-layout">
+          <div>
+            <div class="cal" id="calendario"></div>
+            <div class="cal-legend">
+              <span><i style="border:1px solid var(--accent);background:var(--accent-soft)"></i>Día de clase</span>
+              <span><i style="background:var(--ok)"></i>Con asistencia</span>
+              <span><i style="box-shadow:0 0 0 2px var(--warn) inset"></i>Hoy</span>
             </div>
-            <div class="form-group">
-                <label>Fecha inicio</label>
-                <input type="date" id="fechaInicio">
+          </div>
+          <div>
+            <div id="fechaSelTitle"></div>
+            <div class="row-actions" style="margin-bottom:14px">
+              <button class="btn" id="btnGuardarAsist">💾 Guardar asistencia</button>
+              <button class="btn ghost" id="btnTodosPresencial">Todos presencial</button>
+              <button class="btn ghost" id="btnLimpiarFecha">Limpiar</button>
             </div>
-            <div class="form-group">
-                <label>Fecha fin</label>
-                <input type="date" id="fechaFin">
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Alumno</th><th>RUT</th><th>Depto</th><th>Tipo</th><th>Asistencia</th></tr></thead>
+                <tbody id="asistBody"></tbody>
+              </table>
             </div>
-            <div class="form-group">
-                <label>Días de clase</label>
-                <div class="dias-check" id="diasCheck">
-                    <label><input type="checkbox" value="1"> Lun</label>
-                    <label><input type="checkbox" value="2"> Mar</label>
-                    <label><input type="checkbox" value="3"> Mié</label>
-                    <label><input type="checkbox" value="4"> Jue</label>
-                    <label><input type="checkbox" value="5"> Vie</label>
-                    <label><input type="checkbox" value="6"> Sáb</label>
-                    <label><input type="checkbox" value="0"> Dom</label>
-                </div>
-            </div>
+          </div>
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
-            <button id="btnActualizarCurso">💾 Guardar configuración</button>
-            <button id="btnGenerarCalendarioCurso">📅 Generar calendario (fechas de clase)</button>
-            <label class="file-label">📂 Cargar calendario (CSV/Excel)
-                <input type="file" id="cargarCalendarioArchivo" accept=".xlsx, .xls, .csv">
-            </label>
-        </div>
-        <div id="infoCalendario" style="font-size:0.8rem; margin-top:12px; color:#2c6e9e;"></div>
-    </div>
+      </div>
+    </section>
 
-    <!-- CARGAR DATOS DE ALUMNOS Y ASISTENCIAS -->
-    <div class="panel">
-        <div class="panel-title">📂 Cargar Datos (alumnos y asistencias)</div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <label class="file-label">📎 Cargar Excel (asistencias + alumnos)
-                <input type="file" id="cargarArchivoDCC" accept=".xlsx, .xls">
-            </label>
-            <button id="btnResetTotal">🔄 Resetear curso actual</button>
-            <button id="btnExportarReporteCSV">📎 Exportar CSV</button>
-            <button id="btnExportarExcel">📊 Exportar a Excel</button>
-            <button id="btnBackup">💾 Backup completo</button>
-            <label class="file-label">📂 Restaurar backup
-                <input type="file" id="restaurarBackup" accept=".json">
-            </label>
+    <!-- TAB: ALUMNOS -->
+    <section data-panel="alumnos" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>👥 Alumnos del curso</h3>
+            <div class="hint">Edita nombre, RUT, departamento y tipo. El tipo define la regla de distribución presencial/online.</div>
+          </div>
+          <div class="row-actions">
+            <button class="btn" id="btnNuevoAlumno">＋ Agregar alumno</button>
+          </div>
         </div>
-        <div id="mensajeCarga" style="margin-top: 12px; font-size: 0.85rem;"></div>
-    </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Nombre</th><th>RUT</th><th>Depto</th><th>Tipo</th><th style="text-align:right">Acciones</th></tr></thead>
+            <tbody id="alumnosBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
-    <!-- REGISTRO DE ASISTENCIA POR DÍA -->
-    <div class="panel">
-        <div class="panel-title">📝 Registrar Asistencia por Día</div>
-        <div style="margin-bottom: 12px;">
-            <label>Fecha de clase: </label>
-            <select id="fechaClaseSelect"></select>
-            <button id="btnCargarAsistenciaFecha">📋 Cargar</button>
-            <button id="btnGuardarAsistenciaFecha">💾 Guardar</button>
-            <button id="btnAgregarAlumnoManual">➕ Agregar alumno</button>
+    <!-- TAB: RESUMEN -->
+    <section data-panel="resumen" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>📊 Resumen de asistencia y aprobación</h3>
+            <div class="hint" id="reglaHint"></div>
+          </div>
+          <button class="btn ghost" id="btnExportResumen">📥 Exportar Excel</button>
         </div>
-        <div style="overflow-x: auto;">
-            <table id="asistenciaFechaTable">
-                <thead><tr><th>Alumno</th><th>Depto</th><th>Tipo alumno</th><th>Presencial/Online</th><th>Estado</th><th>Acciones</th></tr></thead>
-                <tbody id="asistenciaFechaBody"><tr><td colspan="6">Seleccione una fecha</tbody>
-            </table>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Alumno</th><th>Tipo</th><th>Asist.</th><th>% Asist.</th>
+              <th>Pres.</th><th>Online</th><th>% Pres.</th><th>% Online</th>
+              <th>Faltas restantes</th><th>75%</th><th>Distrib.</th><th>Resultado</th>
+            </tr></thead>
+            <tbody id="resumenBody"></tbody>
+          </table>
         </div>
-    </div>
+      </div>
+    </section>
 
-    <!-- KPIs -->
-    <div class="kpi-grid" id="kpiContainer"></div>
-
-    <!-- RESUMEN Y APROBACIÓN -->
-    <div class="panel">
-        <div class="panel-title">📊 Resumen de Asistencia y Aprobación</div>
-        <div style="margin-bottom: 10px;"><button id="btnActualizarTipos">✏️ Guardar cambios de tipos</button></div>
-        <div style="overflow-x: auto;">
-            <table id="tablaResumenAsistencia">
-                <thead><tr><th>Alumno</th><th>Depto</th><th>Tipo (editable)</th><th>Días Clase</th><th>Asistencias</th><th>% Asistencia</th><th>Presenciales</th><th>Online</th><th>% Presencial</th><th>% Online</th><th>Cumple 75%</th><th>Cumple Distribución</th><th>Aprueba Curso</th></tr></thead>
-                <tbody id="resumenAsistenciaBody"><tr><td colspan="13">Sin datos</tbody>
-            </table>
+    <!-- TAB: REPORTES -->
+    <section data-panel="reportes" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>⚠️ Alumnos en riesgo</h3><div class="hint">Quienes aún no cumplen el 75% o ya no pueden alcanzarlo.</div></div>
         </div>
-    </div>
-
-    <!-- MAPA DE CALOR -->
-    <div class="panel">
-        <div class="panel-title">🔥 Mapa de Calor - % Asistencia por Alumno y Día de Semana</div>
-        <div class="heatmap-container"><canvas id="heatmapChart" width="800" height="400"></canvas></div>
-        <div class="leyenda">
-            <div><span style="background:#2e7d64;"></span> ≥ 75%</div>
-            <div><span style="background:#f4b942;"></span> 50% - 74%</div>
-            <div><span style="background:#c95a5a;"></span> &lt; 50%</div>
+        <div id="riesgoBox"></div>
+      </div>
+      <div class="charts">
+        <div class="chart-box"><h3>📈 Asistencia promedio por clase</h3><div class="chart-canvas"><canvas id="chartTrend"></canvas></div></div>
+        <div class="chart-box"><h3>🥧 Presencial vs Online (global)</h3><div class="chart-canvas"><canvas id="chartDist"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <h3>🔥 Mapa de calor · asistencia por alumno y fecha</h3>
+        <div class="hint">Verde = presencial · Azul = online · Rojo = ausente · Gris = sin clase / sin dato.</div>
+        <div class="hm-wrap" id="hmWrap"></div>
+        <div class="hm-leg">
+          <div><span style="background:var(--ok)"></span>Presencial</div>
+          <div><span style="background:var(--online)"></span>Online</div>
+          <div><span style="background:var(--bad)"></span>Ausente</div>
+          <div><span style="background:#e3ddcf"></span>Sin dato</div>
         </div>
-    </div>
+      </div>
+    </section>
+
+    <!-- TAB: CONFIG -->
+    <section data-panel="config" class="hidden">
+      <div class="card">
+        <h3>📅 Configuración del curso</h3>
+        <div class="hint">Define fechas, días de clase y el umbral de asistencia. Al guardar se regenera el calendario.</div>
+        <div class="grid-form">
+          <div class="field" style="grid-column:1/-1"><label>Nombre del curso</label><input id="cfgNombre" type="text"></div>
+          <div class="field"><label>Fecha inicio</label><input id="cfgInicio" type="date"></div>
+          <div class="field"><label>Fecha fin</label><input id="cfgFin" type="date"></div>
+          <div class="field"><label>Umbral de aprobación (%)</label><input id="cfgUmbral" type="number" min="1" max="100" value="75"></div>
+        </div>
+        <div class="field" style="margin-top:14px"><label>Días de clase</label>
+          <div class="dias" id="cfgDias">
+            <label><input type="checkbox" value="1">Lun</label>
+            <label><input type="checkbox" value="2">Mar</label>
+            <label><input type="checkbox" value="3">Mié</label>
+            <label><input type="checkbox" value="4">Jue</label>
+            <label><input type="checkbox" value="5">Vie</label>
+            <label><input type="checkbox" value="6">Sáb</label>
+            <label><input type="checkbox" value="0">Dom</label>
+          </div>
+        </div>
+        <div class="row-actions" style="margin-top:18px">
+          <button class="btn" id="btnGuardarCfg">💾 Guardar y generar calendario</button>
+          <label class="btn ghost" for="fileCalendario">📂 Cargar calendario (CSV/Excel)</label>
+          <input type="file" id="fileCalendario" class="fileinput" accept=".xlsx,.xls,.csv">
+          <button class="btn danger" id="btnEliminarCurso">🗑 Eliminar curso</button>
+        </div>
+        <div class="muted-txt" id="cfgInfo" style="margin-top:14px"></div>
+      </div>
+    </section>
+
+    <!-- TAB: DATOS -->
+    <section data-panel="datos" class="hidden">
+      <div class="notice"><span class="ic">🛡️</span><div>
+        <b>Confiabilidad de datos.</b> Tus datos se guardan automáticamente en este navegador (IndexedDB + copia de seguridad).
+        Para protección máxima y poder usarlos en otro equipo, <b>vincula un archivo</b>: cada cambio se guardará también ahí.
+      </div></div>
+
+      <div class="split">
+        <div class="card">
+          <h3>📎 Importar / Exportar</h3>
+          <div class="hint">Importa planillas DCC (una hoja por clase) o una matriz de asistencia.</div>
+          <div class="row-actions">
+            <label class="btn" for="fileImport">📥 Importar Excel</label>
+            <input type="file" id="fileImport" class="fileinput" accept=".xlsx,.xls,.csv">
+            <button class="btn ghost" id="btnExportExcel">📊 Exportar a Excel</button>
+            <button class="btn ghost" id="btnExportCSV">📄 Exportar CSV</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🔗 Archivo vinculado (autoguardado)</h3>
+          <div class="hint" id="fhHint">Guarda automáticamente cada cambio en un archivo de tu disco.</div>
+          <div class="row-actions">
+            <button class="btn" id="btnVincular">🔗 Vincular archivo nuevo</button>
+            <button class="btn ghost" id="btnAbrirVinculado">📂 Abrir archivo existente</button>
+            <button class="btn ghost hidden" id="btnDesvincular">Desvincular</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="card">
+          <h3>💾 Respaldo manual</h3>
+          <div class="hint">Descarga todo (todos los cursos) o restaura desde un respaldo.</div>
+          <div class="row-actions">
+            <button class="btn" id="btnBackup">⬇ Descargar respaldo (.json)</button>
+            <label class="btn ghost" for="fileRestore">⬆ Restaurar respaldo</label>
+            <input type="file" id="fileRestore" class="fileinput" accept=".json">
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🕒 Snapshots automáticos</h3>
+          <div class="hint">Copias guardadas antes de cada acción importante. Restaura si algo salió mal.</div>
+          <div id="snapList"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🧨 Zona de riesgo</h3>
+        <div class="row-actions">
+          <button class="btn ghost" id="btnResetCurso">Reiniciar datos del curso actual</button>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
+<div id="toasts"></div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+
 <script>
-    // ---------- DATOS GLOBALES ----------
-    let cursos = [];
-    let cursoActivoId = null;
-    let alumnos = [];
-    let registros = [];
-    let fechasClase = [];
-    let nextId = 1;
-    let currentFechaClase = "";
-    let heatmapChart = null;
+"use strict";
+/* ============================================================
+   ASISTENCIA · plataforma de registro por curso (archivo único)
+   Confiabilidad: IndexedDB + localStorage + archivo vinculado +
+   snapshots automáticos + migración de datos antiguos.
+   ============================================================ */
 
-    // ---------- UTILIDADES ----------
-    function mostrarMensaje(texto, tipo = "success") {
-        const msg = document.getElementById("globalMessage");
-        msg.textContent = texto;
-        msg.className = `global-message ${tipo}`;
-        msg.style.display = "block";
-        setTimeout(() => { msg.style.display = "none"; }, 5000);
-    }
+const SCHEMA = 2;
+const DIAS_NOMBRE = {0:"Dom",1:"Lun",2:"Mar",3:"Mié",4:"Jue",5:"Vie",6:"Sáb"};
 
-    function guardarTodo() {
-        const data = { cursos, cursoActivoId, alumnos, registros, fechasClase, nextId };
-        localStorage.setItem("asistenciaData", JSON.stringify(data));
-    }
+let state = { schemaVersion: SCHEMA, cursoActivoId: null, cursos: [] };
+let currentTab = "asistencia";
+let currentFecha = "";
+let fileHandle = null;          // FileSystemFileHandle (autoguardado)
+let chartTrend = null, chartDist = null;
 
-    function cargarTodo() {
-        const stored = localStorage.getItem("asistenciaData");
-        if (stored) {
-            try {
-                const data = JSON.parse(stored);
-                cursos = data.cursos || [];
-                cursoActivoId = data.cursoActivoId;
-                alumnos = data.alumnos || [];
-                registros = data.registros || [];
-                fechasClase = data.fechasClase || [];
-                nextId = data.nextId || 1;
-            } catch(e) { console.error(e); }
-        }
-        if (cursos.length === 0) {
-            const defaultId = Date.now();
-            cursos = [{
-                id: defaultId,
-                nombre: "Diplomado Compliance 2026",
-                fechaInicio: "2026-06-01",
-                fechaFin: "2026-06-30",
-                diasClase: [1,2,3,4,5]
-            }];
-            cursoActivoId = defaultId;
-            generarFechasParaCurso(defaultId);
-        }
-        actualizarSelectorCursos();
-        cargarCursoActivo();
-    }
+/* ---------- helpers de fecha (corrige zona horaria) ---------- */
+const pad = n => String(n).padStart(2,"0");
+function isoFromYMD(y,m,d){ return `${y}-${pad(m)}-${pad(d)}`; }
+function parseLocalDate(iso){ const [y,m,d]=String(iso).split("-").map(Number); return new Date(y,m-1,d); } // local, no UTC
+function toISO(date){ return isoFromYMD(date.getFullYear(), date.getMonth()+1, date.getDate()); }
+function diaSemana(iso){ return parseLocalDate(iso).getDay(); }
+function fechaLegible(iso){
+  const d = parseLocalDate(iso);
+  return `${DIAS_NOMBRE[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+}
 
-    function getCursoActivo() {
-        return cursos.find(c => c.id == cursoActivoId);
-    }
+/* ---------- IndexedDB ---------- */
+const IDB_NAME="asistenciaDB", IDB_STORE="kv";
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open(IDB_NAME,1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore(IDB_STORE);
+    r.onsuccess = ()=> res(r.result);
+    r.onerror = ()=> rej(r.error);
+  });
+}
+async function idbSet(k,v){ const db=await idbOpen(); return new Promise((res,rej)=>{const t=db.transaction(IDB_STORE,"readwrite");t.objectStore(IDB_STORE).put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);}); }
+async function idbGet(k){ const db=await idbOpen(); return new Promise((res,rej)=>{const t=db.transaction(IDB_STORE,"readonly");const q=t.objectStore(IDB_STORE).get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);}); }
+async function idbDel(k){ const db=await idbOpen(); return new Promise((res,rej)=>{const t=db.transaction(IDB_STORE,"readwrite");t.objectStore(IDB_STORE).delete(k);t.oncomplete=res;t.onerror=()=>rej(t.error);}); }
 
-    function actualizarSelectorCursos() {
-        const select = document.getElementById("cursosLista");
-        select.innerHTML = "";
-        cursos.forEach(c => {
-            const opt = document.createElement("option");
-            opt.value = c.id;
-            opt.textContent = c.nombre;
-            if (c.id == cursoActivoId) opt.selected = true;
-            select.appendChild(opt);
-        });
-    }
+/* ---------- persistencia (triple redundancia) ---------- */
+let saveTimer=null;
+function setSaveStatus(s){
+  const dot=document.getElementById("saveDot"), txt=document.getElementById("saveTxt");
+  dot.className="save-dot"+(s==="saving"?" saving":s==="error"?" error":"");
+  txt.textContent = s==="saving"?"Guardando…":s==="error"?"Error al guardar":"Guardado"+(fileHandle?" · archivo ✓":"");
+}
+function guardar(){ // debounce
+  setSaveStatus("saving");
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(persistNow, 250);
+}
+async function persistNow(){
+  state.schemaVersion=SCHEMA; state.updatedAt=new Date().toISOString();
+  let ok=false;
+  try{ await idbSet("estado", JSON.parse(JSON.stringify(state))); ok=true; }catch(e){ console.error("idb",e); }
+  try{ localStorage.setItem("asistencia_v2", JSON.stringify(state)); ok=true; }catch(e){ console.warn("ls full",e); }
+  try{ if(fileHandle) await escribirArchivo(); }catch(e){ console.warn("file",e); }
+  setSaveStatus(ok?"saved":"error");
+}
 
-    function actualizarFormularioCurso() {
-        const curso = getCursoActivo();
-        if (curso) {
-            document.getElementById("cursoNombre").value = curso.nombre;
-            document.getElementById("fechaInicio").value = curso.fechaInicio;
-            document.getElementById("fechaFin").value = curso.fechaFin;
-            const checks = document.querySelectorAll("#diasCheck input");
-            checks.forEach(cb => cb.checked = curso.diasClase.includes(parseInt(cb.value)));
-        } else {
-            document.getElementById("cursoNombre").value = "";
-            document.getElementById("fechaInicio").value = "";
-            document.getElementById("fechaFin").value = "";
-            document.querySelectorAll("#diasCheck input").forEach(cb => cb.checked = false);
-        }
-    }
+/* ---------- snapshots automáticos ---------- */
+async function snapshot(motivo){
+  try{
+    let snaps = (await idbGet("snapshots")) || [];
+    snaps.unshift({ ts:new Date().toISOString(), motivo, data:JSON.parse(JSON.stringify(state)) });
+    snaps = snaps.slice(0,12);
+    await idbSet("snapshots", snaps);
+    if(currentTab==="datos") renderSnapshots();
+  }catch(e){ console.warn("snapshot",e); }
+}
 
-    function regenerarCalendarioDesdeCurso() {
-        const curso = getCursoActivo();
-        if (!curso) return;
-        const start = new Date(curso.fechaInicio);
-        const end = new Date(curso.fechaFin);
-        if (isNaN(start) || isNaN(end) || start > end) return;
-        const fechas = [];
-        let current = new Date(start);
-        while (current <= end) {
-            if (curso.diasClase.includes(current.getDay())) {
-                fechas.push(current.toISOString().slice(0,10));
-            }
-            current.setDate(current.getDate() + 1);
-        }
-        fechasClase = fechas;
-        actualizarSelectFechas();
-        if (fechasClase.length) currentFechaClase = fechasClase[0];
-        renderizarTablaAsistenciaFecha(currentFechaClase);
-        updateDashboard();
-        guardarTodo();
-        document.getElementById("infoCalendario").innerHTML = `📆 Calendario generado: ${fechasClase.length} días de clase`;
-    }
+/* ---------- archivo vinculado (File System Access API) ---------- */
+async function escribirArchivo(){
+  if(!fileHandle) return;
+  const w = await fileHandle.createWritable();
+  await w.write(JSON.stringify(state,null,2));
+  await w.close();
+}
+async function vincularArchivo(){
+  if(!window.showSaveFilePicker){ toast("Tu navegador no permite vincular archivos. Usa Chrome o Edge, o el respaldo manual.","warn"); return; }
+  try{
+    fileHandle = await window.showSaveFilePicker({ suggestedName:"asistencia-datos.json", types:[{description:"JSON",accept:{"application/json":[".json"]}}] });
+    await idbSet("fileHandle", fileHandle);
+    await escribirArchivo();
+    actualizarEstadoArchivo();
+    toast("Archivo vinculado. Cada cambio se guarda automáticamente ahí.","ok");
+  }catch(e){ if(e.name!=="AbortError") toast("No se pudo vincular el archivo.","error"); }
+}
+async function abrirArchivoVinculado(){
+  if(!window.showOpenFilePicker){ toast("Tu navegador no permite abrir archivos vinculados.","warn"); return; }
+  try{
+    const [h] = await window.showOpenFilePicker({ types:[{description:"JSON",accept:{"application/json":[".json"]}}] });
+    const file = await h.getFile();
+    const data = JSON.parse(await file.text());
+    if(!data.cursos) throw new Error("Formato inválido");
+    await snapshot("Antes de abrir archivo vinculado");
+    fileHandle = h;
+    await idbSet("fileHandle", fileHandle);
+    cargarEstado(migrar(data));
+    actualizarEstadoArchivo();
+    renderAll();
+    toast("Datos cargados desde el archivo y vinculados.","ok");
+  }catch(e){ if(e.name!=="AbortError") toast("No se pudo abrir el archivo.","error"); }
+}
+async function desvincular(){ fileHandle=null; await idbDel("fileHandle"); actualizarEstadoArchivo(); toast("Archivo desvinculado.","warn"); }
+function actualizarEstadoArchivo(){
+  const hint=document.getElementById("fhHint");
+  const des=document.getElementById("btnDesvincular");
+  if(fileHandle){ hint.innerHTML="✅ <b>Vinculado.</b> Autoguardado activo en: <b>"+(fileHandle.name||"archivo")+"</b>"; des.classList.remove("hidden"); }
+  else { hint.textContent="Guarda automáticamente cada cambio en un archivo de tu disco."; des.classList.add("hidden"); }
+  setSaveStatus("saved");
+}
+async function restaurarHandleGuardado(){
+  if(!window.showOpenFilePicker) return;
+  try{
+    const h = await idbGet("fileHandle");
+    if(!h) return;
+    const perm = await h.queryPermission({mode:"readwrite"});
+    if(perm==="granted"){ fileHandle=h; }
+    actualizarEstadoArchivo();
+  }catch(e){ /* ignore */ }
+}
 
-    function generarFechasParaCurso(cursoId) {
-        const curso = cursos.find(c => c.id == cursoId);
-        if (!curso) return;
-        const start = new Date(curso.fechaInicio);
-        const end = new Date(curso.fechaFin);
-        const fechas = [];
-        let current = new Date(start);
-        while (current <= end) {
-            if (curso.diasClase.includes(current.getDay())) {
-                fechas.push(current.toISOString().slice(0,10));
-            }
-            current.setDate(current.getDate() + 1);
-        }
-        fechasClase = fechas;
-        guardarTodo();
-    }
+/* ---------- migración / carga ---------- */
+function nuevoCursoVacio(nombre, inicio, fin, dias){
+  return { id:Date.now()+Math.floor(Math.random()*999), nombre, fechaInicio:inicio, fechaFin:fin,
+           diasClase:dias||[1,2,3,4,5], umbral:75, alumnos:[], registros:[], fechasClase:[], nextId:1 };
+}
+function migrar(data){
+  if(!data) return null;
+  // formato nuevo
+  if(data.schemaVersion===SCHEMA && Array.isArray(data.cursos) && data.cursos[0] && Array.isArray(data.cursos[0].alumnos)){
+    return data;
+  }
+  // formato antiguo (alumnos/registros/fechasClase globales)
+  const cursos = (data.cursos||[]).map(c=>({
+    id:c.id, nombre:c.nombre, fechaInicio:c.fechaInicio, fechaFin:c.fechaFin,
+    diasClase:c.diasClase||[1,2,3,4,5], umbral:75, alumnos:[], registros:[], fechasClase:[], nextId:1
+  }));
+  if(cursos.length===0) return null;
+  const activo = cursos.find(c=>c.id==data.cursoActivoId) || cursos[0];
+  // adjuntar datos globales antiguos al curso activo
+  activo.alumnos = (data.alumnos||[]).map(a=>({ id:a.id, rut:a.rut||"", nombre:a.nombre, depto:a.depto||"", tipoAlumno:a.tipoAlumno||"Normal" }));
+  activo.registros = (data.registros||[]).map(r=>({ fecha:r.fecha, alumnoId:r.alumnoId, tipoAsistencia:r.tipoAsistencia }));
+  activo.fechasClase = (data.fechasClase||[]).slice().sort();
+  activo.nextId = data.nextId || (activo.alumnos.length+1);
+  // regenerar calendario de los demás
+  cursos.forEach(c=>{ if(c!==activo) c.fechasClase = generarFechas(c); });
+  return { schemaVersion:SCHEMA, cursoActivoId:activo.id, cursos };
+}
+function cargarEstado(s){
+  state = s;
+  if(!state.cursoActivoId || !state.cursos.find(c=>c.id==state.cursoActivoId))
+    state.cursoActivoId = state.cursos[0]?.id || null;
+}
+async function bootData(){
+  let data=null;
+  try{ data = await idbGet("estado"); }catch(e){}
+  if(!data){ try{ const ls=localStorage.getItem("asistencia_v2"); if(ls) data=JSON.parse(ls); }catch(e){} }
+  if(!data){ try{ const old=localStorage.getItem("asistenciaData"); if(old) data=JSON.parse(old); }catch(e){} } // app antigua
+  data = migrar(data);
+  if(!data){
+    const c = nuevoCursoVacio("Curso de ejemplo 2026","2026-06-01","2026-06-30",[1,2,3,4,5]);
+    c.fechasClase = generarFechas(c);
+    data = { schemaVersion:SCHEMA, cursoActivoId:c.id, cursos:[c] };
+  }
+  cargarEstado(data);
+  try{ if(navigator.storage?.persist) await navigator.storage.persist(); }catch(e){}
+}
 
-    function cargarCursoActivo() {
-        actualizarFormularioCurso();
-        regenerarCalendarioDesdeCurso();
-        actualizarSelectFechas();
-        renderizarTablaAsistenciaFecha(currentFechaClase);
-        updateDashboard();
-        mostrarMensaje(`Curso activo: ${getCursoActivo()?.nombre || "ninguno"}`, "success");
-    }
+/* ---------- acceso a curso activo ---------- */
+const curso = ()=> state.cursos.find(c=>c.id==state.cursoActivoId);
+function generarFechas(c){
+  const out=[]; if(!c.fechaInicio||!c.fechaFin) return out;
+  let cur=parseLocalDate(c.fechaInicio); const end=parseLocalDate(c.fechaFin);
+  if(isNaN(cur)||isNaN(end)||cur>end) return out;
+  while(cur<=end){ if(c.diasClase.includes(cur.getDay())) out.push(toISO(cur)); cur.setDate(cur.getDate()+1); }
+  return out;
+}
 
-    // ---------- CRUD CURSOS ----------
-    function nuevoCurso() {
-        let nombre = prompt("Nombre del nuevo curso:");
-        if (!nombre) return;
-        let inicio = prompt("Fecha inicio (YYYY-MM-DD):");
-        let fin = prompt("Fecha fin (YYYY-MM-DD):");
-        if (!inicio || !fin) return;
-        const id = Date.now();
-        cursos.push({
-            id, nombre, fechaInicio: inicio, fechaFin: fin,
-            diasClase: [1,2,3,4,5] // por defecto L-V
-        });
-        cursoActivoId = id;
-        alumnos = [];
-        registros = [];
-        nextId = 1;
-        generarFechasParaCurso(id);
-        guardarTodo();
-        actualizarSelectorCursos();
-        cargarCursoActivo();
-        mostrarMensaje(`Curso "${nombre}" creado`, "success");
-    }
+/* ============================================================
+   CÁLCULO DE RESUMEN Y APROBACIÓN  (reglas originales)
+   ============================================================ */
+function calcularResumen(){
+  const c = curso(); if(!c) return [];
+  const total = c.fechasClase.length;
+  const umbral = c.umbral || 75;
+  return c.alumnos.map(a=>{
+    const regs = c.registros.filter(r=>r.alumnoId===a.id && c.fechasClase.includes(r.fecha));
+    const asist = regs.length;
+    const pres = regs.filter(r=>r.tipoAsistencia==="Presencial").length;
+    const onl = regs.filter(r=>r.tipoAsistencia==="Online").length;
+    const pctA = total ? asist/total*100 : 0;
+    const pctP = asist ? pres/asist*100 : 0;
+    const pctO = asist ? onl/asist*100 : 0;
+    const cumple75 = pctA >= umbral;
+    let cumpleDist;
+    if(a.tipoAlumno==="Normal") cumpleDist = (pctP>=75 && pctO<=25);
+    else cumpleDist = (pctP>=25 && pctO<=75);
+    if(asist===0) cumpleDist=false;
+    // faltas restantes permitidas
+    const req = Math.ceil(total*umbral/100);
+    const maxFaltas = total - req;
+    const faltasActuales = total - asist;
+    const restantes = maxFaltas - faltasActuales;
+    return { ...a, total, asist, pres, onl, pctA, pctP, pctO, cumple75, cumpleDist,
+             aprueba: cumple75 && cumpleDist, restantes, alcanzable: restantes>=0 };
+  });
+}
 
-    function eliminarCursoActivo() {
-        if (!cursoActivoId) return;
-        if (!confirm("¿Eliminar este curso y todos sus datos?")) return;
-        cursos = cursos.filter(c => c.id != cursoActivoId);
-        if (cursos.length > 0) cursoActivoId = cursos[0].id;
-        else { cursoActivoId = null; alumnos = []; registros = []; fechasClase = []; nextId = 1; }
-        guardarTodo();
-        cargarCursoActivo();
-        actualizarSelectorCursos();
-        mostrarMensaje("Curso eliminado", "warning");
-    }
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderAll(){
+  renderCursoSelect();
+  renderKPIs();
+  renderTab(currentTab);
+}
+function renderCursoSelect(){
+  const sel=document.getElementById("cursoSelect");
+  sel.innerHTML="";
+  state.cursos.forEach(c=>{ const o=document.createElement("option"); o.value=c.id; o.textContent=c.nombre; if(c.id==state.cursoActivoId)o.selected=true; sel.appendChild(o); });
+}
+function renderKPIs(){
+  const c=curso(); const data=calcularResumen();
+  const total=data.length;
+  const prom = total ? data.reduce((s,d)=>s+d.pctA,0)/total : 0;
+  const aprueban = data.filter(d=>d.aprueba).length;
+  const riesgo = data.filter(d=>!d.aprueba).length;
+  const kpiClass = prom>=75?"ok":prom>=50?"warn":"bad";
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi ${kpiClass}"><div class="k-label">Asistencia promedio</div><div class="k-val mono">${prom.toFixed(1)}%</div><div class="k-sub">Umbral ${c?.umbral||75}%</div></div>
+    <div class="kpi ok"><div class="k-label">Aprueban</div><div class="k-val mono">${aprueban}<span style="font-size:18px;color:var(--ink-soft)">/${total}</span></div><div class="k-sub">Según reglas del curso</div></div>
+    <div class="kpi ${riesgo? 'warn':'ok'}"><div class="k-label">En riesgo</div><div class="k-val mono">${riesgo}</div><div class="k-sub">No cumplen aún</div></div>
+    <div class="kpi"><div class="k-label">Días de clase</div><div class="k-val mono">${c?c.fechasClase.length:0}</div><div class="k-sub">${c?c.alumnos.length:0} alumnos</div></div>`;
+}
 
-    function guardarConfiguracionCurso() {
-        const curso = getCursoActivo();
-        if (!curso) return;
-        const nombre = document.getElementById("cursoNombre").value.trim();
-        const fechaInicio = document.getElementById("fechaInicio").value;
-        const fechaFin = document.getElementById("fechaFin").value;
-        const dias = Array.from(document.querySelectorAll("#diasCheck input:checked")).map(cb => parseInt(cb.value));
-        if (!nombre) { mostrarMensaje("Nombre obligatorio", "error"); return; }
-        if (!fechaInicio || !fechaFin) { mostrarMensaje("Fechas inválidas", "error"); return; }
-        if (dias.length === 0) { mostrarMensaje("Seleccione al menos un día", "error"); return; }
-        curso.nombre = nombre;
-        curso.fechaInicio = fechaInicio;
-        curso.fechaFin = fechaFin;
-        curso.diasClase = dias;
-        guardarTodo();
-        regenerarCalendarioDesdeCurso();
-        actualizarSelectorCursos();
-        mostrarMensaje("Curso actualizado", "success");
-    }
+function renderTab(tab){
+  currentTab=tab;
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+  document.querySelectorAll("[data-panel]").forEach(p=>p.classList.toggle("hidden",p.dataset.panel!==tab));
+  if(tab==="asistencia") renderAsistencia();
+  if(tab==="alumnos") renderAlumnos();
+  if(tab==="resumen") renderResumen();
+  if(tab==="reportes") renderReportes();
+  if(tab==="config") renderConfig();
+  if(tab==="datos"){ renderSnapshots(); }
+}
 
-    // ---------- CARGA DE CALENDARIO DESDE ARCHIVO ----------
-    function cargarCalendarioDesdeArchivo(dataBuffer) {
-        try {
-            const workbook = XLSX.read(dataBuffer, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-            let fechas = [];
-            for (let i = 0; i < rows.length; i++) {
-                let fechaStr = rows[i][0] ? rows[i][0].toString().trim() : "";
-                if (fechaStr) {
-                    let fechaISO = null;
-                    if (fechaStr.includes("/")) {
-                        let partes = fechaStr.split("/");
-                        if (partes.length === 3) fechaISO = `${partes[2]}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
-                    } else if (fechaStr.includes("-")) fechaISO = fechaStr;
-                    if (fechaISO && !isNaN(new Date(fechaISO))) fechas.push(fechaISO);
-                }
-            }
-            if (fechas.length === 0) throw new Error("No se encontraron fechas válidas");
-            fechasClase = [...new Set(fechas)].sort();
-            guardarTodo();
-            actualizarSelectFechas();
-            if (fechasClase.length) currentFechaClase = fechasClase[0];
-            renderizarTablaAsistenciaFecha(currentFechaClase);
-            updateDashboard();
-            mostrarMensaje(`Calendario cargado: ${fechasClase.length} fechas`, "success");
-        } catch(e) {
-            mostrarMensaje("Error al cargar calendario: " + e.message, "error");
-        }
-    }
+/* ----- ASISTENCIA ----- */
+let calMonth = null; // {y, m(0-based)}
+function ensureCalMonth(){
+  if(calMonth) return;
+  const base = currentFecha ? parseLocalDate(currentFecha) : new Date();
+  calMonth = { y:base.getFullYear(), m:base.getMonth() };
+}
+function renderCalendario(){
+  const c=curso(); const el=document.getElementById("calendario"); if(!el) return;
+  ensureCalMonth();
+  const {y,m}=calMonth;
+  const monthName=new Date(y,m,1).toLocaleDateString("es-CL",{month:"long",year:"numeric"});
+  const first=new Date(y,m,1);
+  const lead=(first.getDay()+6)%7;               // lunes primero
+  const diasMes=new Date(y,m+1,0).getDate();
+  const todayISO=toISO(new Date());
+  const claseSet=new Set(c?c.fechasClase:[]);
+  const presentes={}; if(c) c.registros.forEach(r=>{ presentes[r.fecha]=(presentes[r.fecha]||0)+1; });
+  const cell=(date,other)=>{
+    const iso=toISO(date), cl=["cal-day"];
+    if(other)cl.push("other");
+    if(claseSet.has(iso))cl.push("clase");
+    if(iso===currentFecha)cl.push("sel");
+    if(iso===todayISO)cl.push("today");
+    const dot=presentes[iso]?`<span class="dot" title="${presentes[iso]} presentes"></span>`:"";
+    return `<div class="${cl.join(' ')}" data-iso="${iso}">${date.getDate()}${dot}</div>`;
+  };
+  let cells="";
+  for(let i=0;i<lead;i++) cells+=cell(new Date(y,m,1-(lead-i)),true);
+  for(let d=1;d<=diasMes;d++) cells+=cell(new Date(y,m,d),false);
+  const trail=(7-(lead+diasMes)%7)%7;
+  for(let i=1;i<=trail;i++) cells+=cell(new Date(y,m+1,i),true);
+  el.innerHTML=`
+    <div class="cal-head">
+      <div class="m">${monthName}</div>
+      <div class="cal-nav"><button data-cal="prev" title="Mes anterior">‹</button><button data-cal="today" title="Ir a hoy">•</button><button data-cal="next" title="Mes siguiente">›</button></div>
+    </div>
+    <div class="cal-grid">${["L","M","M","J","V","S","D"].map(d=>`<div class="dow">${d}</div>`).join("")}${cells}</div>`;
+  el.querySelectorAll("[data-cal]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.cal==="prev"){ if(--calMonth.m<0){calMonth.m=11;calMonth.y--;} }
+    else if(b.dataset.cal==="next"){ if(++calMonth.m>11){calMonth.m=0;calMonth.y++;} }
+    else { const t=new Date(); calMonth={y:t.getFullYear(),m:t.getMonth()}; }
+    renderCalendario();
+  });
+  el.querySelectorAll(".cal-day").forEach(d=>d.onclick=()=>{
+    leerAsistenciaUI();                 // conserva lo marcado en el día anterior (en memoria)
+    currentFecha=d.dataset.iso;
+    const cd=parseLocalDate(currentFecha); calMonth={y:cd.getFullYear(),m:cd.getMonth()};
+    renderAsistencia();
+  });
+}
+function renderAsistencia(){
+  const c=curso();
+  if(c && !currentFecha){ currentFecha = c.fechasClase[0] || toISO(new Date()); calMonth=null; }
+  renderCalendario();
+  const tbody=document.getElementById("asistBody"); tbody.innerHTML="";
+  const title=document.getElementById("fechaSelTitle");
+  if(!c){ title.innerHTML=""; return; }
+  const esClase=c.fechasClase.includes(currentFecha);
+  title.innerHTML = currentFecha
+    ? `<b>${fechaLegible(currentFecha)}</b> ${esClase?'<span class="tag ok">Día de clase</span>':'<span class="tag warn">Día extra · se agrega al guardar</span>'}`
+    : `<span class="muted-txt">Selecciona un día en el calendario</span>`;
+  if(!c.alumnos.length){ tbody.innerHTML=`<tr><td colspan="5"><div class="empty">No hay alumnos. Agrégalos en <b>Alumnos</b> o impórtalos desde Excel.</div></td></tr>`; return; }
+  if(!currentFecha){ tbody.innerHTML=`<tr><td colspan="5"><div class="empty">Haz clic en un día del calendario.</div></td></tr>`; return; }
+  c.alumnos.forEach(a=>{
+    const reg=c.registros.find(r=>r.fecha===currentFecha && r.alumnoId===a.id);
+    const tipo=reg?reg.tipoAsistencia:"";
+    const tr=document.createElement("tr"); tr.dataset.id=a.id;
+    tr.innerHTML=`<td>${esc(a.nombre)}</td><td class="mono">${esc(a.rut||"")}</td><td>${esc(a.depto||"")}</td>
+      <td><span class="tag ${a.tipoAlumno==='Normal'?'muted':'on'}">${a.tipoAlumno}</span></td>
+      <td><select class="asist-sel">
+        <option value="" ${!tipo?'selected':''}>— Ausente —</option>
+        <option value="Presencial" ${tipo==='Presencial'?'selected':''}>✅ Presencial</option>
+        <option value="Online" ${tipo==='Online'?'selected':''}>🖥️ Online</option>
+      </select></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function leerAsistenciaUI(){
+  const c=curso(); if(!c||!currentFecha) return;
+  const nuevos=[];
+  document.querySelectorAll("#asistBody tr").forEach(tr=>{
+    const id=Number(tr.dataset.id); const v=tr.querySelector(".asist-sel")?.value;
+    if(v==="Presencial"||v==="Online") nuevos.push({fecha:currentFecha, alumnoId:id, tipoAsistencia:v});
+  });
+  c.registros = c.registros.filter(r=>r.fecha!==currentFecha).concat(nuevos);
+}
+function guardarAsistencia(){
+  const c=curso(); if(!c||!currentFecha){ toast("Selecciona un día en el calendario.","warn"); return; }
+  if(!c.alumnos.length){ toast("Primero agrega alumnos.","warn"); return; }
+  leerAsistenciaUI();
+  const n=c.registros.filter(r=>r.fecha===currentFecha).length;
+  let agregada=false;
+  if(!c.fechasClase.includes(currentFecha)){ c.fechasClase.push(currentFecha); c.fechasClase.sort(); agregada=true; }
+  guardar(); renderKPIs(); renderCalendario();
+  toast(`Asistencia guardada · ${fechaLegible(currentFecha)} (${n} presentes)${agregada?' · día agregado al calendario':''}.`,"ok");
+}
 
-    // ---------- PROCESAR EXCEL DE ASISTENCIAS (formato DCC) ----------
-    function procesarArchivoDCC(dataBuffer) {
-        try {
-            const workbook = XLSX.read(dataBuffer, { type: 'array' });
-            const sheets = workbook.SheetNames;
-            let alumnosMap = new Map(); // rut -> { nombre, depto, tipoAlumno }
-            let clases = []; // { fecha, asistencias: Map<rut, tipo> }
+/* ----- ALUMNOS ----- */
+function renderAlumnos(){
+  const c=curso(); const tbody=document.getElementById("alumnosBody"); tbody.innerHTML="";
+  if(!c||!c.alumnos.length){ tbody.innerHTML=`<tr><td colspan="5"><div class="empty">Sin alumnos. Usa “Agregar alumno” o importa un Excel.</div></td></tr>`; return; }
+  c.alumnos.forEach(a=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${esc(a.nombre)}</td><td class="mono">${esc(a.rut||"")}</td><td>${esc(a.depto||"")}</td>
+      <td><span class="tag ${a.tipoAlumno==='Normal'?'muted':'on'}">${a.tipoAlumno}</span></td>
+      <td style="text-align:right"><button class="btn sm ghost" data-edit="${a.id}">✏️</button> <button class="btn sm danger" data-del="${a.id}">🗑</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editarAlumno(Number(b.dataset.edit)));
+  tbody.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>borrarAlumno(Number(b.dataset.del)));
+}
+async function editarAlumno(id){
+  const c=curso(); const a=id?c.alumnos.find(x=>x.id===id):null;
+  const r=await modalForm({
+    title: a?"Editar alumno":"Nuevo alumno",
+    fields:[
+      {name:"nombre",label:"Nombre completo",value:a?.nombre||"",required:true},
+      {name:"rut",label:"RUT",value:a?.rut||""},
+      {name:"depto",label:"Departamento",value:a?.depto||""},
+      {name:"tipoAlumno",label:"Tipo",type:"select",value:a?.tipoAlumno||"Normal",options:["Normal","Región"]}
+    ]
+  });
+  if(!r) return;
+  if(a){ Object.assign(a,r); }
+  else { c.alumnos.push({ id:c.nextId++, ...r, rut:r.rut.trim(), nombre:r.nombre.trim() }); }
+  guardar(); renderAlumnos(); renderKPIs();
+  toast(a?"Alumno actualizado.":"Alumno agregado.","ok");
+}
+async function borrarAlumno(id){
+  const c=curso(); const a=c.alumnos.find(x=>x.id===id); if(!a) return;
+  if(!await confirmModal("Eliminar alumno",`Se eliminará <b>${esc(a.nombre)}</b> y todas sus asistencias en este curso.`,true)) return;
+  await snapshot("Antes de eliminar alumno");
+  c.alumnos=c.alumnos.filter(x=>x.id!==id);
+  c.registros=c.registros.filter(r=>r.alumnoId!==id);
+  guardar(); renderAlumnos(); renderKPIs();
+  toast("Alumno eliminado.","warn");
+}
 
-            for (let sheetName of sheets) {
-                const sheet = workbook.Sheets[sheetName];
-                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:F100');
-                let headerRow = -1;
-                let colIndices = { rut: -1, paterno: -1, materno: -1, nombres: -1 };
-                for (let R = range.s.r; R <= Math.min(range.e.r, range.s.r + 20); R++) {
-                    for (let C = range.s.c; C <= range.e.c; C++) {
-                        const cell = sheet[XLSX.utils.encode_cell({ r: R, c: C })];
-                        if (cell && cell.v && cell.v.toString().trim().toUpperCase() === "RUT") { headerRow = R; break; }
-                    } if (headerRow !== -1) break;
-                }
-                if (headerRow === -1) continue;
+/* ----- RESUMEN ----- */
+function renderResumen(){
+  const c=curso(); const data=calcularResumen();
+  document.getElementById("reglaHint").innerHTML = c
+    ? `Regla: <b>${c.umbral||75}% de asistencia</b> + distribución — <b>Normal</b>: ≥75% presencial · <b>Región</b>: ≥25% presencial.`
+    : "";
+  const tbody=document.getElementById("resumenBody"); tbody.innerHTML="";
+  if(!data.length){ tbody.innerHTML=`<tr><td colspan="12"><div class="empty">Sin datos.</div></td></tr>`; return; }
+  data.forEach(r=>{
+    const restTag = r.alcanzable
+      ? `<span class="tag ${r.restantes<=1?'warn':'muted'}">${r.restantes}</span>`
+      : `<span class="tag bad">imposible</span>`;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${esc(r.nombre)}</td>
+      <td><select class="tipo-edit" data-id="${r.id}">
+        <option value="Normal" ${r.tipoAlumno==='Normal'?'selected':''}>Normal</option>
+        <option value="Región" ${r.tipoAlumno==='Región'?'selected':''}>Región</option></select></td>
+      <td class="mono">${r.asist}/${r.total}</td>
+      <td class="mono"><b>${r.pctA.toFixed(1)}%</b></td>
+      <td class="mono">${r.pres}</td><td class="mono">${r.onl}</td>
+      <td class="mono">${r.pctP.toFixed(0)}%</td><td class="mono">${r.pctO.toFixed(0)}%</td>
+      <td>${restTag}</td>
+      <td>${r.cumple75?'<span class="tag ok">Sí</span>':'<span class="tag bad">No</span>'}</td>
+      <td>${r.cumpleDist?'<span class="tag ok">Sí</span>':'<span class="tag bad">No</span>'}</td>
+      <td>${r.aprueba?'<span class="tag ok">✅ Aprueba</span>':'<span class="tag bad">❌ No</span>'}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll(".tipo-edit").forEach(sel=>sel.onchange=()=>{
+    const a=curso().alumnos.find(x=>x.id===Number(sel.dataset.id));
+    if(a){ a.tipoAlumno=sel.value; guardar(); renderResumen(); renderKPIs(); }
+  });
+}
 
-                for (let C = range.s.c; C <= range.e.c; C++) {
-                    const cell = sheet[XLSX.utils.encode_cell({ r: headerRow, c: C })];
-                    if (cell && cell.v) {
-                        let txt = cell.v.toString().trim().toUpperCase();
-                        if (txt === "RUT") colIndices.rut = C;
-                        else if (txt === "APELLIDO P." || txt === "APELLIDO P") colIndices.paterno = C;
-                        else if (txt === "APELLIDO M." || txt === "APELLIDO M") colIndices.materno = C;
-                        else if (txt === "NOMBRES") colIndices.nombres = C;
-                    }
-                }
-
-                // Fecha de la clase (celda F5)
-                let fechaStr = null;
-                const fechaCell = sheet['F5'] || sheet['E5'];
-                if (fechaCell) {
-                    if (fechaCell.t === 'd') fechaStr = XLSX.SSF.format("yyyy-mm-dd", fechaCell.v);
-                    else if (fechaCell.t === 's') fechaStr = new Date(fechaCell.v).toISOString().slice(0,10);
-                    else if (typeof fechaCell.v === 'number') fechaStr = XLSX.SSF.format("yyyy-mm-dd", fechaCell.v);
-                }
-                if (!fechaStr) continue;
-
-                let asistenciaCol = 5; // columna F
-                if (colIndices.nombres !== -1) asistenciaCol = colIndices.nombres + 1;
-
-                for (let R = headerRow + 1; R <= range.e.r; R++) {
-                    const rutCell = sheet[XLSX.utils.encode_cell({ r: R, c: colIndices.rut })];
-                    if (!rutCell) continue;
-                    let rut = rutCell.v.toString().trim();
-                    if (rut === "") continue;
-
-                    const paterno = sheet[XLSX.utils.encode_cell({ r: R, c: colIndices.paterno })]?.v?.toString().trim() || "";
-                    const materno = sheet[XLSX.utils.encode_cell({ r: R, c: colIndices.materno })]?.v?.toString().trim() || "";
-                    const nombres = sheet[XLSX.utils.encode_cell({ r: R, c: colIndices.nombres })]?.v?.toString().trim() || "";
-                    let nombreCompleto = `${nombres} ${paterno} ${materno}`.trim().replace(/\s+/g, ' ');
-                    if (nombreCompleto === "") nombreCompleto = `Alumno ${rut}`;
-
-                    const asistCell = sheet[XLSX.utils.encode_cell({ r: R, c: asistenciaCol })];
-                    let asistenciaVal = asistCell ? asistCell.v?.toString().trim() : "";
-                    let tipoAsistencia = null;
-                    if (asistenciaVal === "1" || asistenciaVal === "J") tipoAsistencia = "Presencial";
-                    else if (asistenciaVal === "OL") tipoAsistencia = "Online";
-
-                    if (!alumnosMap.has(rut)) {
-                        alumnosMap.set(rut, { nombre: nombreCompleto, depto: "Compliance", tipoAlumno: "Normal" });
-                    }
-                    if (tipoAsistencia) {
-                        let clase = clases.find(c => c.fecha === fechaStr);
-                        if (!clase) { clase = { fecha: fechaStr, asistencias: new Map() }; clases.push(clase); }
-                        clase.asistencias.set(rut, tipoAsistencia);
-                    }
-                }
-            }
-
-            // Convertir a arrays
-            alumnos = [];
-            const rutToId = new Map();
-            nextId = 1;
-            for (let [rut, info] of alumnosMap.entries()) {
-                const id = nextId++;
-                alumnos.push({ id, nombre: info.nombre, depto: info.depto, tipoAlumno: info.tipoAlumno });
-                rutToId.set(rut, id);
-            }
-
-            registros = [];
-            for (let clase of clases) {
-                for (let [rut, tipo] of clase.asistencias.entries()) {
-                    const alumnoId = rutToId.get(rut);
-                    if (alumnoId) registros.push({ fecha: clase.fecha, alumnoId, tipoAsistencia: tipo });
-                }
-            }
-
-            // Agregar fechas nuevas al calendario (si no están)
-            for (let f of clases.map(c => c.fecha)) {
-                if (!fechasClase.includes(f)) fechasClase.push(f);
-            }
-            fechasClase.sort();
-            actualizarSelectFechas();
-            if (fechasClase.length) currentFechaClase = fechasClase[0];
-            renderizarTablaAsistenciaFecha(currentFechaClase);
-            updateDashboard();
-            guardarTodo();
-            const msg = `✅ Archivo cargado: ${alumnos.length} alumnos, ${fechasClase.length} fechas, ${registros.length} asistencias.`;
-            document.getElementById("mensajeCarga").innerHTML = `<span class="success-msg">${msg}</span>`;
-            mostrarMensaje(msg, "success");
-        } catch (e) {
-            console.error(e);
-            mostrarMensaje("Error al procesar el archivo. Revise formato.", "error");
-        }
-    }
-
-    // ---------- ASISTENCIA POR FECHA ----------
-    function actualizarSelectFechas() {
-        const select = document.getElementById("fechaClaseSelect");
-        select.innerHTML = "";
-        if (fechasClase.length === 0) { select.innerHTML = "<option>Sin fechas</option>"; return; }
-        fechasClase.forEach(f => {
-            let opt = document.createElement("option");
-            opt.value = f;
-            opt.textContent = f;
-            select.appendChild(opt);
-        });
-        if (fechasClase.length) currentFechaClase = fechasClase[0];
-        select.value = currentFechaClase;
-    }
-
-    function renderizarTablaAsistenciaFecha(fecha) {
-        const tbody = document.getElementById("asistenciaFechaBody");
-        tbody.innerHTML = "";
-        if (!fecha || !alumnos.length) { tbody.innerHTML = '<td><td colspan="6">Seleccione fecha y cargue alumnos</tbody>'; return; }
-        if (!fechasClase.includes(fecha)) { tbody.innerHTML = '<td><td colspan="6">Fecha no válida</tbody>'; return; }
-        for (let alum of alumnos) {
-            let registro = registros.find(r => r.fecha === fecha && r.alumnoId === alum.id);
-            let tipo = registro ? registro.tipoAsistencia : "";
-            let estado = registro ? (tipo === "Presencial" ? "✅ Presencial" : "🖥️ Online") : "❌ Ausente";
-            let row = tbody.insertRow();
-            row.setAttribute("data-alumno-id", alum.id);
-            row.innerHTML = `
-                <td>${alum.nombre}</td>
-                <td>${alum.depto}</td>
-                <td>${alum.tipoAlumno}</td>
-                <td><select class="asist-tipo" data-alum="${alum.id}">
-                    <option value="" ${!tipo ? "selected" : ""}>-- Sin registrar --</option>
-                    <option value="Presencial" ${tipo === "Presencial" ? "selected" : ""}>Presencial</option>
-                    <option value="Online" ${tipo === "Online" ? "selected" : ""}>Online</option>
-                </select></td>
-                <td class="estado-asistencia">${estado}</td>
-                <td><button class="borrar-reg" data-alum="${alum.id}">🗑️</button></td>
-            `;
-        }
-        attachEventosAsistencia(fecha);
-    }
-
-    function attachEventosAsistencia(fecha) {
-        document.querySelectorAll(".borrar-reg").forEach(btn => {
-            btn.addEventListener("click", (e) => {
-                let alumId = parseInt(btn.dataset.alum);
-                let idx = registros.findIndex(r => r.fecha === fecha && r.alumnoId === alumId);
-                if (idx !== -1) registros.splice(idx, 1);
-                renderizarTablaAsistenciaFecha(fecha);
-                updateDashboard();
-                guardarTodo();
-                mostrarMensaje(`Registro eliminado para ${fecha}`, "warning");
-            });
-        });
-        document.querySelectorAll(".asist-tipo").forEach(sel => {
-            sel.addEventListener("change", (e) => {
-                let alumId = parseInt(sel.dataset.alum);
-                let nuevoValor = sel.value;
-                let span = sel.closest("tr").querySelector(".estado-asistencia");
-                if (nuevoValor === "") span.innerText = "❌ Ausente";
-                else span.innerText = nuevoValor === "Presencial" ? "✅ Presencial" : "🖥️ Online";
-            });
-        });
-    }
-
-    function guardarAsistenciasFecha(fecha) {
-        if (!fecha) return;
-        let filas = document.querySelectorAll("#asistenciaFechaBody tr");
-        let nuevos = [];
-        for (let fila of filas) {
-            let alumnoId = parseInt(fila.dataset.alumnoId);
-            let select = fila.querySelector(".asist-tipo");
-            let tipo = select.value;
-            if (tipo === "Presencial" || tipo === "Online") nuevos.push({ fecha, alumnoId, tipoAsistencia: tipo });
-        }
-        registros = registros.filter(r => r.fecha !== fecha);
-        registros.push(...nuevos);
-        renderizarTablaAsistenciaFecha(fecha);
-        updateDashboard();
-        guardarTodo();
-        mostrarMensaje(`Guardado ${fecha} (${nuevos.length} registros)`, "success");
-    }
-
-    // ---------- RESÚMEN Y APROBACIÓN ----------
-    function getResumenConAprobacion() {
-        if (fechasClase.length === 0) return [];
-        let totalDias = fechasClase.length;
-        return alumnos.map(alum => {
-            let regs = registros.filter(r => r.alumnoId === alum.id);
-            let asistencias = regs.length;
-            let presenciales = regs.filter(r => r.tipoAsistencia === "Presencial").length;
-            let online = regs.filter(r => r.tipoAsistencia === "Online").length;
-            let pctAsist = (asistencias / totalDias) * 100;
-            let pctPres = asistencias ? (presenciales / asistencias) * 100 : 0;
-            let pctOn = asistencias ? (online / asistencias) * 100 : 0;
-            let cumple75 = pctAsist >= 75;
-            let cumpleDist = false;
-            if (alum.tipoAlumno === "Normal") cumpleDist = (pctPres >= 75 && pctOn <= 25);
-            else cumpleDist = (pctPres >= 25 && pctOn <= 75);
-            let aprueba = cumple75 && cumpleDist;
-            return {
-                id: alum.id, nombre: alum.nombre, depto: alum.depto, tipoAlumno: alum.tipoAlumno,
-                totalDias, asistencias, ausencias: totalDias - asistencias, pctAsistencia: pctAsist,
-                pctPresencial: pctPres, pctOnline: pctOn, presenciales, online,
-                cumple75, cumpleDist, aprueba
-            };
-        });
-    }
-
-    function renderizarTablaResumen() {
-        const data = getResumenConAprobacion();
-        const tbody = document.getElementById("resumenAsistenciaBody");
-        tbody.innerHTML = "";
-        if (data.length === 0) { tbody.innerHTML = '<td><td colspan="13">Sin datos</tbody>'; return; }
-        for (let r of data) {
-            let tipoSelect = `<select class="tipo-editable" data-id="${r.id}">
-                <option value="Normal" ${r.tipoAlumno === "Normal" ? "selected" : ""}>Normal</option>
-                <option value="Región" ${r.tipoAlumno === "Región" ? "selected" : ""}>Región</option>
-            </select>`;
-            let row = tbody.insertRow();
-            row.innerHTML = `
-                <td>${r.nombre}</td><td>${r.depto}</td><td>${tipoSelect}</td>
-                <td>${r.totalDias}</td><td>${r.asistencias}</td><td>${r.pctAsistencia.toFixed(1)}%</td>
-                <td>${r.presenciales}</td><td>${r.online}</td>
-                <td>${r.pctPresencial.toFixed(1)}%</td><td>${r.pctOnline.toFixed(1)}%</td>
-                <td>${r.cumple75 ? "✅ Sí" : "❌ No"}</td>
-                <td>${r.cumpleDist ? "✅ Sí" : "❌ No"}</td>
-                <td style="background:${r.aprueba ? "#c8f0d1" : "#f0c8c8"}">${r.aprueba ? "✅ Aprueba" : "❌ No Aprueba"}</td>
-            `;
-        }
-        document.querySelectorAll(".tipo-editable").forEach(sel => {
-            sel.addEventListener("change", (e) => {
-                let alumId = parseInt(sel.dataset.id);
-                let nuevoTipo = sel.value;
-                let alum = alumnos.find(a => a.id === alumId);
-                if (alum) { alum.tipoAlumno = nuevoTipo; guardarTodo(); updateDashboard(); }
-            });
-        });
-    }
-
-    // ---------- HEATMAP ----------
-    function renderizarHeatmap() {
-        const canvas = document.getElementById("heatmapChart");
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (heatmapChart) heatmapChart.destroy();
-        if (alumnos.length === 0 || fechasClase.length === 0) return;
-        const diasSemana = [1,2,3,4,5,6];
-        const nombresDias = ["Lun","Mar","Mié","Jue","Vie","Sáb"];
-        const dataPoints = [];
-        for (let i = 0; i < alumnos.length; i++) {
-            const alum = alumnos[i];
-            for (let j = 0; j < diasSemana.length; j++) {
-                const dia = diasSemana[j];
-                const fechasDia = fechasClase.filter(f => new Date(f).getDay() === dia);
-                if (fechasDia.length === 0) continue;
-                let asistencias = 0;
-                for (let f of fechasDia) {
-                    if (registros.some(r => r.fecha === f && r.alumnoId === alum.id)) asistencias++;
-                }
-                const porcentaje = (asistencias / fechasDia.length) * 100;
-                dataPoints.push({ x: j, y: i, v: porcentaje });
-            }
-        }
-        const labelsY = alumnos.map(a => a.nombre.length > 20 ? a.nombre.substring(0,18)+"..." : a.nombre);
-        if (dataPoints.length === 0) return;
-        heatmapChart = new Chart(ctx, {
-            type: 'matrix',
-            data: { datasets: [{
-                label: '% Asistencia',
-                data: dataPoints,
-                backgroundColor: (ctx) => {
-                    const v = ctx.dataset.data[ctx.dataIndex].v;
-                    if (v >= 75) return '#2e7d64';
-                    if (v >= 50) return '#f4b942';
-                    return '#c95a5a';
-                },
-                borderWidth: 1, borderColor: '#fff',
-                width: ({chart}) => (chart.chartArea?.width / 6) || 70,
-                height: ({chart}) => (chart.chartArea?.height / alumnos.length) || 30
-            }] },
-            options: {
-                responsive: true, maintainAspectRatio: true,
-                plugins: { tooltip: { callbacks: { title: (ctx) => `${labelsY[ctx[0].raw.y]} - ${nombresDias[ctx[0].raw.x]}`, label: (ctx) => `Asistencia: ${ctx.raw.v.toFixed(1)}%` } }, legend: { position: 'bottom' } },
-                scales: {
-                    x: { type: 'linear', offset: true, ticks: { stepSize: 1, callback: (val) => nombresDias[val] }, title: { display: true, text: 'Día' } },
-                    y: { type: 'linear', offset: true, ticks: { stepSize: 1, callback: (val) => labelsY[val] }, title: { display: true, text: 'Alumno' } }
-                }
-            }
-        });
-    }
-
-    // ---------- DASHBOARD ----------
-    function updateDashboard() {
-        renderizarTablaResumen();
-        renderizarHeatmap();
-        const data = getResumenConAprobacion();
-        let total = data.length;
-        let asistProm = total ? data.reduce((a,b)=>a+b.pctAsistencia,0)/total : 0;
-        let aprueban = data.filter(d => d.aprueba).length;
-        document.getElementById("kpiContainer").innerHTML = `
-            <div class="kpi-card"><h3>📈 Asistencia Promedio</h3><div class="kpi-value">${asistProm.toFixed(1)}%</div><div class="badge">Meta 75%</div></div>
-            <div class="kpi-card"><h3>✅ Aprueban Curso</h3><div class="kpi-value">${aprueban}/${total||0}</div><div class="badge">Según reglas</div></div>
-            <div class="kpi-card"><h3>📅 Días de clase</h3><div class="kpi-value">${fechasClase.length}</div><div class="badge">Calendario</div></div>
-            <div class="kpi-card"><h3>👥 Alumnos</h3><div class="kpi-value">${alumnos.length}</div><div class="badge">Registrados</div></div>
-        `;
-    }
-
-    function agregarAlumnoManual() {
-        let nombre = prompt("Nombre completo:");
-        if (!nombre) return;
-        let depto = prompt("Departamento:", "Compliance");
-        let tipo = prompt("Tipo (Normal/Región):", "Normal");
-        if (tipo !== "Normal" && tipo !== "Región") tipo = "Normal";
-        alumnos.push({ id: nextId++, nombre: nombre.trim(), depto: depto || "Compliance", tipoAlumno: tipo });
-        if (currentFechaClase) renderizarTablaAsistenciaFecha(currentFechaClase);
-        updateDashboard();
-        guardarTodo();
-        mostrarMensaje(`Alumno "${nombre}" agregado`, "success");
-    }
-
-    function exportarReporteCSV() {
-        let data = getResumenConAprobacion();
-        if (data.length === 0) { mostrarMensaje("Sin datos para exportar", "warning"); return; }
-        let csv = [["Alumno","Depto","Tipo","Días Clase","Asistencias","% Asistencia","Presenciales","Online","%Presencial","%Online","Cumple 75%","Cumple Distribución","Aprueba Curso"]];
-        data.forEach(r => csv.push([r.nombre, r.depto, r.tipoAlumno, r.totalDias, r.asistencias, r.pctAsistencia.toFixed(1)+"%", r.presenciales, r.online, r.pctPresencial.toFixed(1)+"%", r.pctOnline.toFixed(1)+"%", r.cumple75?"Sí":"No", r.cumpleDist?"Sí":"No", r.aprueba?"Aprueba":"No Aprueba"]));
-        let blob = new Blob(["\uFEFF" + csv.map(r=>r.join(",")).join("\n")], {type:"text/csv"});
-        saveAs(blob, `reporte_${getCursoActivo()?.nombre.replace(/\s/g,'_')}.csv`);
-        mostrarMensaje("CSV exportado", "success");
-    }
-
-    function exportarExcel() {
-        let data = getResumenConAprobacion();
-        if (data.length === 0) { mostrarMensaje("Sin datos para exportar", "warning"); return; }
-        let wsData = [["Alumno","Depto","Tipo","Días Clase","Asistencias","% Asistencia","Presenciales","Online","%Presencial","%Online","Cumple 75%","Cumple Distribución","Aprueba Curso"]];
-        data.forEach(r => wsData.push([r.nombre, r.depto, r.tipoAlumno, r.totalDias, r.asistencias, r.pctAsistencia.toFixed(1)+"%", r.presenciales, r.online, r.pctPresencial.toFixed(1)+"%", r.pctOnline.toFixed(1)+"%", r.cumple75?"Sí":"No", r.cumpleDist?"Sí":"No", r.aprueba?"Aprueba":"No Aprueba"]));
-        let ws = XLSX.utils.aoa_to_sheet(wsData);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Resumen");
-        XLSX.writeFile(wb, `reporte_${getCursoActivo()?.nombre.replace(/\s/g,'_')}.xlsx`);
-        mostrarMensaje("Excel exportado", "success");
-    }
-
-    function guardarBackup() {
-        const data = { cursos, cursoActivoId, alumnos, registros, fechasClase, nextId };
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
-        saveAs(blob, `backup_${new Date().toISOString().slice(0,19)}.json`);
-        mostrarMensaje("Backup guardado", "success");
-    }
-
-    function restaurarBackup(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (data.cursos && data.alumnos !== undefined) {
-                    cursos = data.cursos;
-                    cursoActivoId = data.cursoActivoId;
-                    alumnos = data.alumnos;
-                    registros = data.registros;
-                    fechasClase = data.fechasClase;
-                    nextId = data.nextId;
-                    guardarTodo();
-                    cargarCursoActivo();
-                    mostrarMensaje("Backup restaurado", "success");
-                } else throw new Error("Formato inválido");
-            } catch(e) { mostrarMensaje("Archivo inválido", "error"); }
-        };
-        reader.readAsText(file);
-    }
-
-    function resetCurso() {
-        if (confirm("¿Resetear todos los datos del curso actual? (alumnos, asistencias, calendario)")) {
-            alumnos = [];
-            registros = [];
-            nextId = 1;
-            regenerarCalendarioDesdeCurso();
-            guardarTodo();
-            cargarCursoActivo();
-            mostrarMensaje("Curso reiniciado", "success");
-        }
-    }
-
-    // ---------- EVENTOS ----------
-    document.getElementById("cursosLista").addEventListener("change", (e) => {
-        cursoActivoId = parseInt(e.target.value);
-        guardarTodo();
-        cargarCursoActivo();
+/* ----- REPORTES ----- */
+function renderReportes(){
+  renderRiesgo();
+  renderCharts();
+  renderHeatmap();
+}
+function renderRiesgo(){
+  const data=calcularResumen().filter(d=>!d.aprueba).sort((a,b)=>a.pctA-b.pctA);
+  const box=document.getElementById("riesgoBox");
+  if(!data.length){ box.innerHTML=`<div class="empty" style="padding:18px">🎉 Ningún alumno en riesgo.</div>`; return; }
+  box.innerHTML = data.map(r=>{
+    const motivo = !r.alcanzable ? "ya no puede alcanzar el umbral"
+      : !r.cumple75 ? `puede faltar ${r.restantes} clase(s) más`
+      : "no cumple la distribución presencial/online";
+    return `<div class="snap-item"><div><b>${esc(r.nombre)}</b> · <span class="mono">${r.pctA.toFixed(1)}%</span>
+      <span class="muted-txt"> — ${motivo}</span></div>
+      <span class="tag ${r.alcanzable?'warn':'bad'}">${r.alcanzable?'En riesgo':'Reprueba'}</span></div>`;
+  }).join("");
+}
+function renderCharts(){
+  const c=curso(); if(!c) return;
+  // tendencia: % presentes por fecha
+  const labels=c.fechasClase.map(f=>fechaLegible(f).replace(/^.../,"")); 
+  const vals=c.fechasClase.map(f=>{
+    const present=c.registros.filter(r=>r.fecha===f).length;
+    return c.alumnos.length? +(present/c.alumnos.length*100).toFixed(1):0;
+  });
+  if(chartTrend) chartTrend.destroy();
+  chartTrend=new Chart(document.getElementById("chartTrend"),{
+    type:"line",
+    data:{labels,datasets:[{label:"% presentes",data:vals,borderColor:"#0d6e63",backgroundColor:"rgba(13,110,99,.12)",fill:true,tension:.3,pointRadius:3,pointBackgroundColor:"#0d6e63"}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+"%"}}}}
+  });
+  // distribución global
+  const pres=c.registros.filter(r=>r.tipoAsistencia==="Presencial").length;
+  const onl=c.registros.filter(r=>r.tipoAsistencia==="Online").length;
+  if(chartDist) chartDist.destroy();
+  chartDist=new Chart(document.getElementById("chartDist"),{
+    type:"doughnut",
+    data:{labels:["Presencial","Online"],datasets:[{data:[pres,onl],backgroundColor:["#1f7a52","#2c6e9e"],borderWidth:2,borderColor:"#fffdf8"}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},cutout:"62%"}
+  });
+}
+function renderHeatmap(){
+  const c=curso(); const wrap=document.getElementById("hmWrap");
+  if(!c||!c.alumnos.length||!c.fechasClase.length){ wrap.innerHTML=`<div class="empty">Sin datos para el mapa de calor.</div>`; return; }
+  const colores={Presencial:"var(--ok)",Online:"var(--online)"};
+  let html=`<table class="hm"><thead><tr><th class="name">Alumno</th>`;
+  c.fechasClase.forEach(f=>{ const d=parseLocalDate(f); html+=`<th title="${fechaLegible(f)}">${pad(d.getDate())}/${pad(d.getMonth()+1)}</th>`; });
+  html+=`<th title="Asistencia">%</th></tr></thead><tbody>`;
+  c.alumnos.forEach(a=>{
+    let present=0;
+    let cells="";
+    c.fechasClase.forEach(f=>{
+      const reg=c.registros.find(r=>r.fecha===f && r.alumnoId===a.id);
+      if(reg){ present++; cells+=`<td class="cell" title="${fechaLegible(f)} · ${reg.tipoAsistencia}" style="background:${colores[reg.tipoAsistencia]}"></td>`; }
+      else cells+=`<td class="cell" title="${fechaLegible(f)} · Ausente" style="background:var(--bad)"></td>`;
     });
-    document.getElementById("btnNuevoCurso").onclick = nuevoCurso;
-    document.getElementById("btnEliminarCurso").onclick = eliminarCursoActivo;
-    document.getElementById("btnActualizarCurso").onclick = guardarConfiguracionCurso;
-    document.getElementById("btnGenerarCalendarioCurso").onclick = () => { regenerarCalendarioDesdeCurso(); mostrarMensaje("Calendario regenerado", "success"); };
-    document.getElementById("cargarCalendarioArchivo").addEventListener("change", (e) => {
-        if (!e.target.files[0]) return;
-        let reader = new FileReader();
-        reader.onload = (ev) => cargarCalendarioDesdeArchivo(new Uint8Array(ev.target.result));
-        reader.readAsArrayBuffer(e.target.files[0]);
-    });
-    document.getElementById("cargarArchivoDCC").addEventListener("change", (e) => {
-        if (!e.target.files[0]) return;
-        let reader = new FileReader();
-        reader.onload = (ev) => procesarArchivoDCC(new Uint8Array(ev.target.result));
-        reader.readAsArrayBuffer(e.target.files[0]);
-    });
-    document.getElementById("btnResetTotal").onclick = resetCurso;
-    document.getElementById("btnExportarReporteCSV").onclick = exportarReporteCSV;
-    document.getElementById("btnExportarExcel").onclick = exportarExcel;
-    document.getElementById("btnBackup").onclick = guardarBackup;
-    document.getElementById("restaurarBackup").addEventListener("change", (e) => {
-        if (e.target.files.length) restaurarBackup(e.target.files[0]);
-        e.target.value = "";
-    });
-    document.getElementById("btnActualizarTipos").onclick = () => { updateDashboard(); };
-    document.getElementById("fechaClaseSelect").addEventListener("change", (e) => { currentFechaClase = e.target.value; renderizarTablaAsistenciaFecha(currentFechaClase); });
-    document.getElementById("btnCargarAsistenciaFecha").onclick = () => { if (currentFechaClase) renderizarTablaAsistenciaFecha(currentFechaClase); };
-    document.getElementById("btnGuardarAsistenciaFecha").onclick = () => { if (currentFechaClase) guardarAsistenciasFecha(currentFechaClase); };
-    document.getElementById("btnAgregarAlumnoManual").onclick = agregarAlumnoManual;
+    const pct=(present/c.fechasClase.length*100);
+    const pctColor = pct>=(c.umbral||75)?"var(--ok)":pct>=50?"var(--warn)":"var(--bad)";
+    html+=`<tr><td class="name" title="${esc(a.nombre)}">${esc(a.nombre)}</td>${cells}<td class="cell mono" style="font-weight:600;color:${pctColor}">${pct.toFixed(0)}</td></tr>`;
+  });
+  html+="</tbody></table>";
+  wrap.innerHTML=html;
+}
 
-    cargarTodo();
+/* ----- CONFIG ----- */
+function renderConfig(){
+  const c=curso(); if(!c) return;
+  document.getElementById("cfgNombre").value=c.nombre;
+  document.getElementById("cfgInicio").value=c.fechaInicio;
+  document.getElementById("cfgFin").value=c.fechaFin;
+  document.getElementById("cfgUmbral").value=c.umbral||75;
+  document.querySelectorAll("#cfgDias input").forEach(cb=>cb.checked=c.diasClase.includes(Number(cb.value)));
+  document.getElementById("cfgInfo").innerHTML=`📆 Calendario actual: <b>${c.fechasClase.length}</b> días de clase.`;
+}
+function guardarConfig(){
+  const c=curso(); if(!c) return;
+  const nombre=document.getElementById("cfgNombre").value.trim();
+  const inicio=document.getElementById("cfgInicio").value;
+  const fin=document.getElementById("cfgFin").value;
+  const umbral=Math.max(1,Math.min(100,Number(document.getElementById("cfgUmbral").value)||75));
+  const dias=[...document.querySelectorAll("#cfgDias input:checked")].map(cb=>Number(cb.value));
+  if(!nombre){ toast("El nombre es obligatorio.","error"); return; }
+  if(!inicio||!fin){ toast("Define fecha de inicio y fin.","error"); return; }
+  if(parseLocalDate(inicio)>parseLocalDate(fin)){ toast("La fecha de inicio es posterior a la de fin.","error"); return; }
+  if(!dias.length){ toast("Selecciona al menos un día de clase.","error"); return; }
+  Object.assign(c,{nombre,fechaInicio:inicio,fechaFin:fin,umbral,diasClase:dias});
+  c.fechasClase=generarFechas(c);
+  c.registros=c.registros.filter(r=>c.fechasClase.includes(r.fecha)); // limpia registros fuera de calendario
+  guardar(); renderAll();
+  toast(`Calendario generado: ${c.fechasClase.length} días.`,"ok");
+}
+
+/* ============================================================
+   IMPORTACIÓN / EXPORTACIÓN EXCEL  (robusta)
+   ============================================================ */
+function normalizaRut(r){ return String(r||"").replace(/\./g,"").replace(/\s/g,"").toUpperCase().trim(); }
+function clasificarAsistencia(v){
+  const s=String(v??"").trim().toUpperCase();
+  if(["1","P","PR","PRES","PRESENCIAL","J","X","SI","SÍ","ASISTIO","ASISTIÓ","✓","V"].includes(s)) return "Presencial";
+  if(["OL","O","ON","ONLINE","REMOTO","R","2","ZOOM"].includes(s)) return "Online";
+  return null; // ausente / vacío
+}
+function parseFechaFlexible(v){
+  if(v==null||v==="") return null;
+  if(typeof v==="number"){ const d=XLSX.SSF.parse_date_code(v); return d?isoFromYMD(d.y,d.m,d.d):null; }
+  if(v instanceof Date) return toISO(v);
+  const s=String(v).trim();
+  let m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); // dd/mm/yyyy (Chile)
+  if(m){ let y=m[3]; if(y.length===2) y="20"+y; return isoFromYMD(+y,+m[2],+m[1]); }
+  m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/); // yyyy-mm-dd
+  if(m) return isoFromYMD(+m[1],+m[2],+m[3]);
+  const dt=new Date(s); return isNaN(dt)?null:toISO(dt);
+}
+
+function importarExcel(buffer){
+  let wb;
+  try{ wb=XLSX.read(buffer,{type:"array",cellDates:true}); }
+  catch(e){ toast("No se pudo leer el archivo.","error"); return; }
+  const c=curso(); if(!c){ toast("Crea o selecciona un curso primero.","warn"); return; }
+
+  // mapa por RUT (o nombre si no hay rut) -> alumno existente
+  const idxAlumno=new Map();
+  c.alumnos.forEach(a=>idxAlumno.set(a.rut?normalizaRut(a.rut):"N:"+a.nombre.toLowerCase(),a));
+  function obtenerAlumno(rut,nombre,depto,tipo){
+    const key = rut?normalizaRut(rut):"N:"+(nombre||"").toLowerCase();
+    let a=idxAlumno.get(key);
+    if(!a){ a={id:c.nextId++,rut:rut?normalizaRut(rut):"",nombre:nombre||("Alumno "+rut),depto:depto||"",tipoAlumno:tipo||"Normal"}; c.alumnos.push(a); idxAlumno.set(key,a); }
+    else { if(nombre&&a.nombre.startsWith("Alumno")) a.nombre=nombre; if(depto&&!a.depto)a.depto=depto; }
+    return a;
+  }
+
+  let nAlumnos0=c.alumnos.length, fechasNuevas=new Set(), nReg=0, hojasOK=0, avisos=[];
+  const registrosNuevos=[]; // {fecha,alumnoId,tipo}
+
+  wb.SheetNames.forEach(name=>{
+    const sheet=wb.Sheets[name];
+    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:""});
+    if(!rows.length){ return; }
+    // localizar fila de encabezado con "RUT"
+    let hr=-1, cols={};
+    for(let R=0;R<Math.min(rows.length,25);R++){
+      for(let C=0;C<rows[R].length;C++){
+        if(String(rows[R][C]).trim().toUpperCase().replace(/\./g,"")==="RUT"){ hr=R; break; }
+      }
+      if(hr!==-1) break;
+    }
+    if(hr===-1){ avisos.push(`Hoja "${name}": sin columna RUT, omitida.`); return; }
+    const header=rows[hr].map(h=>String(h).trim());
+    header.forEach((h,C)=>{
+      const u=h.toUpperCase().replace(/\./g,"");
+      if(u==="RUT")cols.rut=C;
+      else if(u==="APELLIDO P"||u==="PATERNO")cols.pat=C;
+      else if(u==="APELLIDO M"||u==="MATERNO")cols.mat=C;
+      else if(u==="NOMBRES"||u==="NOMBRE")cols.nom=C;
+      else if(u==="DEPTO"||u==="DEPARTAMENTO")cols.depto=C;
+      else if(u==="TIPO")cols.tipo=C;
+    });
+    // ¿es matriz? -> varias columnas-fecha en el encabezado
+    const colsFecha=[];
+    header.forEach((h,C)=>{ const f=parseFechaFlexible(h); if(f) colsFecha.push({C,fecha:f}); });
+
+    if(colsFecha.length>=2){
+      // ---- FORMATO MATRIZ (re-importable) ----
+      hojasOK++;
+      for(let R=hr+1;R<rows.length;R++){
+        const rut=rows[R][cols.rut]; if(rut===undefined||String(rut).trim()==="") continue;
+        const nombre=cols.nom!=null?String(rows[R][cols.nom]).trim():("Alumno "+rut);
+        const depto=cols.depto!=null?String(rows[R][cols.depto]).trim():"";
+        const tipo=cols.tipo!=null?(String(rows[R][cols.tipo]).trim()||"Normal"):"Normal";
+        const a=obtenerAlumno(rut,nombre,depto,tipo);
+        colsFecha.forEach(({C,fecha})=>{
+          const t=clasificarAsistencia(rows[R][C]);
+          fechasNuevas.add(fecha);
+          if(t){ registrosNuevos.push({fecha,alumnoId:a.id,tipoAsistencia:t}); nReg++; }
+        });
+      }
+    } else {
+      // ---- FORMATO DCC (una hoja = una clase) ----
+      // fecha: F5/E5, o nombre de hoja, o primera fecha hallada en cabecera
+      let fecha=null;
+      for(const ref of ["F5","E5","G5","F4","E4"]){ if(sheet[ref]){ fecha=parseFechaFlexible(sheet[ref].v); if(fecha)break; } }
+      if(!fecha) fecha=parseFechaFlexible(name);
+      if(!fecha){ avisos.push(`Hoja "${name}": no se encontró fecha, omitida.`); return; }
+      // columna de asistencia: la que sigue a NOMBRES, o última columna con datos
+      let colAsist = (cols.nom!=null)?cols.nom+1:5;
+      hojasOK++; fechasNuevas.add(fecha);
+      for(let R=hr+1;R<rows.length;R++){
+        const rut=rows[R][cols.rut]; if(rut===undefined||String(rut).trim()==="") continue;
+        const nombre=[cols.nom!=null?rows[R][cols.nom]:"",cols.pat!=null?rows[R][cols.pat]:"",cols.mat!=null?rows[R][cols.mat]:""]
+          .map(x=>String(x||"").trim()).filter(Boolean).join(" ").replace(/\s+/g," ") || ("Alumno "+rut);
+        const a=obtenerAlumno(rut,nombre,"","Normal");
+        const t=clasificarAsistencia(rows[R][colAsist]);
+        if(t){ registrosNuevos.push({fecha,alumnoId:a.id,tipoAsistencia:t}); nReg++; }
+      }
+    }
+  });
+
+  if(hojasOK===0){ toast("No se reconoció ningún formato válido en el archivo.","error"); 
+    if(avisos.length) console.warn(avisos.join("\n")); return; }
+
+  // aplicar: agregar fechas, fusionar registros (sin duplicar)
+  fechasNuevas.forEach(f=>{ if(!c.fechasClase.includes(f)) c.fechasClase.push(f); });
+  c.fechasClase.sort();
+  registrosNuevos.forEach(nr=>{
+    const i=c.registros.findIndex(r=>r.fecha===nr.fecha && r.alumnoId===nr.alumnoId);
+    if(i!==-1) c.registros[i].tipoAsistencia=nr.tipoAsistencia;
+    else c.registros.push(nr);
+  });
+
+  guardar(); renderAll();
+  const nuevosAl=c.alumnos.length-nAlumnos0;
+  modalInfo("Importación completada", `
+    <div class="snap-item"><span>Hojas procesadas</span><b>${hojasOK}</b></div>
+    <div class="snap-item"><span>Alumnos nuevos</span><b>${nuevosAl}</b> <span class="muted-txt">(total ${c.alumnos.length})</span></div>
+    <div class="snap-item"><span>Fechas detectadas</span><b>${fechasNuevas.size}</b></div>
+    <div class="snap-item"><span>Asistencias registradas</span><b>${nReg}</b></div>
+    ${avisos.length?`<div class="muted-txt" style="margin-top:10px">⚠️ ${avisos.map(esc).join("<br>")}</div>`:""}
+    <div class="muted-txt" style="margin-top:10px">Se creó un snapshot por si necesitas revertir.</div>`);
+  toast(`Importado: ${nuevosAl} alumnos nuevos, ${nReg} asistencias.`,"ok");
+}
+
+function buildMatrizAOA(){ // re-importable
+  const c=curso();
+  const head=["RUT","Nombre","Depto","Tipo",...c.fechasClase];
+  const rows=[head];
+  c.alumnos.forEach(a=>{
+    const row=[a.rut||"",a.nombre,a.depto||"",a.tipoAlumno];
+    c.fechasClase.forEach(f=>{
+      const reg=c.registros.find(r=>r.fecha===f && r.alumnoId===a.id);
+      row.push(reg?(reg.tipoAsistencia==="Presencial"?"P":"OL"):"");
+    });
+    rows.push(row);
+  });
+  return rows;
+}
+function exportarExcel(){
+  const c=curso(); const data=calcularResumen();
+  if(!data.length){ toast("Sin datos para exportar.","warn"); return; }
+  const wb=XLSX.utils.book_new();
+  // Resumen
+  const resHead=["Alumno","RUT","Depto","Tipo","Días","Asistencias","% Asist.","Presencial","Online","% Pres.","% Online","Faltas rest.","Cumple 75%","Cumple distrib.","Resultado"];
+  const resRows=[resHead,...data.map(r=>[r.nombre,r.rut||"",r.depto||"",r.tipoAlumno,r.total,r.asist,
+    +r.pctA.toFixed(1),r.pres,r.onl,+r.pctP.toFixed(1),+r.pctO.toFixed(1),r.alcanzable?r.restantes:"imposible",
+    r.cumple75?"Sí":"No",r.cumpleDist?"Sí":"No",r.aprueba?"Aprueba":"No aprueba"])];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resRows),"Resumen");
+  // Matriz (re-importable)
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(buildMatrizAOA()),"Matriz");
+  // Detalle largo
+  const det=[["Fecha","RUT","Alumno","Tipo"]];
+  c.registros.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(r=>{
+    const a=c.alumnos.find(x=>x.id===r.alumnoId); if(a) det.push([r.fecha,a.rut||"",a.nombre,r.tipoAsistencia]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(det),"Detalle");
+  XLSX.writeFile(wb,`asistencia_${slug(c.nombre)}.xlsx`);
+  toast("Excel exportado (Resumen · Matriz · Detalle).","ok");
+}
+function exportarCSV(){
+  const data=calcularResumen(); if(!data.length){ toast("Sin datos.","warn"); return; }
+  const head=["Alumno","RUT","Depto","Tipo","Dias","Asistencias","%Asist","Presencial","Online","%Pres","%Online","FaltasRest","Cumple75","CumpleDistrib","Resultado"];
+  const rows=[head,...data.map(r=>[r.nombre,r.rut||"",r.depto||"",r.tipoAlumno,r.total,r.asist,r.pctA.toFixed(1),r.pres,r.onl,r.pctP.toFixed(1),r.pctO.toFixed(1),r.alcanzable?r.restantes:"imposible",r.cumple75?"Si":"No",r.cumpleDist?"Si":"No",r.aprueba?"Aprueba":"No aprueba"])];
+  const csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  descargar(new Blob([csv],{type:"text/csv"}),`asistencia_${slug(curso().nombre)}.csv`);
+  toast("CSV exportado.","ok");
+}
+
+/* ----- backup / restore / snapshots ----- */
+function backupCompleto(){
+  descargar(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),`respaldo_asistencia_${toISO(new Date())}.json`);
+  toast("Respaldo descargado.","ok");
+}
+async function restaurarBackup(file){
+  try{
+    const data=migrar(JSON.parse(await file.text()));
+    if(!data) throw new Error("inválido");
+    await snapshot("Antes de restaurar respaldo");
+    cargarEstado(data); guardar(); renderAll();
+    toast("Respaldo restaurado.","ok");
+  }catch(e){ toast("Archivo de respaldo inválido.","error"); }
+}
+async function renderSnapshots(){
+  const el=document.getElementById("snapList");
+  const snaps=(await idbGet("snapshots"))||[];
+  if(!snaps.length){ el.innerHTML=`<div class="muted-txt">Aún no hay snapshots.</div>`; return; }
+  el.innerHTML=snaps.map((s,i)=>{
+    const d=new Date(s.ts);
+    return `<div class="snap-item"><div><b>${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}</b>
+      <span class="muted-txt"> — ${esc(s.motivo)}</span></div>
+      <button class="btn sm ghost" data-snap="${i}">Restaurar</button></div>`;
+  }).join("");
+  el.querySelectorAll("[data-snap]").forEach(b=>b.onclick=async()=>{
+    const snaps=(await idbGet("snapshots"))||[]; const s=snaps[Number(b.dataset.snap)]; if(!s) return;
+    if(!await confirmModal("Restaurar snapshot","Se reemplazarán los datos actuales por esta copia.",false)) return;
+    await snapshot("Antes de restaurar snapshot");
+    cargarEstado(migrar(s.data)); guardar(); renderAll();
+    toast("Snapshot restaurado.","ok");
+  });
+}
+
+/* ----- CRUD curso ----- */
+async function nuevoCurso(){
+  const r=await modalForm({title:"Nuevo curso",fields:[
+    {name:"nombre",label:"Nombre del curso",value:"",required:true},
+    {name:"fechaInicio",label:"Fecha inicio",type:"date",value:toISO(new Date())},
+    {name:"fechaFin",label:"Fecha fin",type:"date",value:toISO(new Date(Date.now()+30*864e5))}
+  ]});
+  if(!r) return;
+  const c=nuevoCursoVacio(r.nombre.trim(),r.fechaInicio,r.fechaFin,[1,2,3,4,5]);
+  c.fechasClase=generarFechas(c);
+  state.cursos.push(c); state.cursoActivoId=c.id;
+  guardar(); renderAll();
+  toast(`Curso "${c.nombre}" creado.`,"ok");
+}
+async function eliminarCurso(){
+  const c=curso(); if(!c) return;
+  if(!await confirmModal("Eliminar curso",`Se eliminará <b>${esc(c.nombre)}</b> con todos sus alumnos y asistencias.`,true)) return;
+  await snapshot("Antes de eliminar curso");
+  state.cursos=state.cursos.filter(x=>x.id!==c.id);
+  if(!state.cursos.length){ const n=nuevoCursoVacio("Nuevo curso",toISO(new Date()),toISO(new Date(Date.now()+30*864e5))); n.fechasClase=generarFechas(n); state.cursos.push(n); }
+  state.cursoActivoId=state.cursos[0].id;
+  guardar(); renderAll();
+  toast("Curso eliminado.","warn");
+}
+async function resetCurso(){
+  const c=curso(); if(!c) return;
+  if(!await confirmModal("Reiniciar curso","Se borrarán alumnos y asistencias de este curso (se conserva la configuración).",true)) return;
+  await snapshot("Antes de reiniciar curso");
+  c.alumnos=[]; c.registros=[]; c.nextId=1;
+  guardar(); renderAll();
+  toast("Curso reiniciado.","warn");
+}
+
+/* ============================================================
+   UI: toasts / modal / form
+   ============================================================ */
+function esc(s){ return String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+function slug(s){ return String(s||"curso").replace(/\s+/g,"_").replace(/[^\w\-]/g,""); }
+function descargar(blob,filename){ const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+function toast(msg,type="ok"){
+  const t=document.createElement("div"); t.className="toast "+type;
+  t.innerHTML=`<span>${type==="ok"?"✓":type==="warn"?"⚠":type==="error"?"✕":"ℹ"}</span><span>${esc(msg)}</span>`;
+  document.getElementById("toasts").appendChild(t);
+  setTimeout(()=>{ t.style.opacity="0"; t.style.transform="translateY(8px)"; t.style.transition=".3s"; setTimeout(()=>t.remove(),320); },4200);
+}
+const modalBg=document.getElementById("modalBg"), modalEl=document.getElementById("modal");
+function closeModal(){ modalBg.classList.remove("show"); modalEl.innerHTML=""; }
+modalBg.addEventListener("click",e=>{ if(e.target===modalBg) closeModal(); });
+function modalInfo(title,bodyHTML){
+  modalEl.innerHTML=`<div class="modal-h"><h3>${esc(title)}</h3></div><div class="modal-b">${bodyHTML}</div>
+    <div class="modal-f"><button class="btn" id="mOk">Entendido</button></div>`;
+  modalBg.classList.add("show");
+  modalEl.querySelector("#mOk").onclick=closeModal;
+}
+function confirmModal(title,msg,danger){
+  return new Promise(res=>{
+    modalEl.innerHTML=`<div class="modal-h"><h3>${esc(title)}</h3></div><div class="modal-b">${msg}</div>
+      <div class="modal-f"><button class="btn ghost" id="mNo">Cancelar</button><button class="btn ${danger?'danger':''}" id="mYes">Confirmar</button></div>`;
+    modalBg.classList.add("show");
+    modalEl.querySelector("#mNo").onclick=()=>{closeModal();res(false);};
+    modalEl.querySelector("#mYes").onclick=()=>{closeModal();res(true);};
+  });
+}
+function modalForm({title,fields,submitLabel="Guardar"}){
+  return new Promise(res=>{
+    const body=`<div class="grid-form">`+fields.map(f=>{
+      const id="f_"+f.name;
+      if(f.type==="select") return `<div class="field" style="${f.full?'grid-column:1/-1':''}"><label>${esc(f.label)}</label><select id="${id}">${f.options.map(o=>`<option ${o===f.value?'selected':''}>${esc(o)}</option>`).join("")}</select></div>`;
+      const t=f.type||"text";
+      return `<div class="field" style="${(f.full||t==='text')?'grid-column:1/-1':''}"><label>${esc(f.label)}${f.required?' *':''}</label><input id="${id}" type="${t}" value="${esc(f.value||"")}"></div>`;
+    }).join("")+`</div>`;
+    modalEl.innerHTML=`<div class="modal-h"><h3>${esc(title)}</h3></div><div class="modal-b">${body}</div>
+      <div class="modal-f"><button class="btn ghost" id="mCancel">Cancelar</button><button class="btn" id="mSave">${esc(submitLabel)}</button></div>`;
+    modalBg.classList.add("show");
+    const first=modalEl.querySelector("input,select"); if(first) first.focus();
+    modalEl.querySelector("#mCancel").onclick=()=>{closeModal();res(null);};
+    modalEl.querySelector("#mSave").onclick=()=>{
+      const out={};
+      for(const f of fields){ const v=modalEl.querySelector("#f_"+f.name).value; if(f.required&&!String(v).trim()){ toast(`"${f.label}" es obligatorio.`,"warn"); return; } out[f.name]=v; }
+      closeModal(); res(out);
+    };
+  });
+}
+
+/* ============================================================
+   EVENTOS
+   ============================================================ */
+function wire(){
+  document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>renderTab(b.dataset.tab));
+  document.getElementById("cursoSelect").onchange=e=>{ state.cursoActivoId=Number(e.target.value); currentFecha=""; calMonth=null; guardar(); renderAll(); };
+  document.getElementById("btnNuevoCurso").onclick=nuevoCurso;
+  document.getElementById("btnEditarCurso").onclick=()=>renderTab("config");
+  document.getElementById("btnImportTop").onclick=()=>document.getElementById("fileImport").click();
+  document.getElementById("btnEliminarCurso").onclick=eliminarCurso;
+  document.getElementById("btnGuardarCfg").onclick=guardarConfig;
+  document.getElementById("btnGuardarAsist").onclick=guardarAsistencia;
+  document.getElementById("btnTodosPresencial").onclick=()=>{ document.querySelectorAll("#asistBody .asist-sel").forEach(s=>s.value="Presencial"); };
+  document.getElementById("btnLimpiarFecha").onclick=()=>{ document.querySelectorAll("#asistBody .asist-sel").forEach(s=>s.value=""); };
+  document.getElementById("btnNuevoAlumno").onclick=()=>editarAlumno(null);
+  document.getElementById("btnExportResumen").onclick=exportarExcel;
+  document.getElementById("btnExportExcel").onclick=exportarExcel;
+  document.getElementById("btnExportCSV").onclick=exportarCSV;
+  document.getElementById("btnBackup").onclick=backupCompleto;
+  document.getElementById("btnResetCurso").onclick=resetCurso;
+  document.getElementById("btnVincular").onclick=vincularArchivo;
+  document.getElementById("btnAbrirVinculado").onclick=abrirArchivoVinculado;
+  document.getElementById("btnDesvincular").onclick=desvincular;
+
+  fileOn("fileImport", buf=>{ snapshot("Antes de importar Excel").then(()=>importarExcel(buf)); }, "array");
+  fileOn("fileCalendario", buf=>cargarCalendarioArchivo(buf), "array");
+  fileText("fileRestore", restaurarBackup);
+}
+function fileOn(id,cb,kind){
+  document.getElementById(id).addEventListener("change",e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=ev=>cb(new Uint8Array(ev.target.result));
+    rd.readAsArrayBuffer(f); e.target.value="";
+  });
+}
+function fileText(id,cb){
+  document.getElementById(id).addEventListener("change",e=>{ const f=e.target.files[0]; if(f) cb(f); e.target.value=""; });
+}
+function cargarCalendarioArchivo(buffer){
+  try{
+    const wb=XLSX.read(buffer,{type:"array",cellDates:true});
+    const sh=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:""});
+    const fechas=[];
+    rows.forEach(r=>{ const f=parseFechaFlexible(r[0]); if(f) fechas.push(f); });
+    if(!fechas.length){ toast("No se encontraron fechas válidas en la primera columna.","error"); return; }
+    const c=curso(); c.fechasClase=[...new Set(fechas)].sort();
+    guardar(); renderAll();
+    toast(`Calendario cargado: ${c.fechasClase.length} fechas.`,"ok");
+  }catch(e){ toast("Error al leer el calendario.","error"); }
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+(async function init(){
+  try{
+    await bootData();
+    await restaurarHandleGuardado();
+    wire();
+    renderAll();
+    setSaveStatus("saved");
+  }catch(e){ console.error(e); toast("Error al iniciar. Revisa la consola.","error"); }
+})();
 </script>
 </body>
 </html>
-
