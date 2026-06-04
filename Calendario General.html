@@ -1316,6 +1316,7 @@ var APP = {
   df: [], dfRes: [], globalFilter: [], charts: {},
   simCambios: {}, simDesasig: {}, simExcl: new Set(), propuesta: null, adminOk: false,
   simFactores: {},
+  simAlumnos:  (function(){ try{ return JSON.parse(localStorage.getItem('simAlumnos_v1')||'{}'); }catch(e){ return {}; } })(),
   plan_cursos: (function(){ try{ return JSON.parse(localStorage.getItem('plan_cursos')||'[]'); }catch(e){ return []; } })(),
 };
 const _DF = {};  // Dropdown filter state — GLOBAL
@@ -2894,12 +2895,11 @@ function calcScore(sesiones, alumnos) {
   return (sesiones/4)*factorAlumnos(alumnos);
 }
 
-/* ── Nueva fórmula: promedio mensual de carga ─────────────────
-   1. Agrupar sesiones por mes
-   2. Cada mes: (sesiones_mes ÷ 4 semanas) × factor_alumnos
-   3. Sumar todos los totales mensuales
-   4. Dividir por la cantidad de meses activos = promedio global
-──────────────────────────────────────────────────────────── */
+/* ── Fórmula oficial de carga laboral ──────────────────────────
+   carga = Σ_programas Σ_meses [(días_clase_mes / 4 semanas) × factor_alumnos]
+   La carga es ACUMULATIVA (no se promedia por meses activos).
+   Filtrar por año reduce los días contabilizados → menor carga.
+*/
 function calcScoreMensual(sesiones_por_mes, alumnos) {
   // sesiones_por_mes = {{'2026-06':6, '2026-07':7, ...}}
   var meses = Object.keys(sesiones_por_mes);
@@ -2932,6 +2932,29 @@ function getFactoresDelta(prog) {
   return d;
 }
 
+/* ── Override manual de cantidad de alumnos por programa ──────────────
+   APP.simAlumnos[prog] = número (override) o ausente (usar el del df)  */
+function getAlumnosOverride(prog) {
+  if (APP.simAlumnos && APP.simAlumnos.hasOwnProperty(prog)) {
+    var n = parseInt(APP.simAlumnos[prog]);
+    if (!isNaN(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+function setAlumnosOverride(prog, valor) {
+  if (!APP.simAlumnos) APP.simAlumnos = {};
+  var n = parseInt(valor);
+  if (isNaN(n) || n < 0) { delete APP.simAlumnos[prog]; }
+  else { APP.simAlumnos[prog] = n; }
+  try { localStorage.setItem('simAlumnos_v1', JSON.stringify(APP.simAlumnos)); } catch(e){}
+}
+
+function clearAlumnosOverride(prog) {
+  if (APP.simAlumnos) delete APP.simAlumnos[prog];
+  try { localStorage.setItem('simAlumnos_v1', JSON.stringify(APP.simAlumnos||{})); } catch(e){}
+}
+
 function calcScoreConFactores(ses, alum, prog) {
   return Math.max(0, calcScore(ses, alum) + getFactoresDelta(prog));
 }
@@ -2949,11 +2972,29 @@ function hexToRgb_g(hex){
 }
 
 function computeLoadByCoord(df) {
-  // Paso 1: agrupar por coord → programa → mes
+  // ════════════════════════════════════════════════════════════════════
+  // FÓRMULA OFICIAL DE CARGA LABORAL (PROMEDIO MENSUAL):
+  //
+  //   Paso 1 — Por programa, por mes:
+  //     carga_programa_mes = (días_clase_mes / 4 semanas) × factor_alumnos
+  //
+  //   Paso 2 — Por coordinadora, por mes:
+  //     carga_coord_mes = Σ carga_programa_mes  (suma de todos sus programas)
+  //
+  //   Paso 3 — Promedio de los meses CON carga (> 0):
+  //     carga_final = Σ carga_coord_mes / cantidad_meses_con_carga
+  //
+  // Factor por alumnos: 1-19→1.0  20-29→1.2  30-39→1.4  40-49→1.7  50+→2.0
+  // ════════════════════════════════════════════════════════════════════
+
+  // Normalizar strings: trim + colapsar espacios internos
+  function _norm(s){ return String(s||'').trim().replace(/\s+/g,' '); }
+
+  // Paso 0: agrupar por coord → programa → mes
   var coordProgs = {};
   df.forEach(function(r){
-    var coord = r['COORDINADORA RESPONSABLE'];
-    var prog  = r['PROGRAMA'];
+    var coord = _norm(r['COORDINADORA RESPONSABLE']);
+    var prog  = _norm(r['PROGRAMA']);
     var alum  = r['N_ALUMNOS']||0;
     var fecha = r['DIAS/FECHAS'];
     if(!coord || !prog) return;
@@ -2966,42 +3007,64 @@ function computeLoadByCoord(df) {
     }
   });
 
-  // Paso 2: por coordinadora, calcular carga mensual ponderada
   var result = [];
+  // Almacenar el breakdown para debug
+  window._loadBreakdown = {};
+
   Object.entries(coordProgs).forEach(function(e){
     var coord = e[0], progs = e[1];
-    // Recopilar TODOS los meses activos de esta coordinadora
+
+    // Recopilar todos los meses activos de la coordinadora
     var mesesSet = {};
     Object.values(progs).forEach(function(p){
-      Object.keys(p.meses).forEach(function(m){ mesesSet[m]=true; });
+      Object.keys(p.meses).forEach(function(m){ mesesSet[m] = true; });
     });
     var mesesArr = Object.keys(mesesSet).sort();
-    if(!mesesArr.length){ result.push({coord:coord, puntaje:0}); return; }
+    if (!mesesArr.length){ result.push({coord:coord, puntaje:0}); return; }
 
-    // Para cada mes: sumar (ses_prog_mes / 4) × factor_alumnos_prog
-    var sumaMensual = 0;
+    // Calcular carga por mes, excluir los meses donde la suma quedó en 0
+    var cargasPorMes = {};
+    var detalle = {};   // {mes: [{prog, dias, factor, alum, carga}]}
     mesesArr.forEach(function(mes){
       var cargaMes = 0;
-      Object.values(progs).forEach(function(p){
-        var sesMes = p.meses[mes] || 0;
-        if(sesMes > 0){
-          cargaMes += (sesMes / 4) * factorAlumnos(p.alum);
-        }
-      });
-      // Aplicar factores toggle delta por programa
+      detalle[mes] = [];
       Object.entries(progs).forEach(function(pe){
         var progName = pe[0], p = pe[1];
-        var sesMes = p.meses[mes] || 0;
-        if(sesMes > 0){
-          var delta = getFactoresDelta(progName);
-          if(delta !== 0) cargaMes += delta * (sesMes > 0 ? 1 : 0);
-        }
+        var diasEnMes = p.meses[mes] || 0;
+        if (diasEnMes <= 0) return;
+        // Override manual de alumnos si está configurado en el simulador
+        var override = getAlumnosOverride(progName);
+        var alumUsed = (override !== null) ? override : p.alum;
+        var factor = factorAlumnos(alumUsed);
+        var cargaProg = (diasEnMes / 4) * factor;
+        cargaMes += cargaProg;
+        var delta = getFactoresDelta(progName);
+        if (delta !== 0) cargaMes += delta;
+        detalle[mes].push({
+          prog: progName, dias: diasEnMes, alum: alumUsed, alumOrig: p.alum,
+          override: override !== null,
+          factor: factor, carga: cargaProg, delta: delta
+        });
       });
-      sumaMensual += cargaMes;
+      cargasPorMes[mes] = cargaMes;
     });
 
-    var promedio = sumaMensual / mesesArr.length;
+    // Promedio: solo meses con cargaMes > 0
+    var mesesConCarga = mesesArr.filter(function(m){ return cargasPorMes[m] > 0; });
+    var sumaMensual = mesesConCarga.reduce(function(s,m){ return s + cargasPorMes[m]; }, 0);
+    var promedio = mesesConCarga.length ? sumaMensual / mesesConCarga.length : 0;
+
     result.push({coord:coord, puntaje: Math.round(promedio*100)/100});
+
+    // Guardar breakdown completo para debug visual
+    window._loadBreakdown[coord] = {
+      meses: mesesArr,
+      cargasPorMes: cargasPorMes,
+      detalle: detalle,
+      mesesConCarga: mesesConCarga.length,
+      suma: sumaMensual,
+      promedio: promedio
+    };
   });
 
   return result.sort(function(a,b){ return b.puntaje - a.puntaje; });
@@ -13866,13 +13929,37 @@ function _gCalSimHidePop() {
 }
 
 
+
+function _gCalSimFiltrar() {
+  // Re-renderizar el calendario con los filtros aplicados
+  var df = (typeof getDF === 'function') ? getDF() : [];
+  _gRenderCalSim(df);
+}
+
+function _gCalSimFiltrosLimpiar() {
+  var c = document.getElementById('gCalSimFiltroCoord');
+  var p = document.getElementById('gCalSimFiltroProg');
+  if (c) c.value = '';
+  if (p) p.value = '';
+  _gCalSimFiltrar();
+}
+
 function _gRenderCalSim(df) {
   var wrap = document.getElementById('gCalSimWrap');
   if(!wrap) return;
 
   var hasSim = Object.keys(APP.simCambios||{}).length > 0 || Object.keys(APP.simDesasig||{}).length > 0;
-  if(!hasSim || !df.length) { wrap.style.display = 'none'; return; }
+  // Mostrar el calendario siempre que haya data — sin simulaciones, muestra el estado actual
+  if(!df.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
+
+  // Actualizar título según haya o no simulaciones
+  var titleEl = document.getElementById('gCalSimTitle');
+  var subtEl = document.getElementById('gCalSimSubtitle');
+  if (titleEl) titleEl.textContent = hasSim ? '📅 Calendario Simulado' : '📅 Calendario';
+  if (subtEl) subtEl.textContent = hasSim
+    ? 'Así quedaría el calendario después de las reasignaciones'
+    : 'Sin reasignaciones activas — muestra el calendario actual';
 
   if(!_gCalSimState) {
     var now = new Date();
@@ -13892,6 +13979,77 @@ function _gRenderCalSim(df) {
     if(sim) return Object.assign({}, r, {'COORDINADORA RESPONSABLE': sim});
     return r;
   });
+
+  // ── Poblar dropdowns de filtros con nombres completos ──
+  var coordsSet = {}, progsSet = {};
+  dfSim.forEach(function(r){
+    var c = (r['COORDINADORA RESPONSABLE']||'').trim();
+    var p = (r['PROGRAMA']||'').trim();
+    if(c) coordsSet[c] = true;
+    if(p) progsSet[p] = true;
+  });
+  var coordsArr = Object.keys(coordsSet).sort();
+  var progsArr = Object.keys(progsSet).sort();
+
+  var selC = document.getElementById('gCalSimFiltroCoord');
+  var selP = document.getElementById('gCalSimFiltroProg');
+  var filtroCoord = (selC && selC.value) || '';
+  var filtroProg  = (selP && selP.value) || '';
+
+  if (selC) {
+    selC.innerHTML = '<option value="">Todas las coordinadoras ('+coordsArr.length+')</option>' +
+      coordsArr.map(function(c){
+        return '<option value="'+esc(c)+'"'+(c===filtroCoord?' selected':'')+'>'+esc(c)+'</option>';
+      }).join('');
+  }
+  if (selP) {
+    // Si hay coord seleccionada, mostrar solo sus programas
+    var progsFiltrados = progsArr;
+    if (filtroCoord) {
+      var progsDeCoord = {};
+      dfSim.forEach(function(r){
+        if ((r['COORDINADORA RESPONSABLE']||'').trim() === filtroCoord) {
+          var p = (r['PROGRAMA']||'').trim();
+          if(p) progsDeCoord[p] = true;
+        }
+      });
+      progsFiltrados = Object.keys(progsDeCoord).sort();
+    }
+    selP.innerHTML = '<option value="">Todos los programas ('+progsFiltrados.length+')</option>' +
+      progsFiltrados.map(function(p){
+        return '<option value="'+esc(p)+'"'+(p===filtroProg?' selected':'')+'>'+esc(p)+'</option>';
+      }).join('');
+    // Si el programa filtrado no existe en la nueva lista, resetear
+    if (filtroProg && progsFiltrados.indexOf(filtroProg) < 0) {
+      selP.value = '';
+      filtroProg = '';
+    }
+  }
+
+  // ── Aplicar los filtros al dfSim ──
+  var dfSimFiltrado = dfSim;
+  if (filtroCoord) {
+    dfSimFiltrado = dfSimFiltrado.filter(function(r){
+      return (r['COORDINADORA RESPONSABLE']||'').trim() === filtroCoord;
+    });
+  }
+  if (filtroProg) {
+    dfSimFiltrado = dfSimFiltrado.filter(function(r){
+      return (r['PROGRAMA']||'').trim() === filtroProg;
+    });
+  }
+  dfSim = dfSimFiltrado;
+
+  // Botón limpiar + info
+  var btn = document.getElementById('gCalSimFiltrosClearBtn');
+  var info = document.getElementById('gCalSimFiltrosInfo');
+  var algunFiltro = !!(filtroCoord || filtroProg);
+  if (btn) btn.style.display = algunFiltro ? '' : 'none';
+  if (info) {
+    info.textContent = algunFiltro ?
+      (dfSim.length + ' sesiones visibles · '+coordsArr.length+' coord · '+progsArr.length+' prog totales') :
+      (coordsArr.length+' coordinadoras · '+progsArr.length+' programas');
+  }
 
   // Eventos del mes
   var eMap = {}; _gCalSimEMap = {};
@@ -17940,7 +18098,7 @@ function showCargaProg() {
   $('page').innerHTML =
     '<div class="pg-title" style="margin-bottom:4px">📊 Carga por Programa</div>' +
     '<div style="font-size:11px;color:#8b949e;margin-bottom:14px">' +
-      'Puntaje de carga de cada programa · Fórmula: Σ[(sesiones_mes ÷ 4) × factor_alumnos] ÷ meses_activos' +
+      'Promedio mensual de carga · Σ[(días_mes ÷ 4) × factor_alumnos] ÷ meses_activos · Factor alumnos: 1-19→1, 20-29→1.2, 30-39→1.4, 40-49→1.7, 50+→2' +
     '</div>' +
 
     // Filtro año
@@ -18081,6 +18239,65 @@ function showCargaProg() {
       }
     }
   });
+
+  // Panel de Desglose Mensual (verificación paso a paso)
+  var bd = window._loadBreakdown || {};
+  var coords = Object.keys(bd).sort();
+  if (coords.length > 0) {
+    var meses12 = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+    var allMeses = new Set();
+    coords.forEach(function(co){ bd[co].meses.forEach(function(m){ allMeses.add(m); }); });
+    var mesesGlobales = [...allMeses].sort();
+
+    var tableHtml = '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden;margin-top:16px">'+
+      '<div style="padding:12px 16px;background:#161b22;border-bottom:1px solid #21262d;display:flex;align-items:center;justify-content:space-between">'+
+        '<div>'+
+          '<div style="font-size:12px;font-weight:700;color:#e6edf3">🔍 Desglose Mensual por Coordinadora</div>'+
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Verificación paso a paso · cada celda = Σ[(días÷4)×factor] del mes · hover para ver detalle</div>'+
+        '</div>'+
+        '<button onclick="var b=this.parentNode.parentNode.querySelector(\'.bd-body\');b.style.display=b.style.display===\'none\'?\'\':\'none\';" '+
+          'style="padding:5px 12px;border:1px solid #30363d;background:transparent;color:#8b949e;border-radius:5px;font-size:10px;cursor:pointer">'+
+          'Mostrar / Ocultar'+
+        '</button>'+
+      '</div>'+
+      '<div class="bd-body" style="overflow:auto;max-height:600px">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:10px">'+
+          '<thead style="position:sticky;top:0;z-index:1;background:#161b22">'+
+            '<tr>'+
+              '<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;border-bottom:2px solid #21262d;background:#161b22">Coordinadora</th>'+
+              mesesGlobales.map(function(m){
+                var partes = m.split('-');
+                return '<th style="padding:8px 6px;text-align:center;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;border-bottom:2px solid #21262d;background:#161b22;min-width:54px">'+(meses12[parseInt(partes[1])-1]||m)+'<br/><span style="font-size:7px;opacity:.6">'+partes[0]+'</span></th>';
+              }).join('')+
+              '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#388bfd;text-transform:uppercase;border-bottom:2px solid #21262d;background:#161b22;border-left:2px solid #388bfd">Puntaje</th>'+
+            '</tr>'+
+          '</thead>'+
+          '<tbody>'+
+            coords.map(function(co, ci){
+              var bg = ci%2 ? 'transparent' : 'rgba(255,255,255,.012)';
+              var bdC = bd[co];
+              return '<tr style="background:'+bg+';border-bottom:1px solid #161b22">'+
+                '<td style="padding:8px 12px;color:#e6edf3;font-weight:600">'+esc(abbr(co,28))+'</td>'+
+                mesesGlobales.map(function(m){
+                  var v = bdC.cargasPorMes[m];
+                  if (v == null || v === 0) return '<td style="padding:8px 6px;text-align:center;color:#3a3f47">—</td>';
+                  var det = bdC.detalle[m] || [];
+                  var tip = det.map(function(d){return d.prog.substring(0,40)+': '+d.dias+'d × factor('+d.alum+'al)='+d.factor+' → '+d.carga.toFixed(2);}).join(' | ');
+                  return '<td style="padding:8px 6px;text-align:center;color:#e6edf3;font-family:monospace" title="'+esc(tip)+'">'+v.toFixed(2)+'</td>';
+                }).join('')+
+                '<td style="padding:8px 12px;text-align:center;background:rgba(56,139,253,.05);border-left:2px solid #388bfd">'+
+                  '<div style="font-size:13px;font-weight:900;color:#388bfd">'+bdC.promedio.toFixed(2)+'</div>'+
+                  '<div style="font-size:8px;color:#6e7681">'+bdC.suma.toFixed(2)+' ÷ '+bdC.mesesConCarga+'</div>'+
+                '</td>'+
+              '</tr>';
+            }).join('')+
+          '</tbody>'+
+        '</table>'+
+      '</div>'+
+    '</div>';
+
+    $('page').insertAdjacentHTML('beforeend', tableHtml);
+  }
 
   _cpFiltrar();
 }
@@ -18319,6 +18536,34 @@ function showAdmin() {
       '<div id="gCambios"></div>' +
       '<div id="gAcciones" style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap"></div>' +
 
+      // ═══ PANEL: Cantidad de Alumnos por Programa (integrado al simulador) ═══
+      '<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px 18px;margin-top:20px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+          '<div style="font-size:11px;font-weight:800;color:#388bfd;text-transform:uppercase;letter-spacing:.5px">' +
+            '👥 Cantidad de Alumnos por Programa' +
+          '</div>' +
+          '<button onclick="_gAlumResetAll()" ' +
+            'style="padding:5px 12px;border:1px solid #30363d;background:transparent;color:#8b949e;' +
+            'border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">' +
+            '↺ Restaurar todos' +
+          '</button>' +
+        '</div>' +
+        '<div style="font-size:10px;color:#8b949e;margin-bottom:12px">' +
+          'Edita la cantidad de alumnos para recalcular el factor y ver el impacto en la carga simulada.<br>' +
+          '<span style="color:#6e7681">Factores: 1-19 → ×1.0 · 20-29 → ×1.2 · 30-39 → ×1.4 · 40-49 → ×1.7 · 50+ → ×2.0</span>' +
+        '</div>' +
+
+        // Filtro de búsqueda
+        '<div style="margin-bottom:10px">' +
+          '<input id="gAlumBuscar" type="text" placeholder="🔍 Buscar programa o coordinadora..." ' +
+            'oninput="_gAlumFiltrar()" ' +
+            'style="width:100%;padding:7px 12px;border:1px solid #30363d;border-radius:6px;' +
+            'background:#0d1117;color:#e6edf3;font-size:11px">' +
+        '</div>' +
+
+        '<div id="gAlumLista" style="display:flex;flex-direction:column;gap:5px;max-height:420px;overflow-y:auto"></div>' +
+      '</div>' +
+
     '</div>' +
 
     // ══════════════════════════════════════════════════════════════
@@ -18392,8 +18637,8 @@ function showAdmin() {
       '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;overflow:hidden;border-top:3px solid #22d3ee">' +
         '<div style="padding:14px 20px;background:#161b22;border-bottom:1px solid #21262d;display:flex;align-items:center;justify-content:space-between">' +
           '<div>' +
-            '<div style="font-size:14px;font-weight:900;color:#f0f6ff">📅 Calendario Simulado</div>' +
-            '<div style="font-size:10px;color:#8b949e;margin-top:2px">Así quedaría el calendario después de las reasignaciones</div>' +
+            '<div id="gCalSimTitle" style="font-size:14px;font-weight:900;color:#f0f6ff">📅 Calendario</div>' +
+            '<div id="gCalSimSubtitle" style="font-size:10px;color:#8b949e;margin-top:2px">Sin reasignaciones activas — muestra el calendario actual</div>' +
           '</div>' +
           '<div style="display:flex;gap:8px;align-items:center">' +
             '<button onclick="_gCalSimPrev()" style="padding:6px 12px;border:1px solid #21262d;background:#161b22;color:#e6edf3;border-radius:6px;cursor:pointer;font-size:12px">←</button>' +
@@ -18401,6 +18646,25 @@ function showAdmin() {
             '<button onclick="_gCalSimNext()" style="padding:6px 12px;border:1px solid #21262d;background:#161b22;color:#e6edf3;border-radius:6px;cursor:pointer;font-size:12px">→</button>' +
           '</div>' +
         '</div>' +
+
+        // Fila de filtros del calendario
+        '<div style="padding:10px 20px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+          '<span style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">🔎 Filtros:</span>' +
+          '<select id="gCalSimFiltroCoord" onchange="_gCalSimFiltrar()" ' +
+            'style="padding:6px 10px;border:1px solid #30363d;border-radius:6px;background:#161b22;color:#e6edf3;font-size:11px;min-width:200px;max-width:280px">' +
+            '<option value="">Todas las coordinadoras</option>' +
+          '</select>' +
+          '<select id="gCalSimFiltroProg" onchange="_gCalSimFiltrar()" ' +
+            'style="padding:6px 10px;border:1px solid #30363d;border-radius:6px;background:#161b22;color:#e6edf3;font-size:11px;min-width:240px;max-width:340px">' +
+            '<option value="">Todos los programas</option>' +
+          '</select>' +
+          '<button onclick="_gCalSimFiltrosLimpiar()" id="gCalSimFiltrosClearBtn" ' +
+            'style="padding:5px 10px;border:1px solid #30363d;background:transparent;color:#8b949e;border-radius:6px;font-size:10px;cursor:pointer;display:none">' +
+            '✕ Limpiar' +
+          '</button>' +
+          '<span id="gCalSimFiltrosInfo" style="font-size:10px;color:#6e7681;margin-left:auto"></span>' +
+        '</div>' +
+
         '<div id="gCalSimGrid" style="padding:14px"></div>' +
       '</div>' +
     '</div>' +
@@ -18441,10 +18705,140 @@ function showAdmin() {
         '</div>'+
         '<div id="gDesLista" style="display:flex;flex-direction:column;gap:6px"></div>'+
       '</div>'+
+
     '</div>';
 
   updAdmin();
 }
+
+/* ── Lista editable de alumnos por programa ─────────────────────── */
+function _gRenderAlumList() {
+  var el = document.getElementById('gAlumLista');
+  if (!el) return;
+
+  var df = getDF();
+  var anioFilt = ($('gY-sel')||{}).value || '';
+  if (anioFilt) {
+    df = df.filter(function(r){
+      return r['DIAS/FECHAS'] instanceof Date &&
+             String(r['DIAS/FECHAS'].getFullYear()) === anioFilt;
+    });
+  }
+
+  // Construir set de programas con sus alumnos y coord
+  var progMap = {};
+  df.forEach(function(r){
+    var p = String(r['PROGRAMA']||'').trim().replace(/\s+/g,' ');
+    var coord = String(r['COORDINADORA RESPONSABLE']||'').trim().replace(/\s+/g,' ');
+    var alum = parseInt(r['N_ALUMNOS'])||0;
+    if (!p) return;
+    if (!progMap[p]) progMap[p] = { prog:p, coord:coord, alumOrig:0 };
+    progMap[p].alumOrig = Math.max(progMap[p].alumOrig, alum);
+  });
+
+  var progs = Object.values(progMap).sort(function(a,b){ return a.prog.localeCompare(b.prog); });
+
+  // Filtro de búsqueda
+  var q = (($('gAlumBuscar')||{}).value || '').toLowerCase().trim();
+  if (q) {
+    progs = progs.filter(function(p){
+      return p.prog.toLowerCase().indexOf(q)>=0 || p.coord.toLowerCase().indexOf(q)>=0;
+    });
+  }
+
+  if (!progs.length) {
+    el.innerHTML = '<div style="padding:30px;text-align:center;color:#6e7681;font-size:11px">Sin programas que coincidan</div>';
+    return;
+  }
+
+  function factorTxt(n){
+    if (n>=50) return '2.0'; if (n>=40) return '1.7';
+    if (n>=30) return '1.4'; if (n>=20) return '1.2';
+    return '1.0';
+  }
+  function factorColor(n){
+    if (n>=50) return '#f85149'; if (n>=40) return '#f0b429';
+    if (n>=30) return '#a78bfa'; if (n>=20) return '#22d3ee';
+    return '#3fb950';
+  }
+
+  el.innerHTML = progs.map(function(p){
+    var override = getAlumnosOverride(p.prog);
+    var actual = (override !== null) ? override : p.alumOrig;
+    var modificado = (override !== null && override !== p.alumOrig);
+    var fActual = factorTxt(actual);
+    var fOrig = factorTxt(p.alumOrig);
+    var fColor = factorColor(actual);
+
+    return '<div style="display:grid;grid-template-columns:1fr 90px 90px 60px 80px;gap:10px;align-items:center;'+
+        'padding:8px 12px;background:'+(modificado?'rgba(56,139,253,.06)':'#161b22')+';'+
+        'border:1px solid '+(modificado?'#388bfd55':'#21262d')+';border-radius:8px">'+
+
+      // Nombre del programa + coord
+      '<div style="min-width:0">'+
+        '<div style="font-size:11px;font-weight:600;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(p.prog)+'">'+esc(p.prog)+'</div>'+
+        '<div style="font-size:9px;color:#6e7681;margin-top:2px">'+esc(p.coord||'—')+'</div>'+
+      '</div>'+
+
+      // Alumnos original
+      '<div style="text-align:center">'+
+        '<div style="font-size:8px;color:#6e7681;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Original</div>'+
+        '<div style="font-size:13px;font-weight:700;color:#8b949e">'+p.alumOrig+'</div>'+
+      '</div>'+
+
+      // Input editable
+      '<div style="text-align:center">'+
+        '<div style="font-size:8px;color:#388bfd;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Manual</div>'+
+        '<input type="number" min="0" max="500" value="'+actual+'" '+
+          'data-prog="'+esc(p.prog).replace(/"/g,'&quot;')+'" '+
+          'onchange="_gAlumChange(this)" '+
+          'style="width:70px;padding:5px 8px;border:1px solid '+(modificado?'#388bfd':'#30363d')+';border-radius:6px;'+
+          'background:#0d1117;color:'+(modificado?'#388bfd':'#e6edf3')+';font-size:12px;font-weight:700;text-align:center">'+
+      '</div>'+
+
+      // Factor calculado
+      '<div style="text-align:center;background:'+fColor+'22;border:1px solid '+fColor+'55;border-radius:6px;padding:5px">'+
+        '<div style="font-size:8px;color:#8b949e;text-transform:uppercase;letter-spacing:.3px">Factor</div>'+
+        '<div style="font-size:13px;font-weight:900;color:'+fColor+'">×'+fActual+'</div>'+
+        (modificado&&fActual!==fOrig?'<div style="font-size:8px;color:#6e7681;margin-top:1px">era ×'+fOrig+'</div>':'')+
+      '</div>'+
+
+      // Botón reset
+      '<button onclick="_gAlumReset(\''+esc(p.prog).replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')" '+
+        (modificado?'':'disabled ')+
+        'style="padding:5px 10px;border:1px solid '+(modificado?'#30363d':'#1f2329')+';background:transparent;'+
+        'color:'+(modificado?'#8b949e':'#3a3f47')+';border-radius:5px;font-size:10px;cursor:'+(modificado?'pointer':'not-allowed')+'">'+
+        '↺ Reset'+
+      '</button>'+
+
+    '</div>';
+  }).join('');
+}
+
+function _gAlumChange(input) {
+  var prog = input.getAttribute('data-prog');
+  var v = parseInt(input.value);
+  if (isNaN(v) || v < 0) return;
+  setAlumnosOverride(prog, v);
+  updAdmin();
+}
+
+function _gAlumReset(prog) {
+  clearAlumnosOverride(prog);
+  updAdmin();
+}
+
+function _gAlumResetAll() {
+  if (!confirm('¿Restaurar la cantidad de alumnos original de TODOS los programas?')) return;
+  APP.simAlumnos = {};
+  try { localStorage.setItem('simAlumnos_v1','{}'); } catch(e){}
+  updAdmin();
+}
+
+function _gAlumFiltrar() {
+  _gRenderAlumList();
+}
+
 
 
 function updAdmin() {
@@ -18864,6 +19258,7 @@ function updAdmin() {
   }
   _gDesRenderLista();
   _gRenderCalSim(dfLoad);
+  _gRenderAlumList();
 
   // Show propuesta balanceo
   if (APP.propuesta) renderPropuesta(APP.propuesta, load, progLoad);
@@ -21443,6 +21838,23 @@ function _adnProcess(){
   });
   all.sort(function(a,b){return b.promedio-a.promedio;});
   _ADN.students=all;
+
+  // ── OPTIMIZACIÓN: pre-indexar _ADN.raw por RUT e ID expediente ──
+  // Esto convierte _expGetAsignaturasDeAlumno de O(n) a O(1) por lookup
+  _ADN.byRut = {};
+  _ADN.byIdExp = {};
+  _ADN.raw.forEach(function(r){
+    var rut = (r.rut||'').trim();
+    var idexp = (r.idExpediente||'').trim();
+    if (rut) {
+      if (!_ADN.byRut[rut]) _ADN.byRut[rut] = [];
+      _ADN.byRut[rut].push(r);
+    }
+    if (idexp) {
+      if (!_ADN.byIdExp[idexp]) _ADN.byIdExp[idexp] = [];
+      _ADN.byIdExp[idexp].push(r);
+    }
+  });
 }
 
 function _adnDestroyCharts(){
@@ -21462,7 +21874,7 @@ function _adnDestroyCharts(){
    · 🟢 Finalizado: ESTADO=CERRADO + AVANCE=100% + razón válida
    · 🔴 Abandono:   ESTADO=CERRADO pero no cumple los demás
    · 🟡 En curso:   ESTADO=ACTIVO/VIGENTE
-   · ⚪ Otro:       sin estado claro
+   · 📚 Cursos:     sin estado claro (cursos cortos / sin clasificación)
 ═══════════════════════════════════════════════════════════════════════ */
 
 var _EXP = {
@@ -21477,13 +21889,20 @@ var _FIN = {
   search: '',
   filtPrograma: '',
   filtCohorte: '',
-  filtEstado: '',       // '' | 'finalizado' | 'abandono' | 'enCurso' | 'otro'
+  filtEstado: '',       // '' | 'finalizado' | 'abandono' | 'enCurso'
   sortBy: 'nombre',
   sortDir: 'asc',
   expanded: {},
+  page: 0,
+  pageSize: 50,         // mostrar de a 50 alumnos para no bloquear el render
 };
 
-var _FIN_RAZONES_VALIDAS = ['diplomado','graduado','termino de curso','término de curso'];
+// Razones que indican FINALIZACIÓN (graduado, egresado, etc.)
+var _FIN_RAZONES_FINALIZADO = ['graduado','egresado','diplomado','titulado','termino de curso','término de curso'];
+// Razones que indican ABANDONO (retiro, abandono)
+var _FIN_RAZONES_ABANDONO = ['abandono','retiro temporal','retiro definitivo','retiro','renuncia'];
+// Alias para compatibilidad con código existente
+var _FIN_RAZONES_VALIDAS = _FIN_RAZONES_FINALIZADO;
 
 function _normSinTildes(s){
   return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
@@ -21492,26 +21911,31 @@ function _normSinTildes(s){
 function _expClasificarEstado(a){
   var estado = _normSinTildes(a.estado);
   var razon = _normSinTildes(a.razonInactividad);
-  var av = a.avancePlan;
 
-  // FINALIZADO: cerrado + 100% + razón válida
-  if (estado === 'cerrado' && av !== null && Math.round(av) === 100) {
-    var razonOk = _FIN_RAZONES_VALIDAS.some(function(v){
-      return _normSinTildes(v) === razon;
-    });
-    if (razonOk) return 'finalizado';
-    return 'abandono';   // cerrado pero no calza con razón válida
+  // Helpers para verificar razones (sin tildes, case-insensitive)
+  var esRazonFinalizado = _FIN_RAZONES_FINALIZADO.some(function(v){
+    return _normSinTildes(v) === razon;
+  });
+  var esRazonAbandono = _FIN_RAZONES_ABANDONO.some(function(v){
+    return _normSinTildes(v) === razon;
+  });
+
+  // 🟢 FINALIZADO: razón de finalización (independiente del estado del expediente)
+  //    Incluye: graduado, egresado, diplomado, titulado, término de curso
+  if (esRazonFinalizado) return 'finalizado';
+
+  // 🔴 ABANDONO: cerrado con razón de abandono, retiro, etc.
+  //    También: cerrado sin razón clara → asumir abandono
+  if (estado === 'cerrado') {
+    if (esRazonAbandono) return 'abandono';
+    // Cerrado sin razón válida → abandono por default
+    return 'abandono';
   }
 
-  // ABANDONO: cerrado y NO finalizado
-  if (estado === 'cerrado') return 'abandono';
-
-  // EN CURSO: activo/vigente/regular
-  if (estado === 'activo' || estado === 'vigente' || estado === 'regular' || estado === 'en curso') {
-    return 'enCurso';
-  }
-
-  return 'otro';
+  // 🟡 EN CURSO: abierto con cualquier otra razón (incluye ACTIVO PLAN LECTIVO,
+  //    vacía, o cualquier estado no reconocido). Todos son alumnos con expediente
+  //    abierto y plan lectivo activo.
+  return 'enCurso';
 }
 
 function _expEstadoMeta(tipo){
@@ -21519,7 +21943,7 @@ function _expEstadoMeta(tipo){
     case 'finalizado': return {emoji:'🟢',label:'Finalizado',c:'#10b981',bg:'rgba(16,185,129,.12)'};
     case 'abandono':   return {emoji:'🔴',label:'Abandono',  c:'#f85149',bg:'rgba(248,81,73,.12)'};
     case 'enCurso':    return {emoji:'🟡',label:'En curso',  c:'#f0b429',bg:'rgba(240,180,41,.12)'};
-    default:           return {emoji:'⚪',label:'Otro',      c:'#8b949e',bg:'rgba(139,148,158,.10)'};
+    default:           return {emoji:'🟡',label:'En curso',  c:'#f0b429',bg:'rgba(240,180,41,.12)'};
   }
 }
 
@@ -21527,61 +21951,55 @@ function _expEstadoMeta(tipo){
 function _expHandleFile(file){
   if (!file) return;
   var ext = '.'+file.name.split('.').pop().toLowerCase();
-  if (!['.xlsx','.xls','.csv'].includes(ext)) { showToast('Formato no soportado','err'); return; }
+  if (!['.xlsx','.xls','.csv'].includes(ext)) {
+    showToast('Formato no soportado','err');
+    return;
+  }
   showToast('Procesando expedientes...','ok');
 
   var rd = new FileReader();
+  rd.onerror = function(){ showToast('Error leyendo archivo','err'); };
   rd.onload = function(e){
     try {
-      var wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false});
+      var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:false});
       var sh = wb.Sheets[wb.SheetNames[0]];
       var js2 = XLSX.utils.sheet_to_json(sh, {header:1, raw:true, defval:''});
-      if (js2.length < 2) { showToast('Archivo vacío','err'); return; }
+      if (!js2 || js2.length < 2) { showToast('Archivo vacío','err'); return; }
 
-      // Normalizar headers: quitar tildes, mayúsculas, sin puntos/signos, espacios colapsados
       function _normHead(s){
         return String(s||'')
-          .replace(/^\uFEFF/,'')                              // BOM
-          .replace(/\u00A0/g,' ')                             // espacios no-break
-          .replace(/[\u2018\u2019\u201C\u201D]/g,'')        // comillas tipográficas
+          .replace(/^\uFEFF/,'')
+          .replace(/\u00A0/g,' ')
+          .replace(/[\u2018\u2019\u201C\u201D]/g,'')
           .toUpperCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // quitar tildes
-          .replace(/[.,;:_\-\u00BA\u00AA]/g,' ')            // signos -> espacio
+          .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+          .replace(/[.,;:_\-\u00BA\u00AA]/g,' ')
           .replace(/\s+/g,' ').trim();
       }
 
-      // ── Buscar la fila de headers (escaneo de primeras 10 filas) ──
-      // Una fila de headers se identifica si contiene al menos 3 de estas keywords clave
+      // Detectar fila de headers
       var keywords = ['RUT','PROGRAMA','ESTADO','COHORTE','NOMBRES','EXPEDIENTE'];
       var headerRow = -1;
-      for (var hi=0; hi<Math.min(10, js2.length); hi++){
+      for (var hi = 0; hi < Math.min(10, js2.length); hi++){
         var row = js2[hi] || [];
         var normRow = row.map(_normHead);
         var matches = keywords.filter(function(kw){
-          return normRow.some(function(h){ return h===kw; });
+          return normRow.some(function(h){ return h === kw; });
         });
         if (matches.length >= 3) { headerRow = hi; break; }
       }
       if (headerRow < 0) {
-        showToast('No se detectó fila de headers · primera celda: "'+String(js2[0][0]||'').substring(0,40)+'"','err');
-        console.error('Headers no detectados. Primeras 3 filas:', js2.slice(0,3));
+        showToast('No se detectó fila de headers en el archivo','err');
         return;
       }
       var hd = (js2[headerRow]||[]).map(_normHead);
-
-      // Log diagnóstico para que el usuario vea los headers detectados
-      console.log('[Avance Académico] Fila de headers detectada en línea '+(headerRow+1));
-      console.log('[Avance Académico] Headers normalizados:', hd);
-
-      // Ajustar el inicio de las filas de datos
       var DATA_START = headerRow + 1;
-      // Matcher ESTRICTO: solo coincidencia exacta normalizada (sin fuzzy includes que
-      // confunden COMUNA con COMUNA COLEGIO, PROGRAMA con PROG. CONDUCENTE A, etc.)
+
       function fc(ns){
-        for (var i=0;i<ns.length;i++){
+        for (var i = 0; i < ns.length; i++){
           var t = _normHead(ns[i]);
-          for (var j=0;j<hd.length;j++){
-            if (hd[j]===t) return j;
+          for (var j = 0; j < hd.length; j++){
+            if (hd[j] === t) return j;
           }
         }
         return -1;
@@ -21643,110 +22061,103 @@ function _expHandleFile(file){
         fCreaExp:     fc(['FECHA CREACION EXPEDIENTE']),
         credScT:      fc(['CREDITOS SCT PLAN']),
         horasAcad:    fc(['HORAS ACADEMICAS PLAN']),
-        fCierre:      fc(['FECHA EFECTIVA CIERRE EXPEDIENTE','FECHA CIERRE EXPEDIENTE','FECHA EFECTIVA CIERRE']),
+        fCierre:      fc(['FECHA EFECTIVA CIERRE EXPEDIENTE','FECHA CIERRE EXPEDIENTE','FECHA EFECTIVA CIERRE'])
       };
 
-      // ── DIAGNÓSTICO: avisar si una columna clave no se encontró ──
+      // Validar columnas clave
       var faltantes = [];
-      if (co.rut<0) faltantes.push('RUT');
-      if (co.ap<0) faltantes.push('A. PATERNO');
-      if (co.nm<0) faltantes.push('NOMBRES');
-      if (co.prog<0) faltantes.push('PROGRAMA');
-      if (co.estado<0) faltantes.push('ESTADO');
+      if (co.rut    < 0) faltantes.push('RUT');
+      if (co.ap     < 0) faltantes.push('A. PATERNO');
+      if (co.nm     < 0) faltantes.push('NOMBRES');
+      if (co.prog   < 0) faltantes.push('PROGRAMA');
+      if (co.estado < 0) faltantes.push('ESTADO');
       if (faltantes.length){
-        console.error('[Avance Académico] Columnas faltantes:', faltantes);
-        console.error('[Avance Académico] Headers detectados (revisa diferencias):', hd);
-        showToast('Faltan: '+faltantes.join(', ')+' · Revisa la consola (F12) para ver headers detectados','err');
+        showToast('Faltan columnas: '+faltantes.join(', '),'err');
         return;
       }
 
+      // Parsear filas
       var recs = [];
-      for (var i=DATA_START;i<js2.length;i++){
+      for (var i = DATA_START; i < js2.length; i++){
         var r = js2[i]; if (!r) continue;
         var rec = {
-          rut:          co.rut>=0       ? String(r[co.rut]||'').trim() : '',
-          apPaterno:    co.ap>=0        ? _adnNorm(r[co.ap]) : '',
-          apMaterno:    co.am>=0        ? _adnNorm(r[co.am]) : '',
-          nombres:      co.nm>=0        ? _adnNorm(r[co.nm]) : '',
-          fNac:         co.fNac>=0      ? _adnParseFecha(r[co.fNac]) : '',
-          genero:       co.genero>=0    ? _adnNorm(r[co.genero]) : '',
-          sexo:         co.sexo>=0      ? _adnNorm(r[co.sexo]) : '',
-          emailUai:     co.emailUai>=0  ? _adnNorm(r[co.emailUai]) : '',
-          emailPers:    co.emailPers>=0 ? _adnNorm(r[co.emailPers]) : '',
-          nacionalidad: co.nacionalidad>=0?_adnNorm(r[co.nacionalidad]) : '',
-          tipoColegio:  co.tipoCol>=0   ? _adnNorm(r[co.tipoCol]) : '',
-          colegio:      co.colegio>=0   ? _adnNorm(r[co.colegio]) : '',
-          comunaColegio:co.comunaCol>=0 ? _adnNorm(r[co.comunaCol]) : '',
-          pais:         co.pais>=0      ? _adnNorm(r[co.pais]) : '',
-          ciudad:       co.ciudad>=0    ? _adnNorm(r[co.ciudad]) : '',
-          idExpediente: co.idExp>=0     ? String(r[co.idExp]||'').trim() : '',
-          programa:     co.prog>=0      ? _adnNorm(r[co.prog]) : '',
-          progConducente:co.progCond>=0 ? _adnNorm(r[co.progCond]) : '',
-          idCohorte:    co.idCoh>=0     ? String(r[co.idCoh]||'').trim() : '',
-          cohorte:      co.coh>=0       ? String(r[co.coh]||'').trim() : '',
-          hcs:          co.hcs>=0       ? _adnParseNum(r[co.hcs]) : null,
-          estado:       co.estado>=0    ? _adnNorm(r[co.estado]) : '',
-          razonInactividad: co.razon>=0 ? _adnNorm(r[co.razon]) : '',
-          comentInact:  co.comentInact>=0?_adnNorm(r[co.comentInact]) : '',
-          fInactividad: co.fInact>=0    ? _adnParseFecha(r[co.fInact]) : '',
-          especialidad: co.especialidad>=0?_adnNorm(r[co.especialidad]) : '',
-          versionEsp:   co.versEsp>=0   ? _adnNorm(r[co.versEsp]) : '',
-          sede:         co.sede>=0      ? _adnNorm(r[co.sede]) : '',
-          nombreUAcademica: co.nombreUAc>=0 ? _adnNorm(r[co.nombreUAc]) : '',
-          uAcademicaRamos: co.uAcRamos>=0 ? _adnNorm(r[co.uAcRamos]) : '',
-          promPonderado:co.promPond>=0  ? _adnParseNum(r[co.promPond]) : null,
-          avancePlan:   co.avance>=0    ? _adnParseAvance(r[co.avance]) : null,
-          semestresCursados: co.semCurs>=0 ? _adnParseNum(r[co.semCurs]) : null,
-          direccion:    co.direccion>=0 ? _adnNorm(r[co.direccion]) : '',
-          comuna:       co.comuna>=0    ? _adnNorm(r[co.comuna]) : '',
-          fEgreso:      co.fEgreso>=0   ? _adnParseFecha(r[co.fEgreso]) : '',
-          fGrado:       co.fGrado>=0    ? _adnParseFecha(r[co.fGrado]) : '',
-          semestreAvance: co.semAv>=0   ? String(r[co.semAv]||'').trim() : '',
-          semestreRecuperativo: co.semRec>=0 ? String(r[co.semRec]||'').trim() : '',
-          anioMalla:    co.anioMalla>=0 ? String(r[co.anioMalla]||'').trim() : '',
-          periodoIngreso: co.perIngreso>=0 ? String(r[co.perIngreso]||'').trim() : '',
-          esIntercambio: co.esInter>=0  ? _adnNorm(r[co.esInter]) : '',
-          idVersionMalla: co.idVerMalla>=0 ? String(r[co.idVerMalla]||'').trim() : '',
-          creditosAprobados: co.credAprob>=0 ? _adnParseNum(r[co.credAprob]) : null,
-          numeroExpediente: co.numExp>=0 ? String(r[co.numExp]||'').trim() : '',
-          direccionSost:co.dirSost>=0   ? _adnNorm(r[co.dirSost]) : '',
-          fInicioPeriodo: co.fIniPer>=0 ? _adnParseFecha(r[co.fIniPer]) : '',
-          semestreAdm:  co.semAdm>=0    ? String(r[co.semAdm]||'').trim() : '',
-          promGrado:    co.promGrado>=0 ? _adnParseNum(r[co.promGrado]) : null,
-          ppa:          co.ppa>=0       ? _adnParseNum(r[co.ppa]) : null,
-          reglamento:   co.reglamento>=0? _adnNorm(r[co.reglamento]) : '',
-          tipoReglamento: co.tipoRegl>=0? _adnNorm(r[co.tipoRegl]) : '',
-          fCreacionExp: co.fCreaExp>=0  ? _adnParseFecha(r[co.fCreaExp]) : '',
-          creditosScT:  co.credScT>=0   ? _adnParseNum(r[co.credScT]) : null,
-          horasAcademicas: co.horasAcad>=0 ? _adnParseNum(r[co.horasAcad]) : null,
-          fCierreExp:   co.fCierre>=0   ? _adnParseFecha(r[co.fCierre]) : '',
+          rut:               co.rut       >= 0 ? String(r[co.rut]||'').trim() : '',
+          apPaterno:         co.ap        >= 0 ? _adnNorm(r[co.ap]) : '',
+          apMaterno:         co.am        >= 0 ? _adnNorm(r[co.am]) : '',
+          nombres:           co.nm        >= 0 ? _adnNorm(r[co.nm]) : '',
+          fNac:              co.fNac      >= 0 ? _adnParseFecha(r[co.fNac]) : '',
+          genero:            co.genero    >= 0 ? _adnNorm(r[co.genero]) : '',
+          sexo:              co.sexo      >= 0 ? _adnNorm(r[co.sexo]) : '',
+          emailUai:          co.emailUai  >= 0 ? _adnNorm(r[co.emailUai]) : '',
+          emailPers:         co.emailPers >= 0 ? _adnNorm(r[co.emailPers]) : '',
+          nacionalidad:      co.nacionalidad >= 0 ? _adnNorm(r[co.nacionalidad]) : '',
+          tipoColegio:       co.tipoCol   >= 0 ? _adnNorm(r[co.tipoCol]) : '',
+          colegio:           co.colegio   >= 0 ? _adnNorm(r[co.colegio]) : '',
+          comunaColegio:     co.comunaCol >= 0 ? _adnNorm(r[co.comunaCol]) : '',
+          pais:              co.pais      >= 0 ? _adnNorm(r[co.pais]) : '',
+          ciudad:            co.ciudad    >= 0 ? _adnNorm(r[co.ciudad]) : '',
+          idExpediente:      co.idExp     >= 0 ? String(r[co.idExp]||'').trim() : '',
+          programa:          co.prog      >= 0 ? _adnNorm(r[co.prog]) : '',
+          progConducente:    co.progCond  >= 0 ? _adnNorm(r[co.progCond]) : '',
+          idCohorte:         co.idCoh     >= 0 ? String(r[co.idCoh]||'').trim() : '',
+          cohorte:           co.coh       >= 0 ? String(r[co.coh]||'').trim() : '',
+          hcs:               co.hcs       >= 0 ? _adnParseNum(r[co.hcs]) : null,
+          estado:            co.estado    >= 0 ? _adnNorm(r[co.estado]) : '',
+          razonInactividad:  co.razon     >= 0 ? _adnNorm(r[co.razon]) : '',
+          comentInact:       co.comentInact >= 0 ? _adnNorm(r[co.comentInact]) : '',
+          fInactividad:      co.fInact    >= 0 ? _adnParseFecha(r[co.fInact]) : '',
+          especialidad:      co.especialidad >= 0 ? _adnNorm(r[co.especialidad]) : '',
+          versionEsp:        co.versEsp   >= 0 ? _adnNorm(r[co.versEsp]) : '',
+          sede:              co.sede      >= 0 ? _adnNorm(r[co.sede]) : '',
+          nombreUAcademica:  co.nombreUAc >= 0 ? _adnNorm(r[co.nombreUAc]) : '',
+          uAcademicaRamos:   co.uAcRamos  >= 0 ? _adnNorm(r[co.uAcRamos]) : '',
+          promPonderado:     co.promPond  >= 0 ? _adnParseNum(r[co.promPond]) : null,
+          avancePlan:        co.avance    >= 0 ? _adnParseAvance(r[co.avance]) : null,
+          semestresCursados: co.semCurs   >= 0 ? _adnParseNum(r[co.semCurs]) : null,
+          direccion:         co.direccion >= 0 ? _adnNorm(r[co.direccion]) : '',
+          comuna:            co.comuna    >= 0 ? _adnNorm(r[co.comuna]) : '',
+          fEgreso:           co.fEgreso   >= 0 ? _adnParseFecha(r[co.fEgreso]) : '',
+          fGrado:            co.fGrado    >= 0 ? _adnParseFecha(r[co.fGrado]) : '',
+          semestreAvance:    co.semAv     >= 0 ? String(r[co.semAv]||'').trim() : '',
+          semestreRecuperativo: co.semRec >= 0 ? String(r[co.semRec]||'').trim() : '',
+          anioMalla:         co.anioMalla >= 0 ? String(r[co.anioMalla]||'').trim() : '',
+          periodoIngreso:    co.perIngreso >= 0 ? String(r[co.perIngreso]||'').trim() : '',
+          esIntercambio:     co.esInter   >= 0 ? _adnNorm(r[co.esInter]) : '',
+          idVersionMalla:    co.idVerMalla >= 0 ? String(r[co.idVerMalla]||'').trim() : '',
+          creditosAprobados: co.credAprob >= 0 ? _adnParseNum(r[co.credAprob]) : null,
+          numeroExpediente:  co.numExp    >= 0 ? String(r[co.numExp]||'').trim() : '',
+          direccionSost:     co.dirSost   >= 0 ? _adnNorm(r[co.dirSost]) : '',
+          fInicioPeriodo:    co.fIniPer   >= 0 ? _adnParseFecha(r[co.fIniPer]) : '',
+          semestreAdm:       co.semAdm    >= 0 ? String(r[co.semAdm]||'').trim() : '',
+          promGrado:         co.promGrado >= 0 ? _adnParseNum(r[co.promGrado]) : null,
+          ppa:               co.ppa       >= 0 ? _adnParseNum(r[co.ppa]) : null,
+          reglamento:        co.reglamento >= 0 ? _adnNorm(r[co.reglamento]) : '',
+          tipoReglamento:    co.tipoRegl  >= 0 ? _adnNorm(r[co.tipoRegl]) : '',
+          fCreacionExp:      co.fCreaExp  >= 0 ? _adnParseFecha(r[co.fCreaExp]) : '',
+          creditosScT:       co.credScT   >= 0 ? _adnParseNum(r[co.credScT]) : null,
+          horasAcademicas:   co.horasAcad >= 0 ? _adnParseNum(r[co.horasAcad]) : null,
+          fCierreExp:        co.fCierre   >= 0 ? _adnParseFecha(r[co.fCierre]) : ''
         };
-        // Filtrar filas vacías (sin RUT y sin ID)
         if (!rec.rut && !rec.idExpediente) continue;
         recs.push(rec);
       }
 
-      if (!recs.length) { showToast('No se encontraron expedientes válidos','err'); return; }
+      if (!recs.length){ showToast('No se encontraron expedientes válidos','err'); return; }
 
-      // ── DEDUPLICACIÓN: agrupar múltiples filas del mismo alumno ───
-      // Un alumno puede tener varios expedientes (diplomados, magíster, distintos programas).
-      // Para la tabla principal mostramos UNA fila por RUT, eligiendo el "mejor" expediente
-      // según prioridad: FINALIZADO > EN CURSO > ABANDONO > OTRO. Si empatan, el más reciente.
+      // Deduplicación por RUT (versión simplificada)
+      var byRutAll = {};
       var dedupMap = {};
-      var byRutAll = {};   // para guardar TODOS los expedientes de cada RUT (cruzar después)
 
       function _scoreEstado(estado, razon, avance){
-        var est = String(estado||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
-        var raz = String(razon||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+        var est = String(estado||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+        var raz = String(razon||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
         var validas = ['diplomado','graduado','termino de curso'];
-        if (est==='cerrado' && avance!==null && Math.round(avance)===100 && validas.indexOf(raz)>=0) return 4; // finalizado
-        if (est==='activo'||est==='vigente'||est==='regular'||est==='en curso') return 3; // en curso
-        if (est==='cerrado') return 2; // abandono
-        return 1; // otro
+        if (est === 'cerrado' && avance !== null && Math.round(avance) === 100 && validas.indexOf(raz) >= 0) return 4;
+        if (est === 'activo' || est === 'vigente' || est === 'regular' || est === 'en curso') return 3;
+        if (est === 'cerrado') return 2;
+        return 1;
       }
-
       function _fechaScore(rec){
-        // Devuelve un timestamp para ordenar (más reciente primero)
         var f = rec.fCierreExp || rec.fGrado || rec.fEgreso || rec.fInactividad || rec.fCreacionExp || '';
         if (!f) return 0;
         var d = new Date(f);
@@ -21760,32 +22171,22 @@ function _expHandleFile(file){
 
         var sc = _scoreEstado(r.estado, r.razonInactividad, r.avancePlan);
         var fec = _fechaScore(r);
-        var existing = dedupMap[key];
-
-        if (!existing) {
-          dedupMap[key] = Object.assign({}, r, {_score:sc, _fec:fec});
-          return;
-        }
-        // Mantener el de mejor score; si empata, el de fecha más reciente
-        if (sc > existing._score || (sc === existing._score && fec > existing._fec)) {
+        var ex = dedupMap[key];
+        if (!ex){ dedupMap[key] = Object.assign({}, r, {_score:sc, _fec:fec}); return; }
+        if (sc > ex._score || (sc === ex._score && fec > ex._fec)){
           dedupMap[key] = Object.assign({}, r, {_score:sc, _fec:fec});
         }
       });
 
       var dedup = Object.values(dedupMap).map(function(r){
-        // Quitar campos auxiliares
-        delete r._score; delete r._fec;
-        return r;
+        delete r._score; delete r._fec; return r;
       });
 
-      var totalAntes = recs.length, totalDespues = dedup.length;
-      var duplicados = totalAntes - totalDespues;
-
       _EXP.raw = dedup;
-      _EXP.rawAll = recs;          // dataset completo (sin dedupe) por si se necesita
+      _EXP.rawAll = recs;
       _EXP.byRut = {};
       _EXP.byIdExp = {};
-      _EXP.byRutAll = byRutAll;    // todos los expedientes por RUT (para mostrar historial)
+      _EXP.byRutAll = byRutAll;
       dedup.forEach(function(r){
         if (r.rut) _EXP.byRut[r.rut] = r;
         if (r.idExpediente) _EXP.byIdExp[r.idExpediente] = r;
@@ -21793,30 +22194,59 @@ function _expHandleFile(file){
       _EXP.fileName = file.name;
       _EXP.loaded = true;
 
-      // Reset filtros al cargar
       _FIN.search=''; _FIN.filtPrograma=''; _FIN.filtCohorte=''; _FIN.filtEstado='';
-      _FIN.expanded={};
+      _FIN.expanded={}; _FIN.page=0;
 
-      var msg = totalDespues+' alumnos únicos cargados';
-      if (duplicados>0) msg += ' (de '+totalAntes+' filas; '+duplicados+' duplicados fusionados)';
+      var dups = recs.length - dedup.length;
+      var msg = dedup.length+' alumnos cargados' + (dups>0 ? ' ('+dups+' duplicados fusionados)' : '');
       showToast(msg,'ok');
       renderAlumnosFinalizados();
+
     } catch(err){
+      console.error('[Avance Académico] Error:', err);
+      console.error('[Avance Académico] Stack:', err.stack);
+      // Mostrar el error visualmente en la página, no solo en toast
+      var pg = document.getElementById('page');
+      if (pg) {
+        pg.innerHTML =
+          '<div class="pg-title">📊 Avance Académico</div>'+
+          '<div style="background:rgba(248,81,73,.08);border:1px solid #f85149;border-radius:10px;padding:20px;margin-top:14px;color:#e6edf3;font-size:12px">'+
+            '<div style="font-size:14px;font-weight:800;color:#f85149;margin-bottom:10px">❌ Error al procesar el archivo</div>'+
+            '<div style="font-family:monospace;background:#0d1117;padding:12px;border-radius:6px;border:1px solid #21262d;white-space:pre-wrap;word-break:break-word;font-size:11px;color:#f0f6ff">'+
+              esc(String(err.message||err))+
+            '</div>'+
+            '<div style="margin-top:14px;color:#8b949e;font-size:11px">'+
+              'Revisa la consola del navegador (F12) para ver el detalle completo.<br>'+
+              '<button onclick="_EXP.loaded=false;_EXP.raw=[];renderAlumnosFinalizados()" '+
+                'style="margin-top:10px;padding:6px 14px;background:#388bfd;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">'+
+                '↺ Volver a intentar'+
+              '</button>'+
+            '</div>'+
+          '</div>';
+      }
       showToast('Error: '+err.message,'err');
     }
   };
   rd.readAsArrayBuffer(file);
 }
-
-/* ── Cruce con ADN (asignaturas) por alumno ──────────────────────── */
 function _expGetAsignaturasDeAlumno(expediente){
   if (!_ADN.raw.length) return [];
-  // Buscar todos los registros del ADN del alumno (por RUT o ID expediente)
-  var todas = _ADN.raw.filter(function(r){
-    if (expediente.rut && r.rut && r.rut.trim() === expediente.rut.trim()) return true;
-    if (expediente.idExpediente && r.idExpediente === expediente.idExpediente) return true;
-    return false;
-  });
+  // OPTIMIZACIÓN: usar el índice pre-construido en vez de filter() lineal
+  var todas = [];
+  var rutKey = (expediente.rut||'').trim();
+  var idExpKey = (expediente.idExpediente||'').trim();
+  if (rutKey && _ADN.byRut && _ADN.byRut[rutKey]) {
+    todas = _ADN.byRut[rutKey];
+  } else if (idExpKey && _ADN.byIdExp && _ADN.byIdExp[idExpKey]) {
+    todas = _ADN.byIdExp[idExpKey];
+  } else {
+    // Fallback al método lento si no hay índice
+    todas = _ADN.raw.filter(function(r){
+      if (rutKey && r.rut && r.rut.trim() === rutKey) return true;
+      if (idExpKey && r.idExpediente === idExpKey) return true;
+      return false;
+    });
+  }
 
   // Deduplicar por sigla: si el alumno cursó la misma asignatura varias veces (recursar),
   // mantener la mejor nota aprobada, o la más reciente.
@@ -21851,6 +22281,7 @@ function _expGetAsignaturasDeAlumno(expediente){
 
 /* ═══ MAIN RENDER ════════════════════════════════════════════════ */
 function renderAlumnosFinalizados(){
+  console.log('[Render] renderAlumnosFinalizados START · _EXP.loaded=', _EXP.loaded, '· raw=', _EXP.raw.length);
   var pg = $('page'); if (!pg) return;
 
   // ── Caso 1: Sin expedientes cargados ─────────────────────────
@@ -21889,17 +22320,22 @@ function renderAlumnosFinalizados(){
   }
 
   // ── Caso 2: Expedientes cargados, mostrar tabla ──────────────
-  // Clasificar cada expediente
+  console.time('[Render] paso 1 clasificar');
   var alumnos = _EXP.raw.map(function(a){
     return Object.assign({}, a, { _estado: _expClasificarEstado(a) });
   });
+  console.timeEnd('[Render] paso 1 clasificar');
+  console.log('[Render] paso 1 OK ·', alumnos.length, 'alumnos');
 
   // KPIs globales por estado
   var byEstado = { finalizado:0, abandono:0, enCurso:0, otro:0 };
   alumnos.forEach(function(a){ byEstado[a._estado] = (byEstado[a._estado]||0)+1; });
 
   // Aplicar filtros
+  console.time('[Render] paso 2 filtrar');
   var arr = _finAplicarFiltros(alumnos);
+  console.timeEnd('[Render] paso 2 filtrar');
+  console.log('[Render] paso 2 OK ·', arr.length, 'filtrados');
 
   // Stats sobre filtrado
   var promG = arr.filter(function(a){return a.promGrado!=null;});
@@ -21908,6 +22344,7 @@ function renderAlumnosFinalizados(){
   var avgAvVal = avgAv.length ? avgAv.reduce(function(s,a){return s+a.avancePlan;},0)/avgAv.length : null;
   var progsUni = new Set(arr.map(function(a){return a.programa;}).filter(Boolean)).size;
 
+  console.time('[Render] paso 3 generar HTML');
   pg.innerHTML =
     '<div class="pg-title">📊 Avance Académico <span style="font-size:12px;font-weight:500;color:#8b949e;margin-left:8px">'+_EXP.raw.length+' expedientes</span></div>'+
 
@@ -21940,6 +22377,8 @@ function renderAlumnosFinalizados(){
       '<button onclick="_expExportar()" style="padding:6px 14px;background:#388bfd;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📥 Exportar Excel</button>'+
     '</div>';
 
+  console.timeEnd('[Render] paso 3 generar HTML');
+  console.log('[Render] DONE');
   window._EXPCurrent = arr;
 }
 
@@ -22022,23 +22461,22 @@ function _expFiltrosBarHTML(all){
     {v:'finalizado',label:'🟢 Finalizado'},
     {v:'enCurso',label:'🟡 En curso'},
     {v:'abandono',label:'🔴 Abandono'},
-    {v:'otro',label:'⚪ Otro'},
   ];
 
   return '<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px">'+
 
     '<div><label style="'+lbl+'">🔍 Buscar</label>'+
       '<input id="expSearchInp" type="text" placeholder="RUT, apellido, nombre, programa o ID expediente..." value="'+esc(_FIN.search)+'" '+
-        'oninput="_FIN.search=this.value;clearTimeout(window._finT);window._finT=setTimeout(renderAlumnosFinalizados,180);" '+
+        'oninput="_FIN.search=this.value;_FIN.page=0;clearTimeout(window._finT);window._finT=setTimeout(renderAlumnosFinalizados,180);" '+
         'style="'+inp+'"></div>'+
 
     '<div><label style="'+lbl+'">Estado</label>'+
-      '<select onchange="_FIN.filtEstado=this.value;renderAlumnosFinalizados()" style="'+sel+'">'+
+      '<select onchange="_FIN.filtEstado=this.value;_FIN.page=0;renderAlumnosFinalizados()" style="'+sel+'">'+
         estadoOpts.map(function(o){return '<option value="'+esc(o.v)+'"'+(_FIN.filtEstado===o.v?' selected':'')+'>'+o.label+'</option>';}).join('')+
       '</select></div>'+
 
     '<div><label style="'+lbl+'">Programa ('+progs.length+')</label>'+
-      '<select onchange="_FIN.filtPrograma=this.value;renderAlumnosFinalizados()" style="'+sel+';max-width:240px">'+
+      '<select onchange="_FIN.filtPrograma=this.value;_FIN.page=0;renderAlumnosFinalizados()" style="'+sel+';max-width:240px">'+
         '<option value="">Todos los programas</option>'+
         progs.map(function(p){
           var n = all.filter(function(a){return (a.programa||'')===p;}).length;
@@ -22047,7 +22485,7 @@ function _expFiltrosBarHTML(all){
       '</select></div>'+
 
     '<div><label style="'+lbl+'">Cohorte ('+cohortes.length+')</label>'+
-      '<select onchange="_FIN.filtCohorte=this.value;renderAlumnosFinalizados()" style="'+sel+'">'+
+      '<select onchange="_FIN.filtCohorte=this.value;_FIN.page=0;renderAlumnosFinalizados()" style="'+sel+'">'+
         '<option value="">Todas las cohortes</option>'+
         cohortes.map(function(p){
           // Contar alumnos en esa cohorte
@@ -22088,6 +22526,31 @@ function _expTablaHTML(arr){
   var S = 'padding:8px 12px;font-size:11px;color:#e6edf3;border-bottom:1px solid #161b22;vertical-align:top';
   var THfix = 'padding:9px 12px;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid #21262d;background:#0d1117;white-space:nowrap';
 
+  // ── Paginación: cortar el array según la página actual ──
+  var pageSize = _FIN.pageSize || 50;
+  var totalPages = Math.max(1, Math.ceil(arr.length / pageSize));
+  if (_FIN.page == null) _FIN.page = 0;
+  if (_FIN.page >= totalPages) _FIN.page = totalPages - 1;
+  if (_FIN.page < 0) _FIN.page = 0;
+  var fromIdx = _FIN.page * pageSize;
+  var toIdx = Math.min(fromIdx + pageSize, arr.length);
+  var pageArr = arr.slice(fromIdx, toIdx);
+
+  // Controles de paginación
+  var paginadorHTML = '';
+  if (totalPages > 1) {
+    var btnStyle = 'padding:5px 10px;border:1px solid #21262d;background:#161b22;color:#e6edf3;border-radius:5px;cursor:pointer';
+    var disStyle = 'opacity:.4;cursor:not-allowed';
+    paginadorHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#0d1117;border:1px solid #21262d;border-top:none;font-size:11px;color:#8b949e">'+
+      '<button onclick="_FIN.page=0;renderAlumnosFinalizados()" style="'+btnStyle+';'+(_FIN.page===0?disStyle:'')+'">«</button>'+
+      '<button onclick="if(_FIN.page>0){_FIN.page--;renderAlumnosFinalizados();}" style="'+btnStyle+';'+(_FIN.page===0?disStyle:'')+'">‹</button>'+
+      '<span style="font-weight:700;color:#e6edf3;padding:0 12px">Página '+(_FIN.page+1)+' / '+totalPages+'</span>'+
+      '<button onclick="if(_FIN.page<'+(totalPages-1)+'){_FIN.page++;renderAlumnosFinalizados();}" style="'+btnStyle+';'+(_FIN.page>=totalPages-1?disStyle:'')+'">›</button>'+
+      '<button onclick="_FIN.page='+(totalPages-1)+';renderAlumnosFinalizados()" style="'+btnStyle+';'+(_FIN.page>=totalPages-1?disStyle:'')+'">»</button>'+
+      '<span style="margin-left:16px;color:#6e7681;font-size:10px">Mostrando '+(arr.length?fromIdx+1:0)+'-'+toIdx+' de '+arr.length+'</span>'+
+    '</div>';
+  }
+
   return '<div style="background:#161b22;border:1px solid #21262d;border-radius:10px 10px 0 0;overflow:auto;max-height:62vh">'+
     '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
     '<thead style="position:sticky;top:0;z-index:1">'+
@@ -22106,7 +22569,7 @@ function _expTablaHTML(arr){
       '</tr>'+
     '</thead>'+
     '<tbody>'+
-      arr.map(function(a, i){
+      pageArr.map(function(a, i){
         var rowKey = a.rut || a.idExpediente || ('row'+i);
         var expandido = _FIN.expanded[rowKey];
         var bg = i%2 ? 'transparent' : 'rgba(255,255,255,.012)';
@@ -22202,7 +22665,8 @@ function _expTablaHTML(arr){
         'No hay resultados con los filtros aplicados'+
       '</div>'
     :'')+
-  '</div>';
+  '</div>'+
+  paginadorHTML;
 }
 
 
@@ -23275,28 +23739,65 @@ function adnCloseDet(){
   _ADN.selStu=null;
 }
 
+
+/* ── Indicador global de carga (overlay) ────────────────────────── */
+function _showLoading(mensaje) {
+  var ex = document.getElementById('_globalLoadingOverlay');
+  if (ex) ex.remove();
+  var ov = document.createElement('div');
+  ov.id = '_globalLoadingOverlay';
+  ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(13,17,23,.85);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  ov.innerHTML = '<div style="text-align:center;color:#e6edf3">'+
+    '<div style="width:48px;height:48px;border:3px solid #21262d;border-top-color:#388bfd;border-radius:50%;animation:_spin 0.8s linear infinite;margin:0 auto 16px"></div>'+
+    '<div style="font-size:14px;font-weight:700">'+(mensaje||'Procesando...')+'</div>'+
+    '<div id="_loadingMsg" style="font-size:11px;color:#8b949e;margin-top:6px"></div>'+
+  '</div>'+
+  '<style>@keyframes _spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style>';
+  document.body.appendChild(ov);
+}
+
+function _updateLoading(mensaje) {
+  var el = document.getElementById('_loadingMsg');
+  if (el) el.textContent = mensaje;
+}
+
+function _hideLoading() {
+  var ov = document.getElementById('_globalLoadingOverlay');
+  if (ov) ov.remove();
+}
+
 function _adnHandleFile(file){
+  console.log('[ADN] _adnHandleFile inicio', file && file.name);
   if(!file) return;
   var ext='.'+file.name.split('.').pop().toLowerCase();
   if(!['.xlsx','.xls','.csv'].includes(ext)){ showToast('Formato no soportado','err'); return; }
   showToast('Procesando...','ok');
   var rd=new FileReader();
   rd.onload=function(e){
+    console.log('[ADN] onload - bytes:', e.target.result.byteLength);
     try{
+      console.time('[ADN] Procesamiento total');
       var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false});
+      console.log('[ADN] XLSX.read OK');
       var recs=_adnParseExcel(wb);
+      console.log('[ADN] _adnParseExcel devolvió', recs.length, 'registros');
       if(!recs.length){ showToast('No se encontraron registros válidos','err'); return; }
       _ADN.raw=recs; _ADN.fileName=file.name;
       _ADN.progs=[...new Set(recs.map(function(r){return _adnNorm(r.programa);}).filter(Boolean))].sort();
       _ADN.program='';
       showToast(recs.length+' registros cargados · '+_ADN.progs.length+' programa(s)','ok');
+      console.log('[ADN] Llamando renderAdnAcademico...');
       renderAdnAcademico();
+      console.log('[ADN] renderAdnAcademico OK');
+      console.timeEnd('[ADN] Procesamiento total');
       if(_ADN.progs.length===1) setTimeout(function(){_adnSelProg(_ADN.progs[0]);},100);
-    }catch(err){ showToast('Error: '+err.message,'err'); }
+    }catch(err){
+      console.error('[ADN] Error:', err);
+      showToast('Error: '+err.message,'err');
+    }
   };
   rd.readAsArrayBuffer(file);
 }
-
 function _adnLoadDemo(){
   var CN={DFIS101:'Valor Social de la Filantropía',DFIS102:'Visión Estratégica y Tipologías',DFIS103:'Estrategia y Propuesta de Valor',DFIS104:'Taller de Articulación e Incidencia',DFIS105:'Taller de Innovación para Gestión',DFIS106:'Modelos de Financiamiento',DFIS107:'Estrategia de Comunicaciones',DFIS108:'Metodologías de Evaluación',DFIS109:'Taller Formulación de Proyectos',DFIS110:'Estrategia de Uso de Evidencia',DFIS113:'Gobernanza Efectiva'};
   var PR='DIPLOMADO EN DIRECCIÓN DE FUNDACIONES E INVERSIÓN SOCIAL';
