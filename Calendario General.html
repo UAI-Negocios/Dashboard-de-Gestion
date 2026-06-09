@@ -1710,7 +1710,7 @@ function coordGetInfo(nombre) {
 
 const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
-  programas:    ['resumen','calidad','cronograma','docentes'],
+  programas:    ['resumen','calidad','cronograma','docentes','correos'],
   calendarios:  ['calendario','reservas'],
   planificador: ['plancursos','malla','planreporte','propuestas','horario'],
   admin:        ['gestion','cargaprog','turnos','validaciones','auditoria'],
@@ -1730,6 +1730,7 @@ const TAB_LABELS = {
   calidad:      'Calidad & Sede',
   cronograma:   '📅 Cronograma',
   docentes:     '👨‍🏫 Asignación Docente',
+  correos:      '📧 Correos de Bienvenida',
   declaracion:  'Declaración de Horas',
   anualdecl:    'Declarado por Año',
   presupuesto:  '💰 Presupuesto vs Real',
@@ -1774,7 +1775,14 @@ const DIAS_ES = {0:'Domingo',1:'Lunes',2:'Martes',3:'Miércoles',4:'Jueves',5:'V
 const DAYS_MON = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 const DAYS_ABR = ['Lun','Mar','Mié','Jue','Vie','Sáb'];
 const COLORS = ['#38bdf8','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a3e635','#6366f1','#fb923c','#34d399'];
-const IGNORE_VALS = new Set(['','nan','none','n/a','por definir','sin asignar','s/d','-','nat','na']);
+// IGNORE_VALS: valores que tratamos como vacíos/nulos en general.
+// NO incluye 'por definir' porque para COORDINADORA es un valor válido
+// (programa cuyos programas existen pero aún no tiene coordinadora asignada).
+const IGNORE_VALS = new Set(['','nan','none','n/a','sin asignar','s/d','-','nat','na']);
+
+// IGNORE_NO_ASIG: valores que indican "no asignado" para PROFESOR / SALA / HORARIO
+// (incluye 'por definir' porque ahí sí significa "falta asignar")
+const IGNORE_NO_ASIG = new Set(['','nan','none','n/a','por definir','sin asignar','s/d','-','nat','na']);
 
 /* ══════════════════════════════════════════════════════
    UTILS
@@ -2797,7 +2805,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','finalizados'];
+  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','finalizados','correos'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -2811,6 +2819,7 @@ function refreshView() {
     calidad:      renderCalidad,
     cronograma:   renderCronograma,
     docentes:     renderDocentes,
+    correos:      renderCorreosBienvenida,
     declaracion:  renderDeclaracion,
     anualdecl:    renderAnualDecl,
     presupuesto:  renderPresupuesto,
@@ -3232,9 +3241,9 @@ function renderHome() {
   if(iniSem)  alerts.push({ico:'🚀',txt:'Inician esta semana',det:iniSem+' programas',lv:'alta'});
   const ini30  = futuros.filter(p=>p.inicio>in7&&p.inicio<=in30).length;
   if(ini30)   alerts.push({ico:'📅',txt:'Próximos 30 días',det:ini30+' programas por iniciar',lv:'med'});
-  const sinP   = df.filter(r=>!r['PROFESOR']||IGNORE_VALS.has((r['PROFESOR']||'').toLowerCase())).length;
+  const sinP   = df.filter(r=>!r['PROFESOR']||IGNORE_NO_ASIG.has((r['PROFESOR']||'').toLowerCase())).length;
   if(sinP)    alerts.push({ico:'👤',txt:'Sin Profesor asignado',det:sinP+' sesiones',lv:'med'});
-  const sinS   = df.filter(r=>!r['SALA']||IGNORE_VALS.has((r['SALA']||'').toLowerCase())).length;
+  const sinS   = df.filter(r=>!r['SALA']||IGNORE_NO_ASIG.has((r['SALA']||'').toLowerCase())).length;
   if(sinS)    alerts.push({ico:'🏫',txt:'Sin Sala asignada',det:sinS+' sesiones',lv:'low'});
   const diaMap ={};
   df.forEach(r=>{if(!r['DIAS/FECHAS'])return;const k=fmtDate(r['DIAS/FECHAS']);if(!diaMap[k])diaMap[k]=new Set();diaMap[k].add(r['PROGRAMA']);});
@@ -5038,6 +5047,557 @@ function renderDocentes() {
   _docUpd();
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   CORREOS DE BIENVENIDA — Generador con autocompletado desde calendario
+═══════════════════════════════════════════════════════════════════════ */
+
+var _CB = {
+  programa: '',
+  remitente: {
+    nombre: 'José Vilches Bustos',
+    cargo: 'Jefe de Gestión de Postgrados y Educación Continua',
+    escuela: 'Escuela de Negocios',
+    universidad: 'Universidad Adolfo Ibáñez',
+    email: 'jose.vilches@uai.cl',
+  },
+  coffeeBreak: {
+    activo: true,
+    horario: '09:30 - 10:00 hrs.',
+    descripcion: 'Instancia de recepción y networking'
+  },
+  almuerzo: {
+    activo: true,
+    horario: '13:00 - 14:00 hrs.',
+    descripcion: 'Espacio libre / Almuerzo compartido'
+  },
+  restriccionesAlimentarias: true,
+  fechaLimiteRestricciones: '',
+  imagenHeader: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=600&h=250&fit=crop',
+  webcursosUrl: 'https://webcursos.uai.cl',
+};
+
+function _cbCargarStorage(){
+  try {
+    var s = localStorage.getItem('cb_config_v1');
+    if (s) {
+      var parsed = JSON.parse(s);
+      if (parsed.remitente) _CB.remitente = Object.assign(_CB.remitente, parsed.remitente);
+      if (parsed.imagenHeader) _CB.imagenHeader = parsed.imagenHeader;
+    }
+  } catch(e){}
+}
+
+function _cbGuardarStorage(){
+  try {
+    localStorage.setItem('cb_config_v1', JSON.stringify({
+      remitente: _CB.remitente,
+      imagenHeader: _CB.imagenHeader
+    }));
+  } catch(e){}
+}
+
+function _cbFmtFecha(d){
+  if (!d) return '';
+  var dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return String(d);
+  var dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return dias[dt.getDay()] + ' ' + dt.getDate() + ' de ' + meses[dt.getMonth()] + ', ' + dt.getFullYear();
+}
+
+function _cbFmtFechaLim(d){
+  if (!d) return '';
+  var dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return String(d);
+  var dias = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return dias[dt.getDay()] + ' ' + dt.getDate() + ' de ' + meses[dt.getMonth()];
+}
+
+function _cbDetectarSesiones(programa){
+  // Devuelve las sesiones del PRIMER DÍA del programa, ordenadas por hora
+  if (!programa) return null;
+  var df = getDF();
+  var sesiones = df.filter(function(r){
+    return r['PROGRAMA'] === programa && r['DIAS/FECHAS'] instanceof Date;
+  });
+  if (!sesiones.length) return null;
+
+  // Encontrar la fecha más temprana
+  sesiones.sort(function(a,b){ return a['DIAS/FECHAS'] - b['DIAS/FECHAS']; });
+  var primerDia = sesiones[0]['DIAS/FECHAS'];
+  var pdKey = primerDia.toISOString().substring(0,10);
+
+  // Filtrar todas las sesiones del primer día
+  var primerasSes = sesiones.filter(function(r){
+    return r['DIAS/FECHAS'].toISOString().substring(0,10) === pdKey;
+  });
+
+  // Ordenar por hora (campo HORARIO o Horario)
+  primerasSes.sort(function(a,b){
+    var ha = String(a['HORARIO']||a['Horario']||'').trim();
+    var hb = String(b['HORARIO']||b['Horario']||'').trim();
+    return ha.localeCompare(hb);
+  });
+
+  return {
+    fecha: primerDia,
+    sesiones: primerasSes,
+    sede:  primerasSes[0]['SEDE']  || '',
+    sala:  primerasSes[0]['SALA']  || '',
+    edificio: primerasSes[0]['EDIFICIO'] || '',
+  };
+}
+
+function _cbAbreviarPrograma(p){
+  // Buscar nombre abreviado en el df si existe
+  var df = getDF();
+  for (var i=0; i<df.length; i++){
+    if (df[i]['PROGRAMA'] === p) {
+      var abr = df[i]['NOMBRE ABREVIADO'] || df[i]['Programa_Abrev'] || '';
+      if (abr) return abr;
+    }
+  }
+  return p;
+}
+
+function _cbGetSesionesEdit(){
+  // Lee las sesiones actuales editadas del DOM (si existen) o las default
+  var rows = document.querySelectorAll('[data-cbses]');
+  if (!rows.length) return null;
+  var out = [];
+  rows.forEach(function(row){
+    out.push({
+      tipo:    row.querySelector('[data-cbf="tipo"]').value,
+      horario: row.querySelector('[data-cbf="horario"]').value,
+      docente: row.querySelector('[data-cbf="docente"]').value,
+      modalidad: row.querySelector('[data-cbf="modalidad"]').value,
+      esEspecial: row.dataset.especial === '1',
+    });
+  });
+  return out;
+}
+
+function renderCorreosBienvenida(){
+  var pg = $('page'); if (!pg) return;
+  _cbCargarStorage();
+
+  var df = getDF();
+  if (!df.length) {
+    pg.innerHTML = '<div class="pg-title">📧 Correos de Bienvenida</div>'+
+      '<div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:40px;text-align:center;color:#8b949e;font-size:13px;margin-top:20px">'+
+        '<div style="font-size:36px;margin-bottom:14px">📅</div>'+
+        '<div style="font-size:14px;font-weight:700;color:#e6edf3;margin-bottom:6px">Carga el calendario primero</div>'+
+        'Necesitas tener el calendario académico cargado para generar correos con datos del programa.'+
+      '</div>';
+    return;
+  }
+
+  // Lista única de programas
+  var progs = [...new Set(df.map(function(r){return r['PROGRAMA'];}).filter(Boolean))].sort();
+
+  // Detectar info del programa seleccionado
+  var info = _CB.programa ? _cbDetectarSesiones(_CB.programa) : null;
+  var nombreAbrev = _CB.programa ? _cbAbreviarPrograma(_CB.programa) : '';
+
+  pg.innerHTML =
+    '<div class="pg-title">📧 Correos de Bienvenida'+
+    '<span style="font-size:12px;font-weight:500;color:#8b949e;margin-left:8px">Generador de correos basado en el calendario</span></div>'+
+
+    // Selector de programa
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px 16px;margin:14px 0">'+
+      '<label style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block">'+
+        '🎓 Programa Académico'+
+      '</label>'+
+      '<select id="cbProg" onchange="_CB.programa=this.value;renderCorreosBienvenida()" '+
+        'style="width:100%;padding:10px 14px;border:1px solid #30363d;background:#161b22;color:#e6edf3;border-radius:8px;font-size:13px;cursor:pointer">'+
+        '<option value="">Selecciona un programa...</option>'+
+        progs.map(function(p){
+          return '<option value="'+esc(p)+'"'+(p===_CB.programa?' selected':'')+'>'+esc(p)+'</option>';
+        }).join('')+
+      '</select>'+
+    '</div>'+
+
+    (!_CB.programa ?
+      '<div style="background:#161b22;border:1px dashed #30363d;border-radius:10px;padding:30px;text-align:center;color:#8b949e;font-size:12px;margin-top:14px">'+
+        'Selecciona un programa para autocompletar los datos del correo'+
+      '</div>'
+    : !info ?
+      '<div style="background:rgba(248,81,73,.08);border:1px solid #f85149;border-radius:10px;padding:20px;color:#e6edf3;font-size:12px;margin-top:14px">'+
+        '⚠ No se encontraron sesiones con fecha para este programa'+
+      '</div>'
+    :
+      _cbRenderFormulario(info, nombreAbrev)
+    );
+}
+
+function _cbRenderFormulario(info, nombreAbrev){
+  var fechaInicio = _cbFmtFecha(info.fecha);
+
+  // Por defecto: fecha límite restricciones = 2 días antes de la fecha de inicio
+  if (!_CB.fechaLimiteRestricciones) {
+    var d = new Date(info.fecha); d.setDate(d.getDate()-2);
+    _CB.fechaLimiteRestricciones = d.toISOString().substring(0,10);
+  }
+
+  // Sesiones detectadas + coffee/almuerzo si están activos
+  var sesionesHTML = '';
+  info.sesiones.forEach(function(s, i){
+    var tipo = String(s['ASIGNATURA']||s['SIGLA']||'Sesión '+(i+1));
+    var horario = String(s['HORARIO']||s['Horario']||'');
+    var docente = String(s['PROFESOR']||s['Profesores']||s['DOCENTE']||'');
+    var modalidad = String(s['Modalidad_Calc']||s['MODALIDAD']||'Presencial');
+    sesionesHTML += '<tr data-cbses style="border-bottom:1px solid #21262d">'+
+      '<td style="padding:6px 8px"><input type="text" data-cbf="tipo" value="'+esc(tipo)+'" style="width:100%;padding:5px 8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;border-radius:5px;font-size:11px"></td>'+
+      '<td style="padding:6px 8px;width:140px"><input type="text" data-cbf="horario" value="'+esc(horario)+'" style="width:100%;padding:5px 8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;border-radius:5px;font-size:11px"></td>'+
+      '<td style="padding:6px 8px"><input type="text" data-cbf="docente" value="'+esc(docente)+'" style="width:100%;padding:5px 8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;border-radius:5px;font-size:11px"></td>'+
+      '<td style="padding:6px 8px;width:110px"><input type="text" data-cbf="modalidad" value="'+esc(modalidad)+'" style="width:100%;padding:5px 8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;border-radius:5px;font-size:11px"></td>'+
+    '</tr>';
+  });
+
+  var lblS = 'font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:block';
+  var inpS = 'width:100%;padding:8px 12px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;border-radius:6px;font-size:12px';
+
+  return '<div style="display:grid;grid-template-columns:1fr 380px;gap:14px;margin-top:14px">'+
+
+    // ── Columna izquierda: formulario ─────────────────────
+    '<div style="display:flex;flex-direction:column;gap:14px">'+
+
+      // Datos del programa
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:16px">'+
+        '<div style="font-size:12px;font-weight:800;color:#388bfd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #21262d">'+
+          '📚 Datos del Programa'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+          '<div><label style="'+lblS+'">Nombre Programa</label>'+
+            '<input id="cbNomProg" type="text" value="'+esc(_CB.programa)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Nombre Abreviado</label>'+
+            '<input id="cbNomAbrev" type="text" value="'+esc(nombreAbrev)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Sede</label>'+
+            '<input id="cbSede" type="text" value="'+esc(info.sede)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Sala</label>'+
+            '<input id="cbSala" type="text" value="'+esc(info.sala)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Edificio</label>'+
+            '<input id="cbEdif" type="text" value="'+esc(info.edificio||'C')+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Dirección Sede</label>'+
+            '<input id="cbDir" type="text" value="Av. Diag. Las Torres 2640, Peñalolén, Región Metropolitana." style="'+inpS+'"></div>'+
+        '</div>'+
+      '</div>'+
+
+      // Sesiones del primer día
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:16px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #21262d">'+
+          '<div style="font-size:12px;font-weight:800;color:#10b981;text-transform:uppercase;letter-spacing:.5px">'+
+            '📅 Sesiones del Primer Día — '+esc(fechaInicio)+
+          '</div>'+
+        '</div>'+
+
+        // Coffee break
+        '<div style="background:#161b22;border:1px solid #21262d;border-radius:8px;padding:10px;margin-bottom:10px">'+
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:#e6edf3;font-weight:600">'+
+            '<input type="checkbox" id="cbCoffActivo" '+(_CB.coffeeBreak.activo?'checked':'')+' onchange="_CB.coffeeBreak.activo=this.checked;renderCorreosBienvenida()" style="cursor:pointer">'+
+            '☕ Incluir Coffee Break de Bienvenida'+
+          '</label>'+
+          (_CB.coffeeBreak.activo?
+            '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;margin-top:8px">'+
+              '<input id="cbCoffHor" type="text" value="'+esc(_CB.coffeeBreak.horario)+'" placeholder="Horario" style="'+inpS+';font-size:11px">'+
+              '<input id="cbCoffDesc" type="text" value="'+esc(_CB.coffeeBreak.descripcion)+'" placeholder="Descripción" style="'+inpS+';font-size:11px">'+
+            '</div>'
+          :'')+
+        '</div>'+
+
+        // Tabla de sesiones
+        '<table style="width:100%;border-collapse:collapse;font-size:11px;background:#161b22;border-radius:6px;overflow:hidden">'+
+          '<thead><tr style="background:#161b22">'+
+            '<th style="padding:7px 8px;text-align:left;font-size:9px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.3px">Sesión / Asignatura</th>'+
+            '<th style="padding:7px 8px;text-align:left;font-size:9px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.3px">Horario</th>'+
+            '<th style="padding:7px 8px;text-align:left;font-size:9px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.3px">Docente</th>'+
+            '<th style="padding:7px 8px;text-align:left;font-size:9px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.3px">Modalidad</th>'+
+          '</tr></thead>'+
+          '<tbody>'+ sesionesHTML +'</tbody>'+
+        '</table>'+
+
+        // Almuerzo
+        '<div style="background:#161b22;border:1px solid #21262d;border-radius:8px;padding:10px;margin-top:10px">'+
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:#e6edf3;font-weight:600">'+
+            '<input type="checkbox" id="cbAlmActivo" '+(_CB.almuerzo.activo?'checked':'')+' onchange="_CB.almuerzo.activo=this.checked;renderCorreosBienvenida()" style="cursor:pointer">'+
+            '🍽️ Incluir Almuerzo'+
+          '</label>'+
+          (_CB.almuerzo.activo?
+            '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;margin-top:8px">'+
+              '<input id="cbAlmHor" type="text" value="'+esc(_CB.almuerzo.horario)+'" placeholder="Horario" style="'+inpS+';font-size:11px">'+
+              '<input id="cbAlmDesc" type="text" value="'+esc(_CB.almuerzo.descripcion)+'" placeholder="Descripción" style="'+inpS+';font-size:11px">'+
+            '</div>'
+          :'')+
+        '</div>'+
+      '</div>'+
+
+      // Opciones adicionales
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:16px">'+
+        '<div style="font-size:12px;font-weight:800;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #21262d">'+
+          '⚙️ Opciones Adicionales'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+          '<div>'+
+            '<label style="'+lblS+'">URL Webcursos</label>'+
+            '<input id="cbWebcursos" type="text" value="'+esc(_CB.webcursosUrl)+'" style="'+inpS+'">'+
+          '</div>'+
+          '<div>'+
+            '<label style="'+lblS+'">Imagen Header (URL)</label>'+
+            '<input id="cbImg" type="text" value="'+esc(_CB.imagenHeader)+'" style="'+inpS+'">'+
+          '</div>'+
+        '</div>'+
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px;font-size:11px;color:#e6edf3">'+
+          '<input type="checkbox" id="cbRest" '+(_CB.restriccionesAlimentarias?'checked':'')+' onchange="_CB.restriccionesAlimentarias=this.checked;renderCorreosBienvenida()" style="cursor:pointer">'+
+          '🍪 Incluir aviso de restricciones alimentarias'+
+        '</label>'+
+        (_CB.restriccionesAlimentarias?
+          '<div style="margin-top:8px"><label style="'+lblS+'">Fecha límite informar restricciones</label>'+
+            '<input id="cbFLim" type="date" value="'+_CB.fechaLimiteRestricciones+'" style="'+inpS+'"></div>'
+        :'')+
+      '</div>'+
+
+      // Datos del remitente
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:16px">'+
+        '<div style="font-size:12px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #21262d">'+
+          '✍️ Firma del Remitente'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+          '<div><label style="'+lblS+'">Nombre</label>'+
+            '<input id="cbRemNom" type="text" value="'+esc(_CB.remitente.nombre)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Cargo</label>'+
+            '<input id="cbRemCargo" type="text" value="'+esc(_CB.remitente.cargo)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Escuela</label>'+
+            '<input id="cbRemEsc" type="text" value="'+esc(_CB.remitente.escuela)+'" style="'+inpS+'"></div>'+
+          '<div><label style="'+lblS+'">Universidad</label>'+
+            '<input id="cbRemUni" type="text" value="'+esc(_CB.remitente.universidad)+'" style="'+inpS+'"></div>'+
+          '<div style="grid-column:span 2"><label style="'+lblS+'">Email</label>'+
+            '<input id="cbRemEmail" type="text" value="'+esc(_CB.remitente.email)+'" style="'+inpS+'"></div>'+
+        '</div>'+
+      '</div>'+
+
+      // Botones de acción
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        '<button onclick="_cbGenerar()" style="flex:1;padding:12px 20px;background:#388bfd;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">'+
+          '👁 Vista Previa + Generar HTML'+
+        '</button>'+
+        '<button onclick="_cbCopiarHTML()" style="padding:12px 20px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">'+
+          '📋 Copiar HTML'+
+        '</button>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Columna derecha: vista previa ─────────────────────
+    '<div id="cbPreview" style="background:#fff;border:1px solid #30363d;border-radius:10px;padding:20px;overflow:auto;max-height:90vh;position:sticky;top:14px">'+
+      '<div style="text-align:center;color:#999;font-size:11px;padding:40px 10px">'+
+        'Haz clic en <strong style="color:#388bfd">"Vista Previa + Generar HTML"</strong> para ver el correo aquí.'+
+      '</div>'+
+    '</div>'+
+
+  '</div>';
+}
+
+function _cbReadInputs(){
+  // Helper para leer todos los inputs y armar el objeto de datos
+  var get = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+
+  // Recolectar sesiones de la tabla
+  var sesiones = [];
+  document.querySelectorAll('[data-cbses]').forEach(function(row){
+    sesiones.push({
+      tipo:    row.querySelector('[data-cbf="tipo"]').value,
+      horario: row.querySelector('[data-cbf="horario"]').value,
+      docente: row.querySelector('[data-cbf="docente"]').value,
+      modalidad: row.querySelector('[data-cbf="modalidad"]').value,
+    });
+  });
+
+  var info = _cbDetectarSesiones(_CB.programa);
+  var fechaInicio = info ? _cbFmtFecha(info.fecha) : '';
+
+  // Actualizar _CB con los inputs
+  if (get('cbCoffHor'))  _CB.coffeeBreak.horario = get('cbCoffHor');
+  if (get('cbCoffDesc')) _CB.coffeeBreak.descripcion = get('cbCoffDesc');
+  if (get('cbAlmHor'))   _CB.almuerzo.horario = get('cbAlmHor');
+  if (get('cbAlmDesc'))  _CB.almuerzo.descripcion = get('cbAlmDesc');
+  if (get('cbFLim'))     _CB.fechaLimiteRestricciones = get('cbFLim');
+  if (get('cbWebcursos'))_CB.webcursosUrl = get('cbWebcursos');
+  if (get('cbImg'))      _CB.imagenHeader = get('cbImg');
+  _CB.remitente.nombre = get('cbRemNom') || _CB.remitente.nombre;
+  _CB.remitente.cargo  = get('cbRemCargo') || _CB.remitente.cargo;
+  _CB.remitente.escuela= get('cbRemEsc') || _CB.remitente.escuela;
+  _CB.remitente.universidad = get('cbRemUni') || _CB.remitente.universidad;
+  _CB.remitente.email  = get('cbRemEmail') || _CB.remitente.email;
+  _cbGuardarStorage();
+
+  return {
+    programa:    get('cbNomProg'),
+    nombreAbrev: get('cbNomAbrev'),
+    fechaInicio: fechaInicio,
+    sede:        get('cbSede'),
+    sala:        get('cbSala'),
+    edificio:    get('cbEdif'),
+    direccion:   get('cbDir'),
+    sesiones:    sesiones,
+  };
+}
+
+function _cbConstruirHTML(d){
+  // Construir el HTML del correo con los datos
+  var coff = _CB.coffeeBreak;
+  var alm = _CB.almuerzo;
+  var rem = _CB.remitente;
+  var fLim = _cbFmtFechaLim(_CB.fechaLimiteRestricciones);
+
+  var filasSesiones = '';
+
+  // Coffee Break (si activo)
+  if (coff.activo){
+    filasSesiones += '<tr style="background-color: #FFFDF5;">'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold; color: #B7791F;">☕ Coffee Break de Bienvenida</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; color: #B7791F; font-weight: bold;">'+esc(d.fechaInicio)+'<br>'+esc(coff.horario)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; color: #B7791F;">'+esc(coff.descripcion)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd;"><span style="background-color: #FEFCBF; color: #B7791F; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">Presencial</span></td>'+
+    '</tr>';
+  }
+
+  // Sesiones (con almuerzo intercalado si está activo + alguna sesión empieza después de 13:00)
+  var almuerzoInsertado = false;
+  d.sesiones.forEach(function(s, i){
+    var horaInicio = String(s.horario).match(/(\d{1,2})/);
+    var hi = horaInicio ? parseInt(horaInicio[1]) : 0;
+    // Insertar almuerzo antes de sesiones de la tarde
+    if (alm.activo && !almuerzoInsertado && hi >= 13){
+      filasSesiones += '<tr style="background-color: #F7FAFC;">'+
+        '<td style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold; color: #2B6CB0;">🍽️ Almuerzo</td>'+
+        '<td style="padding: 12px 15px; border: 1px solid #ddd; color: #2B6CB0; font-weight: bold;">'+esc(d.fechaInicio)+'<br>'+esc(alm.horario)+'</td>'+
+        '<td style="padding: 12px 15px; border: 1px solid #ddd; color: #2B6CB0;">'+esc(alm.descripcion)+'</td>'+
+        '<td style="padding: 12px 15px; border: 1px solid #ddd;"><span style="background-color: #EBF8FF; color: #2B6CB0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">Presencial</span></td>'+
+      '</tr>';
+      almuerzoInsertado = true;
+    }
+    var bg = i % 2 === 0 ? '#f9f9f9' : '';
+    filasSesiones += '<tr'+(bg?' style="background-color: '+bg+';"':'')+'>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold;">'+esc(s.tipo)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd;">'+esc(d.fechaInicio)+'<br>'+esc(s.horario)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd;">'+esc(s.docente)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd;"><span style="background-color: #E2E8F0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">'+esc(s.modalidad)+'</span></td>'+
+    '</tr>';
+  });
+
+  // Si almuerzo activo pero no se insertó (no había sesiones PM), agregarlo al final
+  if (alm.activo && !almuerzoInsertado){
+    filasSesiones += '<tr style="background-color: #F7FAFC;">'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold; color: #2B6CB0;">🍽️ Almuerzo</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; color: #2B6CB0; font-weight: bold;">'+esc(d.fechaInicio)+'<br>'+esc(alm.horario)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd; color: #2B6CB0;">'+esc(alm.descripcion)+'</td>'+
+      '<td style="padding: 12px 15px; border: 1px solid #ddd;"><span style="background-color: #EBF8FF; color: #2B6CB0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">Presencial</span></td>'+
+    '</tr>';
+  }
+
+  var html =
+'<div style="max-width: 600px; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; color: #2C3E50; line-height: 1.6;">\n'+
+'  <div style="text-align: center; margin-bottom: 25px;">\n'+
+'    <img src="'+esc(_CB.imagenHeader)+'" alt="Bienvenida '+esc(d.programa)+'" style="width: 100%; max-width: 600px; height: auto; border-radius: 8px; display: block;" />\n'+
+'  </div>\n'+
+'  <p style="margin-bottom: 18px;"><strong>Estimada/o Estudiante,</strong></p>\n'+
+'  <p style="margin-bottom: 18px;">Es un placer saludarte y darte la más cordial bienvenida al <strong>'+esc(d.programa)+'</strong>. Nos entusiasma enormemente que hayas decidido dar este paso clave en tu desarrollo profesional y que confíes en nuestra institución para acompañarte en este proceso de aprendizaje y especialización.</p>\n'+
+'  <p style="margin-bottom: 18px;">El mercado actual exige profesionales dinámicos, capaces de liderar estrategias y de entender las complejidades de su área. A lo largo de este programa, adquirirás herramientas prácticas y conocimientos de vanguardia que te permitirán destacar y generar un impacto real en tu organización o proyectos personales.</p>\n'+
+  (coff.activo ?
+'  <p style="margin-bottom: 18px;">Estamos preparados para comenzar este viaje. Para darte la recepción que mereces y comenzar a conocernos, <strong>te invitamos a participar en un Coffee Break de bienvenida que tendremos preparado para ti a partir de las '+esc(coff.horario.split(' ')[0])+' hrs.</strong>, previo al inicio de nuestra primera sesión presencial.</p>\n'
+  : '')+
+'  <h3 style="color: #1A365D; font-size: 18px; border-bottom: 2px solid #1A365D; padding-bottom: 6px; margin-top: 30px; margin-bottom: 18px;">📅 Cronograma de Inicio de Clases</h3>\n'+
+'  <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; text-align: left;">\n'+
+'    <thead><tr style="background-color: #1A365D; color: white;">\n'+
+'      <th style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold;">Sesión / Actividad</th>\n'+
+'      <th style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold;">Fecha y Horario</th>\n'+
+'      <th style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold;">Docente / Detalle</th>\n'+
+'      <th style="padding: 12px 15px; border: 1px solid #ddd; font-weight: bold;">Modalidad</th>\n'+
+'    </tr></thead>\n'+
+'    <tbody>'+filasSesiones+'</tbody>\n'+
+'  </table>\n'+
+'  <div style="background-color: #F7FAFC; border-left: 4px solid #1A365D; padding: 15px; margin: 25px 0;">\n'+
+'    <p style="margin: 0 0 8px 0; font-weight: bold; color: #1A365D;">📍 Ubicación de las clases y recepción:</p>\n'+
+'    <p style="margin: 0; font-size: 14px; color: #4A5568;">\n'+
+'      <strong>Sala:</strong> '+esc(d.sala)+' / <strong>Edificio:</strong> '+esc(d.edificio)+'<br>\n'+
+'      <strong>Sede:</strong> '+esc(d.sede)+'<br>\n'+
+'      <strong>Dirección:</strong> '+esc(d.direccion)+'\n'+
+'    </p>\n'+
+'  </div>\n'+
+  (_CB.restriccionesAlimentarias ?
+'  <div style="background-color: #EDF2F7; border-left: 4px solid #4A5568; padding: 15px; margin: 25px 0;">\n'+
+'    <p style="margin: 0; font-size: 14px; color: #2D3748;">\n'+
+'      🍪 <strong>Restricciones alimentarias:</strong> Les agradeceremos que, en caso de presentar alguna condición o restricción alimentaria (como perfiles <strong>vegetariano, celíaco o intolerante a la lactosa</strong>), tengan la amabilidad de informarlo respondiendo a este mismo correo a más tardar el <strong>'+esc(fLim)+'</strong>. Esto nos permitirá coordinar las alternativas correctas para los Coffee Breaks y el almuerzo de la jornada.\n'+
+'    </p>\n'+
+'  </div>\n'
+  : '')+
+'  <h3 style="color: #1A365D; font-size: 18px; border-bottom: 2px solid #1A365D; padding-bottom: 6px; margin-top: 25px; margin-bottom: 18px;">💻 Credenciales y Plataformas Universitarias</h3>\n'+
+'  <p style="margin-bottom: 14px;">Les recordamos que al finalizar su proceso de matrícula debieron recibir un correo de bienvenida con sus credenciales UAI (correo institucional y clave de acceso). Con estos datos podrán ingresar a las plataformas principales:</p>\n'+
+'  <ul style="padding-left: 20px; font-size: 14px; margin-bottom: 20px;">\n'+
+'    <li style="margin-bottom: 10px;"><strong>Webcursos:</strong> <a href="'+esc(_CB.webcursosUrl)+'" style="color: #3182CE; text-decoration: underline;">Ingresar a Webcursos</a></li>\n'+
+'    <li style="margin-bottom: 10px;"><strong>Correo institucional:</strong> <a href="https://correo.uai.cl" style="color: #3182CE; text-decoration: underline;">Acceder a mi correo UAI</a></li>\n'+
+'    <li style="margin-bottom: 10px;"><strong>Portal personal (Intranet):</strong> <a href="https://intranet.uai.cl" style="color: #3182CE; text-decoration: underline;">Entrar a Intranet</a></li>\n'+
+'  </ul>\n'+
+'  <h3 style="color: #1A365D; font-size: 18px; border-bottom: 2px solid #1A365D; padding-bottom: 6px; margin-top: 25px; margin-bottom: 18px;">💡 Recomendaciones para tu primer día</h3>\n'+
+'  <ul style="padding-left: 20px; font-size: 14px; margin-bottom: 20px;">\n'+
+  (coff.activo ?
+'    <li style="margin-bottom: 10px;">Te sugerimos llegar puntualmente a las <strong>'+esc(coff.horario.split(' ')[0])+' hrs.</strong> para compartir en el Coffee Break y luego ubicar tu lugar en la sala con tranquilidad.</li>\n'
+  : '')+
+'    <li style="margin-bottom: 10px;">No olvides traer tu laptop o el dispositivo de tu preferencia para realizar apuntes y participar en las dinámicas prácticas.</li>\n'+
+'  </ul>\n'+
+'  <p style="margin-bottom: 18px;">Ante cualquier duda o consulta académica, de acceso o logística, puedes comunicarte directamente conmigo respondiendo a este mensaje o escribiendo a <a href="mailto:'+esc(rem.email)+'" style="color: #3182CE; text-decoration: none;">'+esc(rem.email)+'</a>.</p>\n'+
+'  <p style="margin-bottom: 24px;">Te deseamos el mayor de los éxitos en este nuevo desafío que comienzas. ¡Nos vemos el '+esc(d.fechaInicio)+'!</p>\n'+
+'  <div style="margin-top: 30px; line-height: 1.5;">\n'+
+'    <p style="margin-bottom: 4px;">Atentamente,</p>\n'+
+'    <p style="margin-top: 0; line-height: 1.4;">\n'+
+'      <strong>'+esc(rem.nombre)+'</strong><br>\n'+
+'      '+esc(rem.cargo)+'<br>\n'+
+'      '+esc(d.nombreAbrev||d.programa)+'<br>\n'+
+'      '+esc(rem.escuela)+'<br>\n'+
+'      '+esc(rem.universidad)+'\n'+
+'    </p>\n'+
+'  </div>\n'+
+'</div>';
+
+  return html;
+}
+
+function _cbGenerar(){
+  var d = _cbReadInputs();
+  var html = _cbConstruirHTML(d);
+  window._cbHTML = html;
+
+  // Mostrar vista previa
+  var prev = document.getElementById('cbPreview');
+  if (prev) {
+    prev.innerHTML = html;
+    prev.style.background = '#fff';
+    prev.style.color = '#2C3E50';
+  }
+  showToast('Vista previa generada — usa "Copiar HTML" para llevarlo al portapapeles','ok');
+}
+
+function _cbCopiarHTML(){
+  if (!window._cbHTML) {
+    _cbGenerar();
+  }
+  var html = window._cbHTML;
+  if (!html) { showToast('Genera primero la vista previa','err'); return; }
+  navigator.clipboard.writeText(html).then(function(){
+    showToast('✅ HTML copiado al portapapeles · pégalo en tu cliente de correo','ok');
+  }).catch(function(){
+    // Fallback: textarea temporal
+    var ta = document.createElement('textarea');
+    ta.value = html;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast('HTML copiado','ok'); }
+    catch(e){ showToast('No se pudo copiar — descarga manual','err'); }
+    document.body.removeChild(ta);
+  });
+}
+
+
 function _docMkSel(id,lbl,opts,cur,onch){
   return '<div style="display:flex;flex-direction:column;gap:3px">'+
     '<label style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+lbl+'</label>'+
@@ -5601,7 +6161,7 @@ function asigToggle(tr){
   const ultimaYaPaso = ultimaSes && ultimaSes['DIAS/FECHAS'] && ultimaSes['DIAS/FECHAS'] <= hoyC;
 
   const chips = sesRows.map(function(r,i){
-    const prof    = r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()) ? r['PROFESOR'] : '';
+    const prof    = r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase()) ? r['PROFESOR'] : '';
     const dia     = r['Dia_Semana'] || '';
     const hora    = r['HORARIO'] || '';
     const hrs     = r['HORAS']   ? String(r['HORAS'])+'h' : '';
@@ -6602,7 +7162,7 @@ function renderDeclaracion(){
 
   // Estadísticas
   const nProgs  = new Set(df.map(r=>r['PROGRAMA'])).size;
-  const nProfs  = new Set(df.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR'])).size;
+  const nProfs  = new Set(df.filter(r=>r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR'])).size;
   const hrsEjec = Math.round(df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0));
   const totalHrs= Math.round(df.reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0));
   const sesEjec = df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).length;
@@ -6622,7 +7182,7 @@ function renderDeclaracion(){
   df.forEach(r=>{
     const p=r['PROGRAMA']; if(!p||!r['ASIGNATURA']) return;
     const a=r['ASIGNATURA'];
-    const prof=(r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))?r['PROFESOR']:'Sin docente';
+    const prof=(r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase()))?r['PROFESOR']:'Sin docente';
     const key=p+'|||'+a+'|||'+prof;
     if(!pm[key]) pm[key]={prog:p,abrev:r['NOMBRE ABREVIADO']||abbr(p,30),asig:a,prof:prof,ini:null,fin:null,hrs:0};
     const d=r['DIAS/FECHAS'];
@@ -6704,7 +7264,7 @@ function renderDeclaracion(){
       if(!pmDet[p].asigs[a].fin||d>pmDet[p].asigs[a].fin) pmDet[p].asigs[a].fin=d;
     }
     pmDet[p].asigs[a].ses++;
-    if(r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())) pmDet[p].asigs[a].profs.add(r['PROFESOR']);
+    if(r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase())) pmDet[p].asigs[a].profs.add(r['PROFESOR']);
   });
 
   // Filtrar programas que tienen al menos una asignatura activa o que termina este mes
@@ -6931,7 +7491,7 @@ function _declGeneratePDF(){
 
     // ── Estadísticas ─────────────────────────────────────────────
     const progs = new Set(df.map(r=>r['PROGRAMA'])).size;
-    const profs = new Set(df.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR'])).size;
+    const profs = new Set(df.filter(r=>r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR'])).size;
     const hrsEj = Math.round(df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy).reduce((s,r)=>s+(parseFloat(r['HORAS'])||0),0));
     const stats = [['Programas',progs],['Docentes',profs],['Hrs ejecutadas',hrsEj]];
     const sw = (W-28)/stats.length;
@@ -7047,7 +7607,7 @@ function _declGeneratePDF(){
     const pm3={};
     df.forEach(function(r){
       const p=r['PROGRAMA'],a=r['ASIGNATURA']||'Sin asignatura';
-      const prof=(r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))?r['PROFESOR']:'Sin docente';
+      const prof=(r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase()))?r['PROFESOR']:'Sin docente';
       const key=p+'|||'+a+'|||'+prof;
       if(!pm3[key]) pm3[key]={prog:p,abrev:r['NOMBRE ABREVIADO']||abbr(p,20),asig:a,prof:prof,ini:null,fin:null,hrs:0};
       const d=r['DIAS/FECHAS'];
@@ -7132,7 +7692,7 @@ function declExportarExcel(){
   const hoy = today();
   // Agrupar sesiones ejecutadas por docente
   const prof_map = {};
-  df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy&&r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase()))
+  df.filter(r=>r['DIAS/FECHAS']&&r['DIAS/FECHAS']<=hoy&&r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase()))
     .forEach(r=>{
       const p=r['PROFESOR'];
       if(!prof_map[p]) prof_map[p]={prof:p,prog:new Set(),ses:0,hrs:0};
@@ -7180,13 +7740,13 @@ function buildProgDetail(rows){
   const detId='det_'+Math.random().toString(36).slice(2,7);
 
   // Docentes section
-  const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_VALS.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
+  const allProfs=[...new Set(rows.filter(r=>r['PROFESOR']&&!IGNORE_NO_ASIG.has(r['PROFESOR'].toLowerCase())).map(r=>r['PROFESOR']))];
   let profSection='';
   if(allProfs.length){
     const panelId='dp_'+Math.random().toString(36).slice(2,7);
     const profData2={};
     rows.forEach(r=>{
-      const p=r['PROFESOR']; if(!p||IGNORE_VALS.has(p.toLowerCase())) return;
+      const p=r['PROFESOR']; if(!p||IGNORE_NO_ASIG.has(p.toLowerCase())) return;
       if(!profData2[p]) profData2[p]=[];
       if(r['DIAS/FECHAS']) profData2[p].push(r);
     });
@@ -12413,21 +12973,41 @@ function updPresupuesto() {
     progMap[p].acts.push(r);
     totPlan+=r._horas;
   });
-  // Cruzar con archivo Real
+  // Cruzar con archivo Real (normalizando nombres para tolerar tildes/espacios)
+  function _pptNormProg(s){
+    return String(s||'').trim().toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/\s+/g,' ');
+  }
   if(_ppt.realRows.length) {
     var realByProg = {};
+    var realByProgNorm = {};   // índice normalizado
     _ppt.realRows.forEach(function(r){
       var p = r['Programa']||'(sin)';
-      if(!realByProg[p]) realByProg[p] = {hrs:0, byNombre:{}};
+      var pn = _pptNormProg(p);
+      if(!realByProg[p]) realByProg[p] = {hrs:0, byNombre:{}, byCodigo:{}};
       realByProg[p].hrs += r._horas;
       var nom = r['Nombre']||r['Codigo']||'';
       realByProg[p].byNombre[nom] = (realByProg[p].byNombre[nom]||0) + r._horas;
+      var cod = String(r['Codigo']||'').trim().toUpperCase();
+      if (cod) realByProg[p].byCodigo[cod] = (realByProg[p].byCodigo[cod]||0) + r._horas;
+      // índice normalizado apunta al mismo objeto (no duplicar)
+      realByProgNorm[pn] = realByProg[p];
     });
     Object.values(progMap).forEach(function(p){
-      var rp = realByProg[p.programa];
+      // Match exacto primero, fallback a normalizado
+      var rp = realByProg[p.programa] || realByProgNorm[_pptNormProg(p.programa)];
       p.real = rp ? rp.hrs : 0;
+      p.realByCodigo = rp ? rp.byCodigo || {} : {};
       totReal += p.real;
     });
+    // Diagnóstico en consola: programas sin match
+    var sinMatch = Object.keys(progMap).filter(function(k){return progMap[k].real === 0;});
+    if (sinMatch.length && Object.keys(realByProg).length) {
+      console.log('[Presupuesto] Programas PPT sin match en Real:', sinMatch.length);
+      console.log('  PPT:', Object.keys(progMap).slice(0,5));
+      console.log('  Real:', Object.keys(realByProg).slice(0,5));
+    }
   }
 
   var progArr=Object.values(progMap).map(function(p){
@@ -12554,13 +13134,19 @@ function _pptExpandProg(pi) {
   }
 
   // Generar cursos agrupados
-  // Construir mapa de horas Reales desde el segundo archivo
+  // Construir mapa de horas Reales desde el segundo archivo (match flexible)
+  function _pptNormProgLocal(s){
+    return String(s||'').trim().toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/\s+/g,' ');
+  }
+  var progPNorm = _pptNormProgLocal(p.programa);
   var realByCodigo = {};
   if(_ppt.realRows.length) {
     _ppt.realRows.forEach(function(r){
-      var prog = r['Programa']||'';
-      if(prog !== p.programa) return;
-      var ck = r['Codigo']||'—';
+      var progNorm = _pptNormProgLocal(r['Programa']);
+      if(progNorm !== progPNorm) return;
+      var ck = String(r['Codigo']||'—').trim().toUpperCase();
       realByCodigo[ck] = (realByCodigo[ck]||0) + (parseFloat(r['Horas'])||0);
     });
   }
@@ -12568,10 +13154,11 @@ function _pptExpandProg(pi) {
   var cursoMap = {};
   p.acts.forEach(function(r){
     var ck = (r['Codigo']||'—');
+    var ckUp = String(ck).trim().toUpperCase();
     if(!cursoMap[ck]) cursoMap[ck] = {codigo:ck, nombre:r['Nombre']||'—', tipo:r['TIPO']||'', plan:0, real:0, acts:[]};
     cursoMap[ck].plan += r._horas;
-    // Real viene del segundo archivo, no de _horasAsig
-    cursoMap[ck].real = realByCodigo[ck] || 0;
+    // Real viene del segundo archivo, match case-insensitive
+    cursoMap[ck].real = realByCodigo[ckUp] || realByCodigo[ck] || 0;
     cursoMap[ck].acts.push(r);
   });
   var cursos = Object.values(cursoMap).sort(function(a,b){ return b.plan - a.plan; });
@@ -12641,20 +13228,40 @@ function _pptExpandCurso(pi, ci) {
 
   function sem(pct){var a=Math.abs(pct);return a<=5?{c:'#3fb950',ico:'🟢'}:a<=15?{c:'#f0b429',ico:'🟡'}:{c:'#f85149',ico:'🔴'};}
 
+  // Las horas Real y Declarado a nivel de actividad vienen del curso padre
+  // (no se puede separar por actividad sin más metadata, así que mostramos el total del curso
+  //  prorrateado o el valor del curso para referencia)
+  var totPlanCurso = cu.acts.reduce(function(s,x){return s+x._horas;},0);
+
   var frag = '';
   cu.acts.forEach(function(a){
-    var ad = a._horasAsig - a._horas, ap = a._horas ? ad/a._horas*100 : 0, ac = sem(ap);
+    // Horas PPT de esta actividad
+    var hPlan = a._horas;
+    // Prorratear Real y Declarado a esta actividad según su peso en el curso
+    var peso = totPlanCurso > 0 ? hPlan / totPlanCurso : 0;
+    var hReal = cu.real * peso;
+    var hDecl = cu.decl * peso;
+    // Desviaciones
+    var dvR = hReal - hPlan, pR = hPlan ? dvR/hPlan*100 : 0, acR = sem(pR);
+    var dvD = hDecl - hPlan, pD = hPlan ? dvD/hPlan*100 : 0, acD = sem(pD);
+
     frag += '<tr data-pptact="'+cid+'" style="border-bottom:1px solid rgba(255,255,255,.02);background:#060810">'+
       '<td style="padding:4px 6px 4px 38px;color:#21262d;font-size:8px">·</td>'+
       '<td style="padding:4px 10px;color:#8b949e;font-size:10px">'+esc(abbr(a['NombreEspecifico']||a['Nombre']||'—',36))+'</td>'+
       '<td style="padding:4px 10px;font-size:9px;color:#30363d">'+esc(String(a['centro_costo']||''))+'</td>'+
       '<td style="padding:4px 10px;font-size:9px;color:#6e7681">'+esc(abbr(a['Profesores']||'—',16))+'</td>'+
-      '<td style="padding:4px 10px;text-align:right;color:#388bfd;font-size:10px">'+a._horas.toFixed(0)+'</td>'+
-      '<td style="padding:4px 10px;text-align:right;color:#f0b429;font-size:10px">'+a._horasAsig.toFixed(0)+'</td>'+
-      '<td style="padding:4px 10px;text-align:right;color:#6e7681;font-size:10px">—</td>'+
-      '<td style="padding:4px 10px;text-align:right;color:'+ac.c+';font-size:10px">'+(ad>=0?'+':'')+ad.toFixed(0)+'</td>'+
-      '<td style="padding:4px 10px;color:#30363d">—</td>'+
-      '<td style="padding:4px 10px;text-align:center;font-size:8px;color:'+ac.c+'">'+ac.ico+'</td>'+
+      // PPT
+      '<td style="padding:4px 10px;text-align:right;color:#388bfd;font-size:10px">'+hPlan.toFixed(0)+'h</td>'+
+      // Real (prorrateado por peso)
+      '<td style="padding:4px 10px;text-align:right;color:#f0b429;font-size:10px">'+(cu.real>0?hReal.toFixed(0)+'h':'—')+'</td>'+
+      // Declarado (prorrateado por peso)
+      '<td style="padding:4px 10px;text-align:right;color:#3fb950;font-size:10px">'+(cu.decl>0?hDecl.toFixed(0)+'h':'—')+'</td>'+
+      // Desviación P↔R
+      '<td style="padding:4px 10px;text-align:right;color:'+(cu.real>0?acR.c:'#30363d')+';font-size:10px">'+(cu.real>0?(dvR>=0?'+':'')+dvR.toFixed(0):'—')+'</td>'+
+      // Desviación P↔D
+      '<td style="padding:4px 10px;text-align:right;color:'+(cu.decl>0?acD.c:'#30363d')+';font-size:10px">'+(cu.decl>0?(dvD>=0?'+':'')+dvD.toFixed(0):'—')+'</td>'+
+      // Estado (basado en desviación de declarado vs PPT)
+      '<td style="padding:4px 10px;text-align:center;font-size:8px;color:'+(cu.decl>0?acD.c:'#30363d')+'">'+(cu.decl>0?acD.ico:'—')+'</td>'+
     '</tr>';
   });
 
@@ -16760,7 +17367,7 @@ function renderPlanHorario() {
                   var seen={};
                   APP.df.forEach(function(r){
                     var p=r['PROFESOR']||'';
-                    if(p&&!seen[p]&&!IGNORE_VALS.has(p.toLowerCase())){seen[p]=1;profs.push('<option value="'+esc(p)+'">');}
+                    if(p&&!seen[p]&&!IGNORE_NO_ASIG.has(p.toLowerCase())){seen[p]=1;profs.push('<option value="'+esc(p)+'">');}
                   });
                 }
                 return profs.slice(0,100).join('');
@@ -17698,6 +18305,95 @@ function calHoy() {
   updCal();
 }
 
+
+/* ── Modal con todos los programas/eventos del día ────────────── */
+function _calShowDayDetail(day) {
+  var meta = window._calEMapMeta || {};
+  var evts = (window._calEMap && window._calEMap[day]) || [];
+  if (!evts.length) return;
+
+  // Cerrar overlay existente si lo hay
+  var ex = document.getElementById('_calDayDetailOverlay');
+  if (ex) ex.remove();
+
+  var MNAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var fechaTxt = day + ' de ' + MNAMES[meta.month] + ' ' + meta.year;
+
+  // Construir overlay modal
+  var overlay = document.createElement('div');
+  overlay.id = '_calDayDetailOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:20px';
+  overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:#0d1117;border:1px solid #30363d;border-radius:12px;max-width:760px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.5)';
+
+  // Header
+  var header = '<div style="padding:18px 22px;border-bottom:1px solid #21262d;background:linear-gradient(135deg,rgba(56,139,253,.08),transparent);display:flex;align-items:center;justify-content:space-between">'+
+    '<div>'+
+      '<div style="font-size:16px;font-weight:800;color:#f0f6ff">📅 '+esc(fechaTxt)+'</div>'+
+      '<div style="font-size:11px;color:#8b949e;margin-top:3px">'+evts.length+' programa(s) · '+evts.length+' sesion(es)</div>'+
+    '</div>'+
+    '<button onclick="document.getElementById(\'_calDayDetailOverlay\').remove()" '+
+      'style="background:transparent;border:1px solid #30363d;color:#8b949e;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>'+
+  '</div>';
+
+  // Lista de eventos (todos los programas del día)
+  var lista = '<div style="overflow-y:auto;flex:1;padding:14px 22px">';
+  evts.forEach(function(ev, i){
+    var prog    = ev['PROGRAMA'] || '';
+    var abrev   = ev['Programa_Abrev'] || ev['NOMBRE ABREVIADO'] || prog;
+    var asig    = ev['ASIGNATURA'] || '';
+    var hora    = ev['Horario'] || ev['HORARIO'] || '';
+    var sede    = ev['SEDE'] || '';
+    var sala    = ev['SALA'] || '';
+    var prof    = ev['Profesores'] || ev['PROFESORES'] || '';
+    var coord   = ev['COORDINADORA RESPONSABLE'] || '';
+    var mod     = ev['Modalidad_Calc'] || ev['MODALIDAD'] || '';
+    var horas   = ev['Horas_Sesion'] || ev['HORAS SESIÓN'] || ev['HORAS'] || '';
+    var cc      = ev['centro_costo'] || ev['CENTRO DE COSTO'] || '';
+
+    // Color del programa (mismo esquema que el calendario)
+    var pColor = '#388bfd';
+    if (window._pColorMap && window._pColorMap[prog]) pColor = window._pColorMap[prog];
+
+    lista += '<div style="background:#161b22;border:1px solid #21262d;border-left:3px solid '+pColor+';'+
+      'border-radius:8px;padding:12px 14px;margin-bottom:8px">'+
+      '<div style="display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:8px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:800;color:'+pColor+';margin-bottom:2px">'+esc(abrev)+'</div>'+
+          (prog !== abrev ? '<div style="font-size:10px;color:#8b949e;margin-bottom:4px" title="'+esc(prog)+'">'+esc(prog)+'</div>' : '')+
+          (asig ? '<div style="font-size:11px;color:#e6edf3;font-weight:600">'+esc(asig)+'</div>' : '')+
+        '</div>'+
+        (hora ? '<div style="background:rgba(56,139,253,.12);color:#388bfd;font-weight:800;font-size:11px;padding:4px 10px;border-radius:6px;white-space:nowrap">🕐 '+esc(hora)+'</div>' : '')+
+      '</div>'+
+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:4px 16px;font-size:10px;color:#8b949e;margin-top:8px;padding-top:8px;border-top:1px solid #21262d">'+
+        (sede ? '<div>🏛️ <strong style="color:#e6edf3">'+esc(sede)+'</strong>'+(sala?' · '+esc(sala):'')+'</div>' : '')+
+        (mod ? '<div>📡 <strong style="color:#e6edf3">'+esc(mod)+'</strong></div>' : '')+
+        (prof ? '<div>👤 <strong style="color:#e6edf3">'+esc(prof)+'</strong></div>' : '')+
+        (coord ? '<div>👥 <strong style="color:#e6edf3">'+esc(coord)+'</strong></div>' : '')+
+        (horas ? '<div>⏱️ <strong style="color:#e6edf3">'+esc(horas)+'</strong> h</div>' : '')+
+        (cc ? '<div>💼 CC: <strong style="color:#e6edf3">'+esc(cc)+'</strong></div>' : '')+
+      '</div>'+
+    '</div>';
+  });
+  lista += '</div>';
+
+  modal.innerHTML = header + lista;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Cerrar con ESC
+  function _calDayKeyHandler(e){
+    if (e.key === 'Escape') {
+      var ov = document.getElementById('_calDayDetailOverlay');
+      if (ov) { ov.remove(); document.removeEventListener('keydown', _calDayKeyHandler); }
+    }
+  }
+  document.addEventListener('keydown', _calDayKeyHandler);
+}
+
 function updCal() {
   if(!window._calState) {
     var now = new Date();
@@ -17717,8 +18413,10 @@ function updCal() {
   var lbl = document.getElementById('calLabel');
   if(lbl) lbl.textContent = MNAMES[rm] + ' ' + ry;
 
-  // Mapa de eventos por día
+  // Mapa de eventos por día (guardado globalmente para abrir modal de detalle)
   var eMap = {}; _gCalSimEMap = {};
+  window._calEMap = eMap;
+  window._calEMapMeta = { year: ry, month: rm };
   df.forEach(function(r){
     if(!r['DIAS/FECHAS']) return;
     var d = r['DIAS/FECHAS'];
@@ -17743,6 +18441,7 @@ function updCal() {
       progIdx++;
     }
   });
+  window._pColorMap = progColorMap;  // exposición para el modal de detalle
 
   function getModColor(mod) {
     var m = String(mod||'').toLowerCase();
@@ -17855,8 +18554,13 @@ function updCal() {
     });
 
     if(evts.length > maxVisible){
-      html += '<div style="font-size:8px;color:#388bfd;text-align:center;margin-top:2px;cursor:pointer;'+
-        'font-weight:700">+' + (evts.length - maxVisible) + ' más</div>';
+      html += '<div onclick="_calShowDayDetail('+day+');event.stopPropagation();" '+
+        'style="font-size:9px;color:#388bfd;text-align:center;margin-top:2px;cursor:pointer;'+
+        'font-weight:800;padding:2px 4px;background:rgba(56,139,253,.08);border-radius:3px;'+
+        'border:1px dashed rgba(56,139,253,.3)" '+
+        'onmouseover="this.style.background=\'rgba(56,139,253,.18)\'" '+
+        'onmouseout="this.style.background=\'rgba(56,139,253,.08)\'" '+
+        'title="Ver todos los programas de este día">+' + (evts.length - maxVisible) + ' más</div>';
     }
 
     html += '</td>';
@@ -19969,8 +20673,8 @@ function renderValidaciones(){
 
   const sinProf=df.filter(r=>IGNORE_P.has((r['PROFESOR']||'').toLowerCase())).length;
   const sinSala=df.filter(r=>IGNORE_S.has((r['SALA']||'').toLowerCase())).length;
-  const sinSede=df.filter(r=>!r['SEDE']||IGNORE_VALS.has((r['SEDE']||'').toLowerCase())).length;
-  const sinHor=df.filter(r=>!r['HORARIO']||IGNORE_VALS.has((r['HORARIO']||'').toLowerCase())).length;
+  const sinSede=df.filter(r=>!r['SEDE']||IGNORE_NO_ASIG.has((r['SEDE']||'').toLowerCase())).length;
+  const sinHor=df.filter(r=>!r['HORARIO']||IGNORE_NO_ASIG.has((r['HORARIO']||'').toLowerCase())).length;
 
   // Date anomalies
   const now=new Date(); const y5=new Date(); y5.setFullYear(y5.getFullYear()+5);
@@ -21784,8 +22488,11 @@ function _adnParseExcel(wb){
 }
 
 function _adnProcess(){
+  // Si hay búsqueda activa → ignorar filtro de programa (búsqueda global)
+  // Si no hay búsqueda → filtrar normalmente por programa seleccionado
+  var searchActive = _ADN.search && _ADN.search.trim().length > 0;
   var f=_ADN.raw.filter(function(r){
-    if(r.programa!==_ADN.program) return false;
+    if(!searchActive && r.programa!==_ADN.program) return false;
     if(_ADN.cohort && r.cohorte!==_ADN.cohort) return false;
     if(_ADN.anio && (!r.cohorte || !r.cohorte.startsWith(_ADN.anio))) return false;
     return true;
@@ -21803,7 +22510,8 @@ function _adnProcess(){
     var k=r.idExpediente;
     if(!map[k]) map[k]={id:k,rut:r.rut||k,apPaterno:r.apPaterno,apMaterno:r.apMaterno,nombres:r.nombres,periodos:new Set(),
       fullName:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' '),
-      cohorte:r.cohorte,cursos:{},razon:'',periodoIngreso:''};
+      cohorte:r.cohorte,cursos:{},razon:'',periodoIngreso:'',
+      programa:r.programa||''};
     // Capturar periodoIngreso del expediente cruzado (si está cargado)
     if (!map[k].periodoIngreso && typeof _EXP!=='undefined' && _EXP.loaded){
       var exp = (r.rut && _EXP.byRut[r.rut.trim()]) || (r.idExpediente && _EXP.byIdExp[r.idExpediente]);
@@ -21833,7 +22541,20 @@ function _adnProcess(){
   });
   all=all.filter(function(s){
     if(_ADN.status!=='todos'&&s.estadoFinal!==_ADN.status) return false;
-    if(_ADN.search){var q=_ADN.search.toLowerCase();return s.fullName.toLowerCase().includes(q)||s.id.includes(q);}
+    if(_ADN.search){
+      var q = _ADN.search.toLowerCase().trim();
+      // Normalizar RUT: quitar puntos, guiones, espacios → para comparar sin formato
+      var qRut = q.replace(/[.\-\s]/g,'');
+      var sRut = (s.rut||'').toLowerCase().replace(/[.\-\s]/g,'');
+      // Buscar en: nombre completo, RUT, ID expediente, cohorte, programa, periodo
+      return s.fullName.toLowerCase().includes(q)
+          || (s.rut && s.rut.toLowerCase().includes(q))
+          || (sRut && qRut && sRut.includes(qRut))
+          || s.id.toLowerCase().includes(q)
+          || (s.cohorte && String(s.cohorte).toLowerCase().includes(q))
+          || (s.periodoIngreso && String(s.periodoIngreso).toLowerCase().includes(q))
+          || (s.programa && s.programa.toLowerCase().includes(q));
+    }
     return true;
   });
   all.sort(function(a,b){return b.promedio-a.promedio;});
@@ -23082,7 +23803,7 @@ function renderAdnAcademico(){
 
         // Buscador + botones derecha
         '<div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">'+
-          '<input type="text" placeholder="🔍 Buscar alumno..." value="'+esc(_ADN.search||'')+'" '+
+          '<input type="text" placeholder="🔍 Buscar por nombre, RUT, expediente, cohorte..." value="'+esc(_ADN.search||'')+'" '+
             'oninput="_ADN.search=this.value;_adnRefresh()" '+
             'style="padding:6px 12px;border:1px solid #21262d;border-radius:7px;background:#161b22;color:#e6edf3;font-size:11px;width:180px">'+
           '<button onclick="renderAdnAcademico._reset()" '+
@@ -24351,4 +25072,3 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
-
