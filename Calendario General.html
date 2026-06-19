@@ -9991,6 +9991,7 @@ function renderDeclarado(){
       _dvMakeTab2('dvBT4','cont',   '📄 Contratos',     false)+
       _dvMakeTab2('dvBT5','cruce',  '🔀 Cruce',         false)+
       _dvMakeTab2('dvBT6','analisis','📈 Análisis',      false)+
+      _dvMakeTab2('dvBT7','adnhd',  '🧬 ADN Horas Docente', false)+
     '</div>'+
 
     // ══ KPIs + BODY ════════════════════════════════════════
@@ -10020,7 +10021,7 @@ function _dvMakeTab(id, key, label){
 
 function _dvSetTab(t){
   _dvoTab=t; _dvoPag=1;
-  var tabs=['decl','pend','comp','cont','cruce','analisis'];
+  var tabs=['decl','pend','comp','cont','cruce','analisis','adnhd'];
   tabs.forEach(function(n,i){
     var b=document.getElementById('dvBT'+(i+1)); if(!b) return;
     var on=t===n;
@@ -10034,8 +10035,236 @@ function _dvSetTab(t){
   else if(t==='cont') _dvTabContratos();
   else if(t==='cruce') _dvTabCruce();
   else if(t==='analisis') _dvTabAnalisis();
+  else if(t==='adnhd') _dvTabADNHoras();
 }
 
+
+var _dvAdnQ = '';
+var _dvAdnSort = 'difabs';   // 'difabs' | 'cumpl' | 'plan'
+var _dvAdnRows = [];
+var _dvAdnShown = [];
+var _DV_ADN_RISK = {
+  alto:   {c:'#f85149', ic:'🔴', l:'Alto'},
+  medio:  {c:'#f0b429', ic:'🟡', l:'Medio'},
+  bajo:   {c:'#3fb950', ic:'🟢', l:'OK'},
+  sinplan:{c:'#8b949e', ic:'⚪', l:'Sin plan'}
+};
+
+function _dvTabADNHoras(){
+  var el=document.getElementById('dvBody'); if(!el) return;
+  if(!_dvo.length){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)">'+
+      '<div style="font-size:32px;margin-bottom:8px">🧬</div>'+
+      '<div style="font-size:14px;font-weight:700;margin-bottom:6px">Carga las declaraciones para ver el ADN de horas por docente</div>'+
+      '<div style="font-size:11px">Muestra el RUT de cada docente y sus horas declaradas vs. planificadas.</div>'+
+    '</div>';
+    return;
+  }
+
+  // Agregar por docente (RUT como clave; nombre como respaldo)
+  var idx={};
+  _dvo.forEach(function(r){
+    var rut=String(r.rut||'').trim();
+    var key = rut || _ctNorm(r.profesor||'') || '(s/d)';
+    if(!idx[key]) idx[key]={ rut:rut, nombre:r.profesor||'—', ccs:{}, plan:0, decl:0, nAct:0, det:{} };
+    var e=idx[key];
+    e.plan += (r.hrObl||0);
+    e.decl += (r.hrDec||0);
+    e.nAct++;
+    if((!e.nombre||e.nombre==='—') && r.profesor) e.nombre=r.profesor;
+    if(r.cc && r.cc!=='—') e.ccs[r.cc]=1;
+    var ac=r.actCod||r.actNom||'(s/c)';
+    if(!e.det[ac]) e.det[ac]={ actNom:r.actNom||r.actCod||'—', cc:r.cc||'', tipoAct:r.tipoAct||'', plan:0, decl:0 };
+    e.det[ac].plan += (r.hrObl||0);
+    e.det[ac].decl += (r.hrDec||0);
+  });
+  _dvAdnRows = Object.keys(idx).map(function(k){
+    var e=idx[k];
+    e.cc=Object.keys(e.ccs).join(' - ');
+    e.detalle=Object.values(e.det).sort(function(a,b){ return (b.plan+b.decl)-(a.plan+a.decl); });
+    e.dif=e.decl-e.plan;                       // declarado − planificado
+    e.cumpl = e.plan>0 ? e.decl/e.plan*100 : (e.decl>0?100:0);
+    var dev=Math.abs(e.cumpl-100);
+    e.risk = e.plan===0 ? 'sinplan' : (dev>30?'alto':dev>15?'medio':'bajo');
+    return e;
+  });
+
+  // KPIs
+  var tPlan=0,tDecl=0,nAlto=0,nMedio=0,nSinP=0;
+  _dvAdnRows.forEach(function(r){ tPlan+=r.plan; tDecl+=r.decl; if(r.risk==='alto')nAlto++; if(r.risk==='medio')nMedio++; if(r.risk==='sinplan')nSinP++; });
+  var pctG = tPlan>0 ? tDecl/tPlan*100 : 0;
+  var fmt=function(n){ return Number(n).toLocaleString('es-CL',{maximumFractionDigits:1}); };
+
+  var kpis=[
+    {l:'Docentes', v:_dvAdnRows.length, c:'var(--t1)'},
+    {l:'Hrs Planificadas', v:fmt(Math.round(tPlan)), c:'#8b949e'},
+    {l:'Hrs Declaradas', v:fmt(Math.round(tDecl)), c:'#388bfd'},
+    {l:'% Cumplimiento', v:pctG.toFixed(1)+'%', c:pctG>=85&&pctG<=115?'#3fb950':pctG>=70?'#f0b429':'#f85149'},
+    {l:'🔴 Riesgo alto', v:nAlto, c:nAlto>0?'#f85149':'#3fb950'},
+    {l:'🟡 Riesgo medio', v:nMedio, c:nMedio>0?'#f0b429':'#3fb950'}
+  ];
+
+  el.innerHTML=
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:12px">🧬 Total de horas <b>declaradas</b> vs <b>planificadas</b> por docente (RUT). El semáforo marca la desviación respecto al 100% de cumplimiento.</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px">'+
+      kpis.map(function(k){
+        return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid '+k.c+';border-radius:10px;padding:13px 15px">'+
+          '<div style="font-size:20px;font-weight:900;color:'+k.c+';line-height:1">'+k.v+'</div>'+
+          '<div style="font-size:9px;color:var(--t3);margin-top:4px;text-transform:uppercase;letter-spacing:.4px">'+k.l+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
+      '<input type="text" id="dvAdnQ" placeholder="🔍 Buscar por RUT o nombre del docente..." value="'+esc(_dvAdnQ)+'" '+
+        'style="padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:12px;outline:none;min-width:260px">'+
+      '<span style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-left:6px">Ordenar:</span>'+
+      [['difabs','Mayor variación'],['cumpl','Menor cumplimiento'],['plan','Más horas plan.']].map(function(o){
+        var on=_dvAdnSort===o[0];
+        return '<button onclick="_dvAdnSort=\''+o[0]+'\';_dvAdnFill()" style="padding:5px 12px;border-radius:13px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid '+(on?'#388bfd':'var(--border)')+';background:'+(on?'rgba(56,139,253,.14)':'transparent')+';color:'+(on?'#388bfd':'var(--t3)')+'">'+o[1]+'</button>';
+      }).join('')+
+      '<button onclick="_dvExportADNHoras()" style="margin-left:auto;padding:6px 14px;background:#10b981;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📥 Excel</button>'+
+    '</div>'+
+    '<div id="dvAdnWrap" style="overflow:auto;max-height:600px;border:1px solid var(--border);border-radius:10px"></div>';
+
+  var inp=document.getElementById('dvAdnQ');
+  if(inp) inp.oninput=function(){ _dvAdnQ=this.value; clearTimeout(window._dvAdnT); window._dvAdnT=setTimeout(_dvAdnFill,150); };
+  _dvAdnFill();
+}
+
+function _dvAdnFill(){
+  var wrap=document.getElementById('dvAdnWrap'); if(!wrap) return;
+  var q=(_dvAdnQ||'').toLowerCase().trim();
+  var rows=(_dvAdnRows||[]).filter(function(r){
+    if(!q) return true;
+    return String(r.rut).toLowerCase().indexOf(q)>=0 || String(r.nombre).toLowerCase().indexOf(q)>=0;
+  });
+  if(_dvAdnSort==='cumpl') rows.sort(function(a,b){ return a.cumpl-b.cumpl; });
+  else if(_dvAdnSort==='plan') rows.sort(function(a,b){ return b.plan-a.plan; });
+  else rows.sort(function(a,b){ return Math.abs(b.dif)-Math.abs(a.dif); });
+
+  var fmt=function(n){ return Number(n).toLocaleString('es-CL',{maximumFractionDigits:1}); };
+  if(!rows.length){ wrap.innerHTML='<div style="padding:24px;text-align:center;color:var(--t3)">Sin docentes para la búsqueda.</div>'; return; }
+
+  _dvAdnShown = rows;
+  wrap.innerHTML=
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+        ['RUT','Docente','CC','Hrs Decl.','Δ (Decl−Plan)','% Cumpl.','Riesgo'].map(function(h,i){
+          var al=(i>=3&&i<=5)?'right':(i===6?'center':'left');
+          return '<th style="padding:9px 12px;text-align:'+al+';font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+h+'</th>';
+        }).join('')+
+      '</tr></thead><tbody>'+
+      rows.map(function(r,ri){
+        var rc=_DV_ADN_RISK[r.risk]||_DV_ADN_RISK.bajo;
+        var dc=Math.abs(r.dif)<0.5?'var(--t3)':(r.dif>0?'#388bfd':'#f0b429');
+        var barW=Math.min(100,r.cumpl);
+        var pc=r.cumpl>=85&&r.cumpl<=115?'#3fb950':r.cumpl>=70?'#f0b429':'#f85149';
+        return '<tr onmouseenter="_dvAdnTip(event,'+ri+')" onmousemove="_dvAdnTipMove(event)" onmouseleave="_dvAdnTipHide()" style="border-bottom:1px solid var(--border);border-left:3px solid '+rc.c+';cursor:help">'+
+          '<td style="padding:8px 12px;font-weight:700;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap">'+esc(r.rut||'—')+'</td>'+
+          '<td style="padding:8px 12px;color:var(--t1)" title="'+esc(r.nombre)+'">'+esc(abbr(r.nombre,30))+'<div style="font-size:9px;color:var(--t3)">'+r.nAct+' actividad(es)</div></td>'+
+          '<td style="padding:8px 12px;font-size:10px;color:var(--t2)" title="'+esc(r.cc)+'">'+esc(r.cc?abbr(r.cc,16):'—')+'</td>'+
+          '<td style="padding:8px 12px;text-align:right;color:#388bfd;font-weight:800;font-variant-numeric:tabular-nums">'+fmt(r.decl)+'</td>'+
+          '<td style="padding:8px 12px;text-align:right;font-weight:800;color:'+dc+';font-variant-numeric:tabular-nums">'+(r.dif>0?'+':'')+fmt(Math.round(r.dif*10)/10)+'</td>'+
+          '<td style="padding:8px 12px;text-align:right">'+
+            '<div style="display:flex;align-items:center;justify-content:flex-end;gap:7px">'+
+              '<div style="width:42px;height:5px;background:rgba(148,163,184,.2);border-radius:3px;overflow:hidden"><div style="width:'+barW+'%;height:5px;background:'+pc+'"></div></div>'+
+              '<span style="font-weight:800;color:'+pc+';min-width:42px;text-align:right">'+(r.plan>0?r.cumpl.toFixed(0)+'%':'—')+'</span>'+
+            '</div></td>'+
+          '<td style="padding:8px 12px;text-align:center"><span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:'+rc.c+'1c;color:'+rc.c+';border:1px solid '+rc.c+'45;white-space:nowrap">'+rc.ic+' '+rc.l+'</span></td>'+
+        '</tr>';
+      }).join('')+
+    '</tbody></table>';
+}
+
+function _dvAdnTip(ev, i){
+  var r=(_dvAdnShown||[])[i]; if(!r) return;
+  var tip=document.getElementById('dvAdnTip');
+  if(!tip){
+    tip=document.createElement('div'); tip.id='dvAdnTip';
+    tip.style.cssText='position:fixed;z-index:99990;pointer-events:none;width:470px;max-width:93vw;'+
+      'background:#03101e;'+
+      'background-image:linear-gradient(rgba(0,150,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,150,255,.05) 1px,transparent 1px);'+
+      'background-size:26px 26px;'+
+      'border:1px solid rgba(0,190,255,.45);border-radius:12px;overflow:hidden;display:none;'+
+      'box-shadow:0 0 0 1px rgba(0,190,255,.1),0 18px 55px rgba(0,0,0,.88),0 0 42px rgba(0,170,255,.20);'+
+      'font-family:"SF Mono",ui-monospace,Consolas,monospace';
+    document.body.appendChild(tip);
+  }
+  var fmt=function(n){ return Number(n).toLocaleString('es-CL',{maximumFractionDigits:1}); };
+  var CY='#34d6ff', CY2='#7fe9ff', DIM='#5a8bb0', LINE='rgba(0,150,255,.14)';
+  var det=r.detalle||[];
+  var lim=det.slice(0,12); var extra=det.length>12?det.length-12:0;
+  var body=lim.map(function(d){
+    var dif=d.decl-d.plan;
+    var dcol=Math.abs(dif)<0.5?DIM:(dif>0?CY:'#ffb454');
+    var dcc = d.cc ? String(d.cc).replace(/,\s*/g,' - ') : '';
+    return '<tr style="border-top:1px solid '+LINE+'">'+
+      '<td style="padding:5px 11px;color:#cfeeff">'+esc(abbr(d.actNom,28))+'</td>'+
+      '<td style="padding:5px 11px;color:'+DIM+';font-size:9px;letter-spacing:.3px;white-space:nowrap" title="'+esc(dcc)+'">'+esc(dcc?abbr(dcc,20):'—')+'</td>'+
+      '<td style="padding:5px 11px;text-align:right;color:'+CY+';font-weight:700;white-space:nowrap;text-shadow:0 0 6px rgba(0,200,255,.4)">'+fmt(d.decl)+'</td>'+
+      '<td style="padding:5px 11px;text-align:right;font-weight:700;color:'+dcol+';white-space:nowrap">'+(dif>0?'+':'')+fmt(Math.round(dif*10)/10)+'</td>'+
+    '</tr>';
+  }).join('');
+  var risk=(_DV_ADN_RISK[r.risk]||_DV_ADN_RISK.bajo);
+  tip.innerHTML=
+    // barra de escaneo superior
+    '<div style="height:2px;background:linear-gradient(90deg,transparent,'+CY+',transparent);box-shadow:0 0 10px '+CY+'"></div>'+
+    '<div style="position:relative;padding:11px 14px;border-bottom:1px solid rgba(0,190,255,.2);background:linear-gradient(90deg,rgba(0,120,200,.16),transparent)">'+
+      '<div style="display:flex;align-items:center;gap:7px">'+
+        '<span style="font-size:9px;color:'+CY+';border:1px solid rgba(0,190,255,.4);border-radius:4px;padding:1px 6px;letter-spacing:1px;text-shadow:0 0 6px rgba(0,200,255,.5)">◈ ADN</span>'+
+        '<span style="font-weight:800;color:'+CY2+';font-size:13px;letter-spacing:.4px;text-shadow:0 0 10px rgba(0,200,255,.45)">'+esc(r.nombre)+'</span>'+
+      '</div>'+
+      '<div style="font-size:10px;color:'+DIM+';margin-top:4px;letter-spacing:.4px">'+
+        'RUT '+esc(r.rut||'—')+'  ·  '+det.length+' ACT  ·  DECL '+fmt(r.decl)+'h  ·  '+
+        '<span style="color:'+risk.c+'">'+risk.ic+' '+(r.plan>0?r.cumpl.toFixed(0)+'%':'S/PLAN')+'</span>'+
+      '</div>'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:10px;position:relative">'+
+      '<thead><tr><th style="padding:5px 11px;text-align:left;font-size:8px;color:'+DIM+';text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid '+LINE+'">Actividad</th>'+
+        '<th style="padding:5px 11px;text-align:left;font-size:8px;color:'+DIM+';letter-spacing:.6px;border-bottom:1px solid '+LINE+'">CC</th>'+
+        '<th style="padding:5px 11px;text-align:right;font-size:8px;color:'+CY+';letter-spacing:.6px;border-bottom:1px solid '+LINE+'">DECL</th>'+
+        '<th style="padding:5px 11px;text-align:right;font-size:8px;color:'+DIM+';letter-spacing:.6px;border-bottom:1px solid '+LINE+'">Δ</th></tr></thead>'+
+      '<tbody>'+body+'</tbody>'+
+      '<tfoot><tr style="border-top:1px solid rgba(0,190,255,.35);background:rgba(0,90,160,.18)">'+
+        '<td style="padding:6px 11px;color:'+CY2+';font-size:9px;font-weight:800;letter-spacing:.6px">TOTAL</td>'+
+        '<td></td>'+
+        '<td style="padding:6px 11px;text-align:right;color:'+CY+';font-weight:800;text-shadow:0 0 6px rgba(0,200,255,.4)">'+fmt(r.decl)+'</td>'+
+        '<td style="padding:6px 11px;text-align:right;font-weight:800;color:'+(Math.abs(r.dif)<0.5?DIM:r.dif>0?CY:'#ffb454')+'">'+(r.dif>0?'+':'')+fmt(Math.round(r.dif*10)/10)+'</td>'+
+      '</tr></tfoot>'+
+    '</table>'+
+    (extra?'<div style="padding:6px 12px;color:'+DIM+';font-size:9px;letter-spacing:.4px">+ '+extra+' actividad(es) adicional(es)…</div>':'');
+  tip.style.display='block';
+  _dvAdnTipMove(ev);
+}
+function _dvAdnTipMove(ev){
+  var tip=document.getElementById('dvAdnTip'); if(!tip||tip.style.display==='none') return;
+  var pad=16, w=tip.offsetWidth||440, h=tip.offsetHeight||200;
+  var x=ev.clientX+pad, y=ev.clientY+pad;
+  if(x+w>window.innerWidth-8) x=ev.clientX-w-pad;
+  if(x<8) x=8;
+  if(y+h>window.innerHeight-8) y=Math.max(8, window.innerHeight-h-8);
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function _dvAdnTipHide(){ var tip=document.getElementById('dvAdnTip'); if(tip) tip.style.display='none'; }
+
+function _dvExportADNHoras(){
+  if(typeof XLSX==='undefined' || !_dvAdnRows.length){ showToast('Sin datos para exportar','err'); return; }
+  var data=_dvAdnRows.slice().sort(function(a,b){ return Math.abs(b.dif)-Math.abs(a.dif); }).map(function(r){
+    return {
+      'RUT':r.rut, 'Docente':r.nombre, 'CC':r.cc,
+      'Hrs Planificadas':Math.round(r.plan*100)/100,
+      'Hrs Declaradas':Math.round(r.decl*100)/100,
+      'Diferencia (Decl-Plan)':Math.round(r.dif*100)/100,
+      '% Cumplimiento':r.plan>0?Math.round(r.cumpl*10)/10:'',
+      'Riesgo':(_DV_ADN_RISK[r.risk]||{}).l||'',
+      'N° Actividades':r.nAct
+    };
+  });
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'ADN Horas Docente');
+  XLSX.writeFile(wb, 'ADN_Horas_Docente_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Exportado','ok');
+}
 
 function _dvKpi(){
   var el=document.getElementById('dvKpi'); if(!el) return;
@@ -11805,16 +12034,12 @@ function _dvTabAnalisis(){
   // Campos esperados: NombrePrograma, programa_centrocosto, Profesor, Horas, movimiento_horas_lv, movimiento_horas_sd, movimiento_monto, ActividadCodigo
   var progMap = {};
   _dvo.forEach(function(r){
-    var prog = String(r['NombrePrograma'] || r['Programa'] || r['programa_nombre'] || '').trim();
+    var prog = String(r.programa || '').trim();
     if(!prog) return;
     if(!progMap[prog]) progMap[prog]={prog:prog,plan:0,decl:0,monto:0,n:0};
-    var hrLV = parseFloat(r['movimiento_horas_lv'])||0;
-    var hrSD = parseFloat(r['movimiento_horas_sd'])||0;
-    var hrPlan = parseFloat(r['Horas'])||0;
-    var monto = parseFloat(String(r['movimiento_monto']||'0').replace(',','.'))||0;
-    progMap[prog].plan  += hrPlan;
-    progMap[prog].decl  += (hrLV+hrSD);
-    progMap[prog].monto += monto;
+    progMap[prog].plan  += (r.hrObl||0);
+    progMap[prog].decl  += (r.hrDec||0);
+    progMap[prog].monto += (r.monto||0);
     progMap[prog].n++;
   });
   var progArr = Object.values(progMap)
@@ -11823,14 +12048,10 @@ function _dvTabAnalisis(){
     .slice(0,12);
 
   // ── Totales ────────────────────────────────────────────────
-  var totDecl  = _dvo.reduce(function(s,r){
-    return s + (parseFloat(String(r['movimiento_monto']||'0').replace(',','.'))||0);
-  }, 0);
+  var totDecl  = _dvo.reduce(function(s,r){ return s + (r.monto||0); }, 0);
   var totCont  = _ctData.reduce(function(s,r){ return s+(r.monto||0); }, 0);
-  var totHrPlan = _dvo.reduce(function(s,r){ return s+(parseFloat(r['Horas'])||0); }, 0);
-  var totHrDecl = _dvo.reduce(function(s,r){
-    return s + (parseFloat(r['movimiento_horas_lv'])||0) + (parseFloat(r['movimiento_horas_sd'])||0);
-  }, 0);
+  var totHrPlan = _dvo.reduce(function(s,r){ return s+(r.hrObl||0); }, 0);
+  var totHrDecl = _dvo.reduce(function(s,r){ return s + (r.hrDec||0); }, 0);
 
   el.innerHTML=
 
@@ -30555,3 +30776,4 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
+
