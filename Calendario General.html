@@ -1712,7 +1712,7 @@ const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
   programas:    ['resumen','calidad','cronograma','docentes','correos'],
   calendarios:  ['calendario','reservas','actterm'],
-  planificador: ['plancursos','malla','planreporte','propuestas','horario','asistencia'],
+  planificador: ['plancursos','plancoord','malla','planreporte','propuestas','horario','asistencia'],
   admin:        ['gestion','cargaprog','cargapuntaje','turnos','cargalaboral','coordcarga'],
   control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce','controlhoras','valoreshora','areacg'],
   ayuda:        ['manual','faqs'],
@@ -1722,6 +1722,7 @@ const CATS = {
 // Display labels for each tab key
 const TAB_LABELS = {
   home:         'Home',
+  agente:       '🤖 Agente',
   global:       'Global',
   coord:        'Coordinadoras',
   comp:         'Comparativa',
@@ -1751,6 +1752,7 @@ const TAB_LABELS = {
   cargalaboral: 'Control General',
   coordcarga:   '👥 Coordinadoras',
   plancursos:   'Planificador General',
+  plancoord:    'Planificación Coordinadoras',
   propuestas:   '📅 Generador de Propuestas',
   horario:      '🗓️ Planificador de Horarios',
   asistencia:   '📝 Registro de Asistencia',
@@ -3358,12 +3360,13 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','declarado','plancursos','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','finalizados','correos','asistencia','areacg'];
+  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','finalizados','correos','asistencia','areacg'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
   const FN = {
     home:         renderHome,
+    agente:       renderAgente,
     global:       renderGlobal,
     coord:        renderCoord,
     comp:         renderComparativa,
@@ -3393,6 +3396,7 @@ function refreshView() {
     cargalaboral: renderResumenCargaLaboral,
     coordcarga:   renderCoordinadorasCL,
     plancursos:   renderPlanificador,
+    plancoord:    renderPlanCoord,
     propuestas:   renderPropuestasCalendario,
     horario:      renderPlanHorario,
     asistencia:   renderRegistroAsistencia,
@@ -30858,6 +30862,315 @@ function renderCoordinadorasCL(){
     '</tr></thead><tbody>'+(coords.length?rows:'<tr><td colspan="8" style="padding:24px;text-align:center;color:#6e7681">Sin datos</td></tr>')+'</tbody></table></div>';
   pg.innerHTML=head+filtros+table;
 }
+/* ===== Planificaci\u00f3n Coordinadoras: programas + asignaturas + coordinadora ===== */
+var PLANCOORD=null; var _PCKEY='plan_coord_v1';
+var _PCF={q:'',coord:'',anio:''};
+function _pcSetF(k,v){ _PCF[k]=v; renderPlanCoord(); }
+function _pcClearF(){ _PCF={q:'',coord:'',anio:''}; renderPlanCoord(); }
+function _pcMatch(p){
+  if(_PCF.anio && String(p.anio||'')!==String(_PCF.anio)) return false;
+  if(_PCF.coord){ if(_PCF.coord==='__none__'){ if(p.coord&&p.coord.trim())return false; } else if((p.coord||'').trim()!==_PCF.coord){ return false; } }
+  if(_PCF.q){ var q=_PCF.q.toLowerCase(); var hit=((p.programa||'').toLowerCase().indexOf(q)>=0)||((p.periodo||'').toLowerCase().indexOf(q)>=0)||p.asigs.some(function(a){return ((a.sigla||'').toLowerCase().indexOf(q)>=0)||((a.nombre||'').toLowerCase().indexOf(q)>=0);}); if(!hit)return false; }
+  return true;
+}
+function _pcFilterBar(total,opts){
+  if(!total||PLANCOORD===null) return '';
+  var anios=[],seen={}; PLANCOORD.forEach(function(p){ if(p.anio&&!seen[p.anio]){ seen[p.anio]=1; anios.push(p.anio); } }); anios.sort();
+  var fActive=!!(_PCF.q||_PCF.coord||_PCF.anio);
+  var lbl='font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px';
+  var inp='padding:7px 10px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:12px';
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:12px 14px;margin-bottom:14px">'+
+    '<div style="flex:1;min-width:170px"><div style="'+lbl+'">Buscar</div><input id="_pcSearch" value="'+escA(_PCF.q)+'" oninput="_pcSetF(\'q\',this.value)" placeholder="Programa o sigla\u2026" style="'+inp+';width:100%;box-sizing:border-box"></div>'+
+    '<div><div style="'+lbl+'">Coordinadora</div><select onchange="_pcSetF(\'coord\',this.value)" style="'+inp+'"><option value="">Todas</option><option value="__none__"'+(_PCF.coord==='__none__'?' selected':'')+'>Sin coordinadora</option>'+opts.map(function(o){return '<option'+(_PCF.coord===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select></div>'+
+    '<div><div style="'+lbl+'">A\u00f1o</div><select onchange="_pcSetF(\'anio\',this.value)" style="'+inp+'"><option value="">Todos</option>'+anios.map(function(y){return '<option'+(String(_PCF.anio)===String(y)?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></div>'+
+    (fActive?'<button onclick="_pcClearF()" style="padding:7px 12px;border:1px solid #30363d;border-radius:8px;background:transparent;color:#8b949e;font-size:12px;font-weight:700;cursor:pointer">Limpiar</button>':'')+
+  '</div>';
+}
+function _pcLoad(){ try{ var r=localStorage.getItem(_PCKEY); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function _pcSave(){ try{ localStorage.setItem(_PCKEY, JSON.stringify(PLANCOORD||[])); }catch(e){} }
+function _pcClean(s){ return String(s==null?'':s).replace(/^[\s"']+|[\s"']+$/g,'').replace(/\s+/g,' ').trim(); }
+function _pcRow(line){
+  var cells=line.split('\t').map(_pcClean);
+  var si=-1; for(var i=0;i<cells.length;i++){ if(/^[A-Z]{2,7}\d{2,4}$/.test(cells[i])){ si=i; break; } }
+  if(si<0) return null;
+  var sigla=cells[si]; var nombre=_pcClean(cells.slice(si+1).join(' '));
+  var head=cells.slice(0,si).filter(Boolean);
+  var programa=head.length?head[0]:''; var anio='';
+  for(var j=1;j<head.length;j++){ if(/^(19|20)\d{2}$/.test(head[j])) anio=head[j]; }
+  var periodo=''; if(head.length>1){ periodo=head.slice(1).filter(function(x){return !/^(19|20)\d{2}$/.test(x);}).join(' '); }
+  return {programa:programa,periodo:periodo,anio:anio,sigla:sigla,nombre:nombre};
+}
+function _pcGroup(flat){
+  var map={}, order=[], lastKey='';
+  flat.forEach(function(r,idx){
+    var programa=_pcClean(r.programa), periodo=_pcClean(r.periodo), anio=_pcClean(r.anio), sigla=_pcClean(r.sigla), nombre=_pcClean(r.nombre);
+    if(!programa && !sigla && !nombre) return;
+    var key;
+    if(programa){ key=programa.toUpperCase(); if(!map[key]){ map[key]={id:'pc'+Date.now().toString(36)+idx+Math.random().toString(36).slice(2,5), programa:programa, periodo:periodo, anio:anio, coord:'', exp:false, asigs:[], _sig:{}}; order.push(key); } else { if(!map[key].periodo&&periodo)map[key].periodo=periodo; if(!map[key].anio&&anio)map[key].anio=anio; } lastKey=key; }
+    else { key=lastKey; }
+    if(!key) return; var g=map[key]; if(!g) return;
+    if(sigla||nombre){ var sk=(sigla||('#'+nombre)).toUpperCase(); if(!g._sig[sk]){ g._sig[sk]=1; g.asigs.push({sigla:sigla, nombre:nombre, periodo:periodo}); } }
+  });
+  return order.map(function(k){ var g=map[k]; delete g._sig; return g; });
+}
+function _pcParse(text){
+  var lines=String(text||'').split(/\r?\n/); var flat=[];
+  lines.forEach(function(line){
+    if(!line.trim())return;
+    var up=line.toUpperCase();
+    if(up.indexOf('SIGLA')>=0 && (up.indexOf('NOMBRE ASIGNATURA')>=0||up.indexOf('PROGRAMA')>=0)) return;
+    var r=_pcRow(line); if(!r)return; flat.push(r);
+  });
+  return _pcGroup(flat);
+}
+function _pcMerge(progs){
+  if(!progs.length){ showToast('No se detectaron programas. Revisa el formato.','err'); return; }
+  if(PLANCOORD===null) PLANCOORD=_pcLoad();
+  var byKey={}; PLANCOORD.forEach(function(p){ byKey[(p.programa+'|'+p.periodo).toUpperCase()]=p; });
+  progs.forEach(function(np){ var k=(np.programa+'|'+np.periodo).toUpperCase(); var ex=byKey[k]; if(ex){ np.coord=ex.coord||np.coord; np.id=ex.id; } byKey[k]=np; });
+  PLANCOORD=Object.keys(byKey).map(function(k){return byKey[k];});
+  _pcSave(); renderPlanCoord();
+  var na=progs.reduce(function(s,p){return s+p.asigs.length;},0);
+  showToast(progs.length+' programa(s) \u00b7 '+na+' asignatura(s) procesadas','ok');
+}
+function _pcImport(){ var ta=document.getElementById('_pcTa'); if(!ta){return;} _pcMerge(_pcParse(ta.value)); }
+function _pcFileBtn(){ var f=document.getElementById('_pcFile'); if(f)f.click(); }
+function _pcHandleFile(file){ if(!file)return; var rd=new FileReader();
+  rd.onload=function(e){ try{
+    var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    var sh=wb.Sheets[wb.SheetNames[0]]; var rows=smartParseSheet(sh);
+    if(!rows||!rows.length){ showToast('Hoja vac\u00eda','err'); return; }
+    var s=rows[0];
+    var cP=findCol(s,['PROGRAMA']), cPer=findCol(s,['PERIODO ACADEMICO','PERIODO ACAD\u00c9MICO','PERIODO']), cAn=findCol(s,['A\u00d1O PERIODO','A\u00d1O PER\u00cdODO','A\u00d1O','ANO PERIODO']), cS=findCol(s,['SIGLA']), cN=findCol(s,['NOMBRE ASIGNATURA','ASIGNATURA','NOMBRE']);
+    var flat=rows.map(function(r){ return {programa:cP?r[cP]:'', periodo:cPer?r[cPer]:'', anio:cAn?r[cAn]:'', sigla:cS?r[cS]:'', nombre:cN?r[cN]:''}; });
+    _pcMerge(_pcGroup(flat));
+  }catch(err){ showToast('Error leyendo Excel: '+err.message,'err'); } };
+  rd.readAsArrayBuffer(file);
+}
+function _pcFile(inp){ var f=inp&&inp.files&&inp.files[0]; _pcHandleFile(f); if(inp)inp.value=''; }
+function _pcDragOver(ev){ ev.preventDefault(); var z=document.getElementById('_pcDrop'); if(z){ z.style.borderColor='#388bfd'; z.style.background='rgba(56,139,253,.08)'; } }
+function _pcDragLeave(ev){ var z=document.getElementById('_pcDrop'); if(z){ z.style.borderColor='#30363d'; z.style.background='transparent'; } }
+function _pcDrop(ev){ ev.preventDefault(); _pcDragLeave(ev); var f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(f) _pcHandleFile(f); }
+function _pcToggle(id){ if(PLANCOORD===null)PLANCOORD=_pcLoad(); var p=PLANCOORD.filter(function(x){return x.id===id;})[0]; if(p){ p.exp=!p.exp; _pcSave(); renderPlanCoord(); } }
+function _pcSetCoord(id,val){ if(PLANCOORD===null)PLANCOORD=_pcLoad(); var p=PLANCOORD.filter(function(x){return x.id===id;})[0]; if(p){ p.coord=val; _pcSave(); var k=document.getElementById('_pcKpiSin'); if(k){ k.textContent=PLANCOORD.filter(function(x){return !(x.coord&&x.coord.trim());}).length; } } }
+function _pcDel(id){ if(PLANCOORD===null)PLANCOORD=_pcLoad(); PLANCOORD=PLANCOORD.filter(function(x){return x.id!==id;}); _pcSave(); renderPlanCoord(); }
+function _pcClearAll(){ if(!confirm('\u00bfBorrar toda la planificaci\u00f3n de coordinadoras?'))return; PLANCOORD=[]; _pcSave(); renderPlanCoord(); }
+function _pcCoordOpts(){ var set={}; try{ (getDF()||[]).forEach(function(r){ var c=_pcClean(r['COORDINADORA RESPONSABLE']||r['COORDINADORA']||''); if(c)set[c]=1; }); }catch(e){} if(PLANCOORD){ PLANCOORD.forEach(function(p){ if(p.coord&&p.coord.trim())set[p.coord.trim()]=1; }); } return Object.keys(set).sort(function(a,b){return a.localeCompare(b,'es');}); }
+function renderPlanCoord(){
+  var pg=$('page'); if(!pg) return;
+  if(PLANCOORD===null) PLANCOORD=_pcLoad();
+  var total=PLANCOORD.length;
+  var totalAsig=PLANCOORD.reduce(function(s,p){return s+p.asigs.length;},0);
+  var sinCoord=PLANCOORD.filter(function(p){return !(p.coord&&p.coord.trim());}).length;
+  var opts=_pcCoordOpts();
+  var head='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">'+
+    '<div style="width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#388bfd,#34d6ff);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none">\ud83d\uddc2\ufe0f</div>'+
+    '<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:900;color:#f0f6ff">Planificaci\u00f3n Coordinadoras</div>'+
+      '<div style="font-size:12px;color:#8b949e">Programas, periodo y asignaturas \u00b7 asigna una coordinadora a cada programa</div></div>'+
+  '</div>';
+  var importPanel='<div style="margin-bottom:16px">'+
+    '<div id="_pcDrop" onclick="_pcFileBtn()" ondragover="_pcDragOver(event)" ondragleave="_pcDragLeave(event)" ondrop="_pcDrop(event)" style="border:2px dashed #30363d;border-radius:12px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:transparent">'+
+      '<div style="font-size:34px;margin-bottom:8px">\ud83d\udcc4</div>'+
+      '<div style="font-size:14px;font-weight:800;color:#f0f6ff;margin-bottom:4px">Cargar archivo Excel</div>'+
+      '<div style="font-size:12px;color:#8b949e">Arrastra aqu\u00ed tu archivo o haz clic para seleccionarlo</div>'+
+      '<div style="font-size:10px;color:#6e7681;margin-top:8px">Columnas: PROGRAMA \u00b7 PERIODO ACAD\u00c9MICO \u00b7 A\u00d1O PERIODO \u00b7 SIGLA \u00b7 NOMBRE ASIGNATURA</div>'+
+      '<input type="file" id="_pcFile" accept=".xlsx,.xls,.csv" onchange="_pcFile(this)" style="display:none">'+
+    '</div>'+
+    '<details style="margin-top:10px"><summary style="font-size:12px;color:#8b949e;cursor:pointer;padding:6px 2px">o pegar desde Excel</summary>'+
+      '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px;margin-top:8px">'+
+        '<textarea id="_pcTa" placeholder="PROGRAMA&#9;PERIODO ACADEMICO&#9;A\u00d1O PERIODO&#9;SIGLA&#9;NOMBRE ASIGNATURA&#10;CERTIFICACI\u00d3N EN COACHING EJECUTIVO&#9;CCE2026_2026/1&#9;2026&#9;LAB101&#9;LABORATORIOS&#10;&#9;&#9;&#9;PLE440&#9;COACHING EJECUTIVO" style="width:100%;min-height:110px;padding:10px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>'+
+        '<button onclick="_pcImport()" style="margin-top:8px;padding:8px 16px;border:none;border-radius:8px;background:#388bfd;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Procesar pegado</button>'+
+      '</div>'+
+    '</details>'+
+    (total?'<div style="margin-top:10px;text-align:right"><button onclick="_pcClearAll()" style="padding:7px 14px;border:1px solid #30363d;border-radius:8px;background:transparent;color:#f85149;font-size:12px;font-weight:700;cursor:pointer">Borrar todo</button></div>':'')+
+  '</div>';
+  var kpis='';
+  if(total){ kpis='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px">'+
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;border-left:3px solid #388bfd"><div style="font-size:22px;font-weight:900;color:#388bfd">'+total+'</div><div style="font-size:10px;color:#8b949e;font-weight:700;margin-top:3px">Programas</div></div>'+
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;border-left:3px solid #34d6ff"><div style="font-size:22px;font-weight:900;color:#34d6ff">'+totalAsig+'</div><div style="font-size:10px;color:#8b949e;font-weight:700;margin-top:3px">Asignaturas</div></div>'+
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px 16px;border-left:3px solid '+(sinCoord?'#f0b429':'#3fb950')+'"><div style="font-size:22px;font-weight:900;color:'+(sinCoord?'#f0b429':'#3fb950')+'" id="_pcKpiSin">'+sinCoord+'</div><div style="font-size:10px;color:#8b949e;font-weight:700;margin-top:3px">Sin coordinadora</div></div>'+
+  '</div>'; }
+  var datalist='<datalist id="_pcCoords">'+opts.map(function(o){return '<option value="'+escA(o)+'">';}).join('')+'</datalist>';
+  var list;
+  if(!total){ list='<div style="text-align:center;padding:40px 20px;color:#6e7681;border:1px dashed #30363d;border-radius:12px"><div style="font-size:34px;margin-bottom:10px">\ud83d\uddc2\ufe0f</div><div style="font-size:13px">Pega o carga tu planificaci\u00f3n arriba para comenzar.</div></div>'; }
+  else { var view=PLANCOORD.filter(_pcMatch); var fnote=(view.length!==PLANCOORD.length)?'<div style="font-size:11px;color:#8b949e;margin-bottom:8px">Mostrando '+view.length+' de '+PLANCOORD.length+' programa(s)</div>':''; list=fnote+(view.length?view.map(function(p){ var coordOk=!!(p.coord&&p.coord.trim());
+    return '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;margin-bottom:10px;overflow:hidden">'+
+      '<div style="display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer" onclick="_pcToggle(\''+p.id+'\')">'+
+        '<div style="font-size:15px;color:#6e7681;flex:none;'+(p.exp?'transform:rotate(90deg);':'')+'transition:transform .2s">\u203a</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800;color:#f0f6ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(p.programa)+'">'+esc(p.programa)+'</div>'+
+          '<div style="font-size:11px;color:#8b949e;margin-top:4px">'+(p.periodo?'<span style="background:#161b22;border:1px solid #21262d;border-radius:5px;padding:1px 7px;margin-right:6px">'+esc(p.periodo)+'</span>':'')+(p.anio?'<span style="background:#161b22;border:1px solid #21262d;border-radius:5px;padding:1px 7px;margin-right:6px">'+esc(p.anio)+'</span>':'')+'<span style="color:#6e7681">'+p.asigs.length+' asignatura(s)</span></div></div>'+
+        '<div onclick="event.stopPropagation()" style="flex:none"><input list="_pcCoords" value="'+escA(p.coord||'')+'" onchange="_pcSetCoord(\''+p.id+'\',this.value)" placeholder="Coordinadora\u2026" style="width:180px;padding:7px 10px;border:1px solid '+(coordOk?'#3fb950':'#30363d')+';border-radius:7px;background:#161b22;color:#e6edf3;font-size:12px;box-sizing:border-box"></div>'+
+        '<button onclick="event.stopPropagation();_pcDel(\''+p.id+'\')" title="Eliminar" style="flex:none;background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:7px;padding:7px 9px;cursor:pointer;font-size:12px">\ud83d\uddd1\ufe0f</button>'+
+      '</div>'+
+      (p.exp?('<div style="border-top:1px solid #21262d;padding:4px 16px 12px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:#6e7681;text-align:left"><th style="padding:7px 8px;font-weight:700;width:110px">Sigla</th><th style="padding:7px 8px;font-weight:700;width:150px">Periodo</th><th style="padding:7px 8px;font-weight:700">Nombre asignatura</th></tr></thead><tbody>'+
+        p.asigs.map(function(a){return '<tr style="border-top:1px solid #161b22"><td style="padding:7px 8px;color:#34d6ff;font-weight:700;font-family:monospace">'+esc(a.sigla)+'</td><td style="padding:7px 8px;color:#8b949e">'+esc(a.periodo||'\u2014')+'</td><td style="padding:7px 8px;color:#e6edf3">'+esc(a.nombre)+'</td></tr>';}).join('')+
+        '</tbody></table></div>'):'')+
+    '</div>';
+  }).join(''):'<div style="text-align:center;padding:30px;color:#6e7681;border:1px dashed #30363d;border-radius:12px">Sin resultados para el filtro aplicado.</div>'); }
+  var filterBar=_pcFilterBar(total,opts);
+  pg.innerHTML=head+importPanel+kpis+filterBar+datalist+list;
+  if(_PCF.q){ var _si=document.getElementById('_pcSearch'); if(_si){ try{ _si.focus(); var _v=_si.value; _si.value=''; _si.value=_v; }catch(e){} } }
+}
+/* ===== Agente local: consultas + alertas (topes profesor, coordinadora sobrecargada, inicios) ===== */
+var _AG={msgs:[]};
+function _agRows(){ try{ return getDF()||[]; }catch(e){ return []; } }
+function _agNorm(s){ return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function _agHora(str){ if(!str)return null; var m=String(str).match(/(\d{1,2})[:\.](\d{2})\s*[-a\u2013\u2014]+\s*(\d{1,2})[:\.](\d{2})/); if(!m)return null; var s=(+m[1])*60+(+m[2]),e=(+m[3])*60+(+m[4]); if(e<=s)return null; return [s,e]; }
+function _agDK(d){ return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate(); }
+function _agFF(d){ var M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear(); }
+function _agToday(){ var t=new Date(); t.setHours(0,0,0,0); return t; }
+var _AG_MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+/* ---- Detecciones ---- */
+function _agCoordOver(){
+  var rows=_agRows(), by={};
+  rows.forEach(function(r){ var c=(r['COORDINADORA RESPONSABLE']||'').trim(); var d=r['DIAS/FECHAS']; if(!c||!(d instanceof Date)||isNaN(d))return; var k=c+'|'+_agDK(d); if(!by[k])by[k]={coord:c,date:d,progs:{}}; var p=(r['PROGRAMA']||'').trim(); if(p)by[k].progs[p]=1; });
+  var out=[]; Object.keys(by).forEach(function(k){ var g=by[k]; var ps=Object.keys(g.progs); if(ps.length>2)out.push({coord:g.coord,date:g.date,n:ps.length,progs:ps}); });
+  out.sort(function(a,b){return b.n-a.n || a.date-b.date;}); return out;
+}
+function _agProfTopes(){
+  var rows=_agRows(), by={};
+  rows.forEach(function(r){ var p=(r['PROFESOR']||'').trim(); var d=r['DIAS/FECHAS']; if(!p||!(d instanceof Date)||isNaN(d))return; if(/^(por definir|sin |n\/a|tba|-)/i.test(p))return; var k=p+'|'+_agDK(d); if(!by[k])by[k]=[]; by[k].push({prog:(r['PROGRAMA']||'').trim(), asig:(r['ASIGNATURA']||'').trim(), hs:(r['HORARIO']||'').trim(), rango:_agHora(r['HORARIO']), sede:(r['SEDE']||'').trim(), date:d, prof:p}); });
+  var out=[];
+  Object.keys(by).forEach(function(k){ var arr=by[k]; if(arr.length<2)return; var seen={},u=[]; arr.forEach(function(x){ var s=x.prog+'|'+x.asig+'|'+x.hs; if(!seen[s]){seen[s]=1;u.push(x);} }); if(u.length<2)return;
+    var withH=u.filter(function(x){return x.rango;}); var conflict=false,tipo='';
+    if(withH.length>=2){ for(var i=0;i<withH.length&&!conflict;i++)for(var j=i+1;j<withH.length;j++){ var a=withH[i].rango,b=withH[j].rango; if(a[0]<b[1]&&b[0]<a[1]){conflict=true;tipo='solape';break;} } if(!conflict && u.length>withH.length){ conflict=true; tipo='mismo_dia'; } }
+    else { conflict=true; tipo='mismo_dia'; }
+    if(conflict)out.push({prof:u[0].prof,date:u[0].date,tipo:tipo,sesiones:u});
+  });
+  out.sort(function(a,b){return a.date-b.date;}); return out;
+}
+function _agStarts(){
+  var rows=_agRows(), by={};
+  rows.forEach(function(r){ var p=(r['PROGRAMA']||'').trim(); var d=r['DIAS/FECHAS']; if(!p||!(d instanceof Date)||isNaN(d))return; if(!by[p])by[p]={prog:p,abbr:(r['NOMBRE ABREVIADO']||r['Programa_Abrev']||'').trim(),coord:(r['COORDINADORA RESPONSABLE']||'').trim(),start:d,end:d}; if(d<by[p].start)by[p].start=d; if(d>by[p].end)by[p].end=d; });
+  return Object.keys(by).map(function(k){return by[k];});
+}
+function _agStartBuckets(){
+  var t=_agToday(), lim=new Date(t.getTime()+7*864e5); var all=_agStarts();
+  var prox=all.filter(function(x){return x.start>=t && x.start<=lim;}).sort(function(a,b){return a.start-b.start;});
+  var curso=all.filter(function(x){return x.start<t && x.end>=t;}).sort(function(a,b){return b.start-a.start;});
+  return {prox:prox, curso:curso, all:all};
+}
+
+/* ---- Chat ---- */
+function _agEntities(){
+  var rows=_agRows(), P={},C={},D={},S={};
+  rows.forEach(function(r){ var p=(r['PROGRAMA']||'').trim(); if(p)P[p]=(r['NOMBRE ABREVIADO']||r['Programa_Abrev']||'').trim(); var c=(r['COORDINADORA RESPONSABLE']||'').trim(); if(c)C[c]=1; var d=(r['PROFESOR']||'').trim(); if(d)D[d]=1; var s=(r['SEDE']||'').trim(); if(s)S[s]=1; });
+  return {progs:Object.keys(P).map(function(k){return {name:k,abbr:P[k]};}), coords:Object.keys(C), profs:Object.keys(D), sedes:Object.keys(S)};
+}
+function _agFind(qn, list, getK){ var best=null,bl=0; list.forEach(function(it){ var v=_agNorm(getK?getK(it):it); if(v.length>=4 && qn.indexOf(v)>=0 && v.length>bl){best=it;bl=v.length;} }); return best; }
+function _agRowsFor(field, val){ return _agRows().filter(function(r){ return (r[field]||'').trim()===val; }); }
+function _agAgendaDate(qn){
+  var t=_agToday();
+  if(/\bhoy\b/.test(qn)) return t;
+  if(/\bmanana\b/.test(qn)) return new Date(t.getTime()+864e5);
+  var m=qn.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+  if(m){ var dd=+m[1],mm=+m[2]-1,yy=m[3]?(+m[3]<100?2000+ +m[3]:+m[3]):t.getFullYear(); var d=new Date(yy,mm,dd); if(!isNaN(d)){d.setHours(0,0,0,0);return d;} }
+  return null;
+}
+function _agBadge(txt,clr){ return '<span style="font-size:10px;font-weight:800;color:'+clr+';background:'+clr+'22;border:1px solid '+clr+'55;border-radius:5px;padding:1px 7px">'+txt+'</span>'; }
+function _agAnswer(qraw){
+  var rows=_agRows(); if(!rows.length) return 'A\u00fan no hay datos cargados. Carga el calendario acad\u00e9mico y podr\u00e9 responder.';
+  var qn=_agNorm(qraw); var E=_agEntities();
+  // 1) Topes de profesor
+  if(/\btope|choque|solap|cruce|colision/.test(qn)){
+    var tp=_agProfTopes(); var profF=_agFind(qn,E.profs); var mesI=_AG_MESES.findIndex(function(m){return qn.indexOf(m)>=0;});
+    if(profF) tp=tp.filter(function(x){return x.prof===profF;});
+    if(mesI>=0) tp=tp.filter(function(x){return x.date.getMonth()===mesI;});
+    if(!tp.length) return 'No detecto topes de profesor'+(profF?' para '+profF:'')+(mesI>=0?' en '+_AG_MESES[mesI]:'')+'. \u2705';
+    return '<div style="font-weight:700;margin-bottom:6px">\u26A0\uFE0F '+tp.length+' tope(s) de profesor'+(profF?' \u00b7 '+profF:'')+'</div>'+tp.slice(0,12).map(function(x){ return '<div style="margin:6px 0;padding:8px 10px;background:#161b22;border:1px solid #21262d;border-radius:8px"><div style="font-size:12px;color:#f0f6ff;font-weight:600">'+esc(x.prof)+' \u00b7 '+_agFF(x.date)+' '+(x.tipo==='solape'?_agBadge('solape horario','#f85149'):_agBadge('mismo d\u00eda','#f0b429'))+'</div>'+x.sesiones.map(function(s){return '<div style="font-size:11px;color:#8b949e;margin-top:2px">\u2022 '+esc(s.prog||s.asig)+(s.hs?' ('+esc(s.hs)+')':'')+(s.sede?' \u00b7 '+esc(s.sede):'')+'</div>';}).join('')+'</div>';}).join('')+(tp.length>12?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(tp.length-12)+' m\u00e1s</div>':'');
+  }
+  // 2) Coordinadora sobrecargada
+  if(/sobrecarg|critic|sobre ?carga|mas programas|m\u00e1s programas/.test(qn)){
+    var co=_agCoordOver(); var cf=_agFind(qn,E.coords); if(cf)co=co.filter(function(x){return x.coord===cf;});
+    if(!co.length) return 'No hay coordinadoras con m\u00e1s de 2 programas el mismo d\u00eda'+(cf?' ('+cf+')':'')+'. \u2705';
+    return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDD34 '+co.length+' d\u00eda(s) de sobrecarga</div>'+co.slice(0,12).map(function(x){return '<div style="margin:6px 0;padding:8px 10px;background:#161b22;border:1px solid #21262d;border-radius:8px"><div style="font-size:12px;color:#f0f6ff;font-weight:600">'+esc(x.coord)+' \u00b7 '+_agFF(x.date)+' '+_agBadge(x.n+' programas','#f85149')+'</div><div style="font-size:11px;color:#8b949e;margin-top:2px">'+x.progs.map(esc).join(' \u00b7 ')+'</div></div>';}).join('')+(co.length>12?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(co.length-12)+' m\u00e1s</div>':'');
+  }
+  // 3) Inicios
+  if(/empiez|inicio|comienz|\bparte\b|arranca|start|inaugura/.test(qn)){
+    var pf=_agFind(qn,E.progs,function(it){return it.name;}) || _agFind(qn,E.progs,function(it){return it.abbr;});
+    if(pf){ var st=_agStarts().filter(function(x){return x.prog===pf.name;})[0]; if(st){ var t=_agToday(); var rel=st.start>=t?('empieza en '+Math.round((st.start-t)/864e5)+' d\u00eda(s)'):(st.end>=t?'en curso':'ya finaliz\u00f3'); return '<b>'+esc(st.prog)+'</b> comienza el <b>'+_agFF(st.start)+'</b> ('+rel+'). Termina ~'+_agFF(st.end)+'.'; } }
+    var b=_agStartBuckets();
+    if(/mes\b/.test(qn)){ var t2=_agToday(); var ini=new Date(t2.getFullYear(),t2.getMonth(),1),fin=new Date(t2.getFullYear(),t2.getMonth()+1,0); var mm=b.all.filter(function(x){return x.start>=ini&&x.start<=fin;}).sort(function(a,b){return a.start-b.start;}); if(!mm.length)return 'No hay inicios este mes.'; return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCC5 '+mm.length+' inicio(s) este mes</div>'+mm.map(function(x){return '<div style="font-size:12px;color:#8b949e;margin:3px 0">\u2022 <span style="color:#f0f6ff">'+esc(x.abbr||x.prog)+'</span> \u2014 '+_agFF(x.start)+'</div>';}).join(''); }
+    if(!b.prox.length) return 'No hay programas que inicien en los pr\u00f3ximos 7 d\u00edas. En curso: '+b.curso.length+'.';
+    return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCC5 '+b.prox.length+' inicio(s) en los pr\u00f3ximos 7 d\u00edas</div>'+b.prox.map(function(x){return '<div style="font-size:12px;color:#8b949e;margin:3px 0">\u2022 <span style="color:#f0f6ff">'+esc(x.abbr||x.prog)+'</span> \u2014 '+_agFF(x.start)+(x.coord?' \u00b7 '+esc(x.coord):'')+'</div>';}).join('');
+  }
+  // 4) Agenda por fecha
+  var ad=_agAgendaDate(qn);
+  if(ad && /clase|sesion|agenda|que hay|qu\u00e9 hay|dia|d\u00eda|hoy|manana/.test(qn)){
+    var ds=rows.filter(function(r){var d=r['DIAS/FECHAS'];return d instanceof Date&&!isNaN(d)&&_agDK(d)===_agDK(ad);}).sort(function(a,b){return String(a['HORARIO']||'').localeCompare(String(b['HORARIO']||''));});
+    if(!ds.length) return 'No hay clases el '+_agFF(ad)+'.';
+    return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCC5 '+ds.length+' clase(s) el '+_agFF(ad)+'</div>'+ds.slice(0,20).map(function(r){return '<div style="font-size:12px;color:#8b949e;margin:3px 0">\u2022 '+(r['HORARIO']?'<span style="color:#34d6ff">'+esc(r['HORARIO'])+'</span> ':'')+'<span style="color:#f0f6ff">'+esc(r['NOMBRE ABREVIADO']||r['PROGRAMA'])+'</span>'+(r['PROFESOR']?' \u00b7 '+esc(r['PROFESOR']):'')+(r['SEDE']?' \u00b7 '+esc(r['SEDE']):'')+'</div>';}).join('')+(ds.length>20?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(ds.length-20)+' m\u00e1s</div>':'');
+  }
+  // 5) Conteos por coordinadora / programa / profesor / sede
+  if(/sesion|clase|cuant|cu\u00e1nt|dias|d\u00edas|carga|resumen/.test(qn)){
+    var cf2=_agFind(qn,E.coords); if(cf2){ var rs=_agRowsFor('COORDINADORA RESPONSABLE',cf2); var dd={}; rs.forEach(function(r){var d=r['DIAS/FECHAS'];if(d instanceof Date&&!isNaN(d))dd[_agDK(d)]=1;}); var pr={}; rs.forEach(function(r){if(r['PROGRAMA'])pr[r['PROGRAMA']]=1;}); return '<b>'+esc(cf2)+'</b>: '+rs.length+' sesiones \u00b7 '+Object.keys(dd).length+' d\u00edas con clases \u00b7 '+Object.keys(pr).length+' programas.'; }
+    var pf2=_agFind(qn,E.progs,function(it){return it.name;})||_agFind(qn,E.progs,function(it){return it.abbr;}); if(pf2){ var rs2=_agRowsFor('PROGRAMA',pf2.name); return '<b>'+esc(pf2.name)+'</b>: '+rs2.length+' sesiones.'; }
+    var df2=_agFind(qn,E.profs); if(df2){ var rs3=_agRowsFor('PROFESOR',df2); return '<b>'+esc(df2)+'</b>: '+rs3.length+' clases.'; }
+    var sf2=_agFind(qn,E.sedes); if(sf2){ var rs4=_agRowsFor('SEDE',sf2); return '<b>'+esc(sf2)+'</b>: '+rs4.length+' sesiones.'; }
+  }
+  // 6) profesor suelto
+  var df3=_agFind(qn,E.profs); if(df3){ var rs5=_agRowsFor('PROFESOR',df3); var tp2=_agProfTopes().filter(function(x){return x.prof===df3;}); return '<b>'+esc(df3)+'</b>: '+rs5.length+' clases'+(tp2.length?' \u00b7 '+_agBadge(tp2.length+' tope(s)','#f85149'):' \u00b7 sin topes')+'.'; }
+  var sf3=_agFind(qn,E.sedes); if(sf3){ var rs6=_agRowsFor('SEDE',sf3); return '<b>'+esc(sf3)+'</b>: '+rs6.length+' sesiones.'; }
+  return _agHelp();
+}
+function _agHelp(){ return 'Puedo ayudarte con:<div style="font-size:12px;color:#8b949e;margin-top:6px;line-height:1.9">\u2022 \u00bfQu\u00e9 programas empiezan esta semana?<br>\u2022 \u00bfCu\u00e1ndo empieza [programa]?<br>\u2022 \u00bfHay topes? / topes de [profesor]<br>\u2022 \u00bfQui\u00e9n est\u00e1 sobrecargada?<br>\u2022 \u00bfCu\u00e1ntas sesiones tiene [coordinadora]?<br>\u2022 \u00bfQu\u00e9 clases hay hoy / el 15/03?</div>'; }
+function _agAsk(t){ var inp=document.getElementById('agInput'); if(inp)inp.value=t; _agSend(); }
+function _agSend(){
+  var inp=document.getElementById('agInput'); if(!inp)return; var q=inp.value.trim(); if(!q)return;
+  _AG.msgs.push({role:'user',html:esc(q)});
+  var ans; try{ ans=_agAnswer(q); }catch(e){ ans='Ocurri\u00f3 un error procesando la consulta.'; }
+  _AG.msgs.push({role:'bot',html:ans});
+  inp.value=''; _agRenderLog(); 
+}
+function _agRenderLog(){
+  var log=document.getElementById('agLog'); if(!log)return;
+  log.innerHTML=_AG.msgs.map(function(m){ if(m.role==='user'){ return '<div style="display:flex;justify-content:flex-end;margin:8px 0"><div style="max-width:80%;background:#1f6feb;color:#fff;padding:8px 12px;border-radius:12px 12px 4px 12px;font-size:13px">'+m.html+'</div></div>'; } return '<div style="display:flex;gap:8px;margin:8px 0"><div style="width:26px;height:26px;border-radius:50%;background:#161b22;border:1px solid #21262d;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none">\uD83E\uDD16</div><div style="max-width:85%;background:#0d1117;border:1px solid #21262d;color:#e6edf3;padding:9px 12px;border-radius:12px 12px 12px 4px;font-size:13px;line-height:1.5">'+m.html+'</div></div>'; }).join('');
+  log.scrollTop=log.scrollHeight;
+}
+function renderAgente(){
+  var pg=$('page'); if(!pg)return;
+  var rows=_agRows();
+  if(!rows.length){ pg.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:55vh"><div style="text-align:center;max-width:420px"><div style="font-size:40px;margin-bottom:14px">\uD83E\uDD16</div><h2 style="font-size:20px;font-weight:900;color:#f0f6ff;margin-bottom:8px">Agente</h2><p style="font-size:13px;color:#8b949e;line-height:1.6">Carga el calendario acad\u00e9mico y podr\u00e9 responder consultas y avisarte topes, sobrecargas e inicios de programa.</p></div></div>'; return; }
+  var co=_agCoordOver(), tp=_agProfTopes(), b=_agStartBuckets();
+  function alertCard(icon,title,clr,count,body){ return '<div style="background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:14px;border-left:3px solid '+clr+'"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:15px">'+icon+'</span><span style="font-size:13px;font-weight:800;color:#f0f6ff">'+title+'</span><span style="margin-left:auto;font-size:12px;font-weight:800;color:'+clr+'">'+count+'</span></div>'+body+'</div>'; }
+  var cBody = co.length? co.slice(0,4).map(function(x){return '<div style="font-size:11px;color:#8b949e;margin:3px 0">'+esc(x.coord)+' \u00b7 '+_agFF(x.date)+' \u00b7 '+x.n+' prog</div>';}).join('')+(co.length>4?'<div style="font-size:10px;color:#6e7681">\u2026 y '+(co.length-4)+' m\u00e1s</div>':'') : '<div style="font-size:11px;color:#3fb950">\u2713 Sin sobrecargas</div>';
+  var tBody = tp.length? tp.slice(0,4).map(function(x){return '<div style="font-size:11px;color:#8b949e;margin:3px 0">'+esc(x.prof)+' \u00b7 '+_agFF(x.date)+' '+(x.tipo==='solape'?'(solape)':'(mismo d\u00eda)')+'</div>';}).join('')+(tp.length>4?'<div style="font-size:10px;color:#6e7681">\u2026 y '+(tp.length-4)+' m\u00e1s</div>':'') : '<div style="font-size:11px;color:#3fb950">\u2713 Sin topes</div>';
+  var sBody = (b.prox.length? b.prox.slice(0,4).map(function(x){return '<div style="font-size:11px;color:#8b949e;margin:3px 0">'+esc(x.abbr||x.prog)+' \u2014 '+_agFF(x.start)+'</div>';}).join('') : '<div style="font-size:11px;color:#8b949e">Sin inicios en 7 d\u00edas</div>')+'<div style="font-size:10px;color:#6e7681;margin-top:4px">En curso: '+b.curso.length+'</div>';
+  var alerts='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:16px">'+
+    alertCard('\uD83D\uDD34','Coordinadora sobrecargada','#f85149',co.length,cBody)+
+    alertCard('\u26A0\uFE0F','Topes de profesor','#f0b429',tp.length,tBody)+
+    alertCard('\uD83D\uDCC5','Pr\u00f3ximos inicios (7d)','#388bfd',b.prox.length,sBody)+
+  '</div>';
+  var chips=['\u00bfQu\u00e9 programas empiezan esta semana?','\u00bfHay topes?','\u00bfQui\u00e9n est\u00e1 sobrecargada?','\u00bfQu\u00e9 clases hay hoy?'];
+  var head='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#1f6feb,#34d6ff);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">\uD83E\uDD16</div><div><div style="font-size:18px;font-weight:900;color:#f0f6ff">Agente</div><div style="font-size:12px;color:#8b949e">Consulta los datos y revisa alertas de topes, sobrecarga e inicios</div></div></div>';
+  var chat='<div style="background:#161b22;border:1px solid #21262d;border-radius:14px;padding:14px">'+
+    '<div id="agLog" style="max-height:380px;overflow-y:auto;margin-bottom:10px;min-height:80px"></div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+chips.map(function(ch){return '<button onclick="_agAsk(this.getAttribute(\'data-q\'))" data-q="'+escA(ch)+'" style="font-size:11px;padding:5px 10px;border:1px solid #30363d;border-radius:14px;background:#0d1117;color:#8b949e;cursor:pointer">'+esc(ch)+'</button>';}).join('')+'</div>'+
+    '<div style="display:flex;gap:8px"><input id="agInput" placeholder="Escribe tu consulta\u2026" onkeydown="if(event.key===\'Enter\')_agSend()" style="flex:1;padding:10px 12px;border:1px solid #30363d;border-radius:10px;background:#0d1117;color:#e6edf3;font-size:13px"><button onclick="_agSend()" style="padding:10px 16px;border:none;border-radius:10px;background:#1f6feb;color:#fff;font-weight:700;font-size:13px;cursor:pointer">Enviar</button></div>'+
+  '</div>';
+  pg.innerHTML=head+alerts+chat;
+  if(!_AG.msgs.length){ _AG.msgs.push({role:'bot',html:'Hola \uD83D\uDC4B Soy tu agente. '+_agHelp()}); }
+  _agRenderLog();
+}
+function _agRefreshPanel(){
+  var rows=_agRows(); var al=document.getElementById('agAlerts');
+  if(al){
+    if(!rows.length){ al.innerHTML='<div style="font-size:12px;color:#8b949e;padding:6px 0 10px">Carga el calendario para ver alertas y poder consultar.</div>'; }
+    else{
+      var co=_agCoordOver(), tp=_agProfTopes(), b=_agStartBuckets();
+      function pill(icon,txt,n,clr){ return '<div style="display:flex;align-items:center;gap:6px;padding:6px 9px;background:#0d1117;border:1px solid #21262d;border-left:3px solid '+clr+';border-radius:8px"><span style="font-size:13px">'+icon+'</span><span style="font-size:11px;color:#8b949e;flex:1">'+txt+'</span><span style="font-size:14px;font-weight:800;color:'+clr+'">'+n+'</span></div>'; }
+      al.innerHTML='<div style="display:grid;gap:6px;margin-bottom:10px">'+
+        pill('\uD83D\uDD34','Coordinadora sobrecargada',co.length,co.length?'#f85149':'#3fb950')+
+        pill('\u26A0\uFE0F','Topes de profesor',tp.length,tp.length?'#f0b429':'#3fb950')+
+        pill('\uD83D\uDCC5','Inicios pr\u00f3ximos (7d)',b.prox.length,'#388bfd')+
+      '</div>';
+    }
+  }
+  if(!_AG.msgs.length && rows.length){ _AG.msgs.push({role:'bot',html:'Hola \uD83D\uDC4B '+_agHelp()}); }
+  _agRenderLog();
+}
+function _agToggle(){ var p=document.getElementById('agPop'); if(!p)return; var show=(p.style.display==='none'||!p.style.display); p.style.display=show?'flex':'none'; if(show){ _agRefreshPanel(); var i=document.getElementById('agInput'); if(i) setTimeout(function(){ try{i.focus();}catch(e){} },40); } }
 function _adnIsCerr(r){ return (r.estado==='APROBADO')||(r.nota!=null&&!isNaN(r.nota)&&r.nota>0); }
 function _adnBarHtml(pct,clr){ return '<div style="height:8px;background:#161b22;border-radius:6px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+clr+';border-radius:6px"></div></div>'; }
 function _adnClr(pct){ return pct>=85?'#3fb950':pct>=60?'#388bfd':pct>=40?'#f0b429':'#f85149'; }
@@ -30869,6 +31182,7 @@ function _adnBuildModel(){
   var raw=_ADN.raw||[]; var sel=_ADN.cohorteSel||''; var pm={};
   raw.forEach(function(r){
     if(sel && r.cohorte!==sel) return;
+    if(_ADN.anioSel && _adnYear(r.cohorte)!==_ADN.anioSel) return;
     var p=r.programa||'\u2014';
     if(!pm[p]) pm[p]={prog:p, coh:{}, asign:{}, stu:{}};
     var g=pm[p]; if(r.cohorte)g.coh[r.cohorte]=true; if(r.sigla)g.asign[r.sigla]=r.nombreAsig||r.sigla;
@@ -30940,9 +31254,6 @@ function _adnOverview(M){
     '<div style="width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#388bfd,#22d3ee);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none">&#129514;</div>'+
     '<div style="flex:1;min-width:0"><div style="font-size:18px;font-weight:900;color:#f0f6ff">ADN Acad&eacute;mico</div>'+
       '<div style="font-size:12px;color:#8b949e">Avance de cierre de notas &middot; '+t.nProg+' programa(s) &middot; '+esc(_ADN.fileName||'')+'</div></div>'+
-    '<div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px">Cohorte</span>'+
-      '<select onchange="_ADN.cohorteSel=this.value;renderAdnAcademico()" style="padding:7px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:12px;font-weight:700">'+
-        '<option value="">Todas</option>'+M.cohortes.map(function(co){return '<option value="'+esc(co)+'"'+(co===sel?' selected':'')+'>'+esc(co)+'</option>';}).join('')+'</select></div>'+
     '<button onclick="_ADN.raw=[];_ADN.program=\'\';renderAdnAcademico()" style="padding:8px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#8b949e;font-size:11px;cursor:pointer;align-self:flex-end">&#8635; Cambiar archivo</button>'+
   '</div>';
   var helpb='<div style="background:rgba(56,139,253,.07);border:1px solid rgba(56,139,253,.2);border-radius:10px;padding:10px 14px;margin:12px 0 16px;font-size:11px;color:#8b949e;line-height:1.6">'+
@@ -30970,7 +31281,78 @@ function _adnOverview(M){
         '<div style="font-size:18px;color:#6e7681;flex:none">&#8250;</div>'+
       '</div>';
     }).join('')+'</div>';
-  pg.innerHTML=head+helpb+kpis+list;
+  var filterBar=_adnFilterBar(M,true);
+  pg.innerHTML=head+filterBar+helpb+kpis+list;
+}
+function _adnSetPView(v){ _ADN.pview=v; renderAdnAcademico(); }
+function _adnNota(n){ if(n==null||isNaN(n))return ''; return (Math.round(n*10)/10).toFixed(1).replace('.',','); }
+function _adnNoteClr(n){
+  if(n==null||isNaN(n)) return {bg:'#161b22',fg:'#484f58'};
+  if(n<4)   return {bg:'#7d2622',fg:'#ffb3ab'};
+  if(n<5)   return {bg:'#8a5320',fg:'#ffd7a8'};
+  if(n<5.5) return {bg:'#6f631e',fg:'#f4e6a1'};
+  if(n<6.5) return {bg:'#2d5a34',fg:'#b9f0c4'};
+  return {bg:'#1f7a3d',fg:'#c6f6d5'};
+}
+function _adnHeatBuild(progName){
+  var raw=_ADN.raw||[]; var sel=_ADN.cohorteSel||'';
+  var asig={}, stu={}, order=[];
+  raw.forEach(function(r){
+    if(r.programa!==progName) return;
+    if(sel && r.cohorte!==sel) return;
+    if(_ADN.anioSel && _adnYear(r.cohorte)!==_ADN.anioSel) return;
+    if(r.sigla) asig[r.sigla]=r.nombreAsig||r.sigla;
+    var sk=r.idExpediente||('?'+(r.nombres||'')+(r.apPaterno||''));
+    if(!stu[sk]){ stu[sk]={id:sk, name:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' ')||sk, rut:(r.rut||''), notes:{}, stat:{}}; order.push(sk); }
+    if(r.sigla){
+      if(r.nota!=null && !isNaN(r.nota) && r.nota>0){ var cur=stu[sk].notes[r.sigla]; if(cur==null||r.nota>cur) stu[sk].notes[r.sigla]=r.nota; }
+      else { var _es=String(r.estado||'').toUpperCase(); if(_es.indexOf('HOMOLOG')>=0) stu[sk].stat[r.sigla]='HO'; else if(_es.indexOf('PENDIENTE')>=0 && stu[sk].stat[r.sigla]!=='HO') stu[sk].stat[r.sigla]='P'; }
+    }
+  });
+  var siglas=Object.keys(asig).sort();
+  var students=order.map(function(sk){ var s=stu[sk]; var vals=siglas.map(function(k){return s.notes[k];}).filter(function(v){return v!=null;}); var prom=vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:0; return {id:sk,name:s.name,rut:s.rut,notes:s.notes,stat:s.stat,prom:prom,cnt:vals.length}; });
+  students.sort(function(a,b){ return (b.prom||0)-(a.prom||0) || a.name.localeCompare(b.name,'es'); });
+  return {siglas:siglas, asig:asig, students:students};
+}
+function _adnHeatHtml(p){
+  var H=_adnHeatBuild(p.prog);
+  if(!H.siglas.length) return '<div style="padding:24px;text-align:center;color:#6e7681;border:1px solid #21262d;border-radius:10px">No hay asignaturas con nota para mostrar en el mapa de calor.</div>';
+  var q=(_ADN.stuSearch||'').toLowerCase().trim();
+  var studs=H.students.filter(function(s){return !q||s.name.toLowerCase().indexOf(q)>=0;});
+  var scale=[['&lt;4','#7d2622'],['4&ndash;4,9','#8a5320'],['5&ndash;5,4','#6f631e'],['5,5&ndash;6,4','#2d5a34'],['6,5&ndash;7','#1f7a3d']];
+  var legend='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;font-size:10px;color:#8b949e"><span style="font-weight:700">Escala de nota:</span>'+scale.map(function(x){return '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:'+x[1]+'"></span>'+x[0]+'</span>';}).join('')+'<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:#161b22;border:1px solid #30363d"></span>sin nota</span>'+
+    '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:#2a2413"></span><b style="color:#e3b341">P</b> pendiente</span>'+
+    '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:3px;background:#17303f"></span><b style="color:#79c0ff">HO</b> homologado</span></div>';
+  var search='<input id="adnStuSearch" type="text" value="'+esc(_ADN.stuSearch||'')+'" oninput="_ADN.stuSearch=this.value;renderAdnAcademico()" placeholder="&#128269; Buscar alumno..." style="width:100%;max-width:320px;padding:8px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:12px;margin-bottom:10px">';
+  var thead='<tr><th style="position:sticky;left:0;top:0;z-index:4;background:#161b22;padding:8px 10px;text-align:left;font-weight:700;color:#8b949e;min-width:170px">Alumno</th>'+
+    H.siglas.map(function(sg){return '<th title="'+escA(H.asig[sg]||sg)+'" style="padding:8px 4px;font-weight:700;color:#8b949e;font-family:monospace;font-size:11px;white-space:nowrap;min-width:52px;text-align:center">'+esc(sg)+'</th>';}).join('')+
+    '<th style="padding:8px 6px;font-weight:800;color:#c9d1d9;text-align:center;min-width:52px;border-left:1px solid #30363d">Prom</th></tr>';
+  var body=studs.map(function(s){
+    var cells=H.siglas.map(function(sg){ var n=s.notes[sg]; var st=(s.stat&&s.stat[sg])||''; var label,c;
+      if(n!=null){ label=_adnNota(n); c=_adnNoteClr(n); }
+      else if(st==='HO'){ label='HO'; c={bg:'#17303f',fg:'#79c0ff'}; }
+      else if(st==='P'){ label='P'; c={bg:'#2a2413',fg:'#e3b341'}; }
+      else { label=''; c={bg:'#161b22',fg:'#484f58'}; }
+      var _t=(H.asig[sg]||sg)+': '+(n!=null?_adnNota(n):(st==='HO'?'homologado':st==='P'?'pendiente':'sin nota'));
+      return '<td style="padding:0;text-align:center"><div style="margin:2px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:'+c.bg+';color:'+c.fg+';font-size:12px;font-weight:700" title="'+escA(_t)+'">'+label+'</div></td>'; }).join('');
+    var pc=_adnNoteClr(s.prom);
+    return '<tr><td style="position:sticky;left:0;z-index:1;background:#0d1117;padding:6px 10px;max-width:190px;border-right:1px solid #21262d" title="'+esc(s.name)+'"><div style="color:#f0f6ff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.name)+'</div>'+(s.rut?'<div style="font-size:10px;color:#6e7681;font-family:monospace">'+esc(s.rut)+'</div>':'')+'</td>'+cells+'<td style="padding:0;text-align:center;border-left:1px solid #30363d"><div style="margin:2px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:'+pc.bg+';color:'+pc.fg+';font-size:12px;font-weight:800">'+(s.prom?_adnNota(s.prom):'')+'</div></td></tr>';
+  }).join('');
+  return legend+search+'<div style="overflow:auto;border:1px solid #21262d;border-radius:10px;max-height:70vh"><table style="border-collapse:collapse;font-size:12px;width:100%"><thead>'+thead+'</thead><tbody>'+(studs.length?body:'<tr><td colspan="'+(H.siglas.length+2)+'" style="padding:24px;text-align:center;color:#6e7681">Sin resultados</td></tr>')+'</tbody></table></div><div style="font-size:10px;color:#6e7681;margin-top:6px">&#128161; Cada celda es la nota del alumno en esa asignatura (ordenados por promedio). Pasa el cursor sobre una celda para ver el detalle.</div>';
+}
+function _adnYear(coh){ var m=String(coh==null?'':coh).match(/(19|20)\d{2}/); return m?m[0]:''; }
+function _adnAllProgs(){ var s={}; (_ADN.raw||[]).forEach(function(r){ if(r.programa)s[r.programa]=1; }); return Object.keys(s).sort(function(a,b){return a.localeCompare(b,'es');}); }
+function _adnAnios(){ var s={}; (_ADN.raw||[]).forEach(function(r){ var y=_adnYear(r.cohorte); if(y)s[y]=1; }); return Object.keys(s).sort().reverse(); }
+function _adnSetProg(v){ _ADN.program=v; _ADN.selStu=null; _ADN.stuSearch=''; renderAdnAcademico(); }
+function _adnFilterBar(M, home){
+  var progs=_adnAllProgs(); var cohs=(M&&M.cohortes)||[]; var anios=_adnAnios();
+  var lbl='font-size:8px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px';
+  var sel='padding:7px 10px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:12px;font-weight:600';
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:12px 14px;margin-bottom:14px">'+
+    '<div style="flex:1;min-width:220px"><div style="'+lbl+'">Programa</div><select onchange="_adnSetProg(this.value)" style="'+sel+';width:100%;max-width:100%">'+(home?'<option value="">Todos los programas</option>':'')+progs.map(function(pr){return '<option value="'+escA(pr)+'"'+(pr===_ADN.program?' selected':'')+'>'+esc(pr)+'</option>';}).join('')+'</select></div>'+
+    '<div><div style="'+lbl+'">Cohorte</div><select onchange="_ADN.cohorteSel=this.value;renderAdnAcademico()" style="'+sel+'"><option value="">Todas</option>'+cohs.map(function(co){return '<option value="'+escA(co)+'"'+(co===(_ADN.cohorteSel||'')?' selected':'')+'>'+esc(co)+'</option>';}).join('')+'</select></div>'+
+    '<div><div style="'+lbl+'">A\u00f1o</div><select onchange="_ADN.anioSel=this.value;renderAdnAcademico()" style="'+sel+'"><option value="">Todos</option>'+anios.map(function(y){return '<option value="'+escA(y)+'"'+(y===(_ADN.anioSel||'')?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></div>'+
+  '</div>';
 }
 function _adnProgramView(M){
   var pg=$('page');
@@ -31021,7 +31403,14 @@ function _adnProgramView(M){
       '<th style="padding:10px 14px;font-weight:700;text-align:center">Estado</th>'+
     '</tr></thead><tbody>'+(studs.length?rows:'<tr><td colspan="6" style="padding:24px;text-align:center;color:#6e7681">Sin resultados</td></tr>')+'</tbody></table></div>'+
     '<div style="font-size:10px;color:#6e7681;margin-top:8px">&#128161; Haz clic en un alumno para ver qu&eacute; asignaturas le faltan por cerrar.</div>';
-  pg.innerHTML=head+kpis+search+table;
+  var filterBar=_adnFilterBar(M,false);
+  var pv=_ADN.pview||'heat';
+  var toggle='<div style="display:inline-flex;gap:2px;background:#0d1117;border:1px solid #21262d;border-radius:9px;padding:3px;margin-bottom:14px">'+
+    '<button onclick="_adnSetPView(\'heat\')" style="padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;'+(pv==='heat'?'background:#388bfd;color:#fff':'background:transparent;color:#8b949e')+'">\uD83D\uDD25 Mapa de calor</button>'+
+    '<button onclick="_adnSetPView(\'list\')" style="padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;'+(pv==='list'?'background:#388bfd;color:#fff':'background:transparent;color:#8b949e')+'">Alumnos</button>'+
+  '</div>';
+  if(pv==='heat'){ pg.innerHTML=head+filterBar+kpis+toggle+_adnHeatHtml(p); }
+  else { pg.innerHTML=head+filterBar+kpis+toggle+search+table; }
   var si=document.getElementById('adnStuSearch'); if(si&&q){ si.focus(); si.setSelectionRange(si.value.length,si.value.length); }
 }
 function _adnBuildSb(){
@@ -31838,11 +32227,15 @@ document.addEventListener('keydown',function(e){ if(e.key==='Escape') adnCloseDe
 
 function renderManual(){
   const STEPS=[
-    ['📂 Carga de Datos','Usa el panel lateral izquierdo para cargar tu archivo académico. Acepta Excel (.xlsx, .xls) y CSV. También puedes arrastrar y soltar el archivo directamente en la zona de carga. Una vez cargado verás el número de registros procesados.','Las columnas se detectan automáticamente por nombre: DIAS/FECHAS, COORDINADORA RESPONSABLE, PROGRAMA, SEDE, HORARIO, PROFESOR, ASIGNATURA, SALA, Nº ALUMNOS. Si tu columna tiene un nombre parecido, también será detectada.'],
-    ['📊 Dashboard','El Dashboard Home muestra KPIs clave: total de sesiones, programas activos, clases de hoy y próximos 7 días. Las alertas activas se calculan automáticamente al cargar los datos.','El gráfico de tendencia mensual muestra la evolución del número de clases a lo largo del tiempo. Los accesos rápidos te llevan directamente a las secciones más usadas.'],
-    ['coord','El tab Coordinadoras permite filtrar por hasta 8 criterios simultáneos: año, mes, sede, modalidad, coordinadora, programa, profesor y día de la semana.','El gráfico muestra los 20 días con más carga. Las barras rojas indican días críticos (más de 2 programas). La tabla de días críticos muestra el detalle completo.'],
-    ['📅 Calendarios','El Calendario Académico muestra una vista mensual tipo agenda con todos los eventos. Los eventos muestran horario, programa, asignatura, profesor y sala.','Puedes exportar el calendario en formato iCal (.ics) para importarlo en Google Calendar, Outlook o Apple Calendar. También puedes exportar a Excel filtrado por el mes y período seleccionado.'],
-    ['⚙️ Administración','Accede con la contraseña <strong>admin</strong> al panel de gestión. Aquí puedes ver la matriz de sesiones mensuales y calcular la carga laboral por puntaje.','El sistema de balanceo automático distribuye los programas equitativamente entre coordinadoras. También puedes hacer reasignaciones manuales programa por programa.'],
+    ['📂 Carga de Datos','Usa el panel lateral izquierdo para cargar tu archivo académico. Acepta Excel (.xlsx, .xls) y CSV, o arrastra y suelta el archivo en la zona de carga. Al cargar verás el número de registros procesados.','El dashboard entra directo con la unidad <strong>Magister y Diplomados</strong> por defecto; ya no aparece la pantalla de selección. Cambia entre <strong>Magister y Diplomados</strong> y <strong>MBA</strong> con los botones del menú lateral superior. Las columnas se detectan solas (DIAS/FECHAS, COORDINADORA RESPONSABLE, PROGRAMA, SEDE, HORARIO, PROFESOR, ASIGNATURA, SALA, Nº ALUMNOS).'],
+    ['📊 Dashboard','El Dashboard Home muestra KPIs clave: total de sesiones, programas activos, clases de hoy y próximos 7 días. Las alertas se calculan al cargar los datos.','El gráfico de tendencia mensual muestra la evolución de clases en el tiempo, y los accesos rápidos te llevan a las secciones más usadas.'],
+    ['🗂️ Programas y Coordinadoras','En Programas revisas el resumen por programa con sus asignaturas y fechas. El tab Coordinadoras del Dashboard permite filtrar por año, mes, sede, modalidad, coordinadora, programa, profesor y día.','El gráfico muestra los días con más carga; las barras rojas marcan días críticos (una coordinadora con más de 2 programas el mismo día).'],
+    ['📅 Calendarios','El Calendario Académico muestra una vista mensual tipo agenda con horario, programa, asignatura, profesor y sala en cada evento.','Exporta en iCal (.ics) para Google/Outlook/Apple Calendar, o a Excel filtrado por el mes y período seleccionado.'],
+    ['🧬 ADN Académico','Analiza el avance de cierre de notas por programa y alumno. Carga el reporte de notas y verás KPIs de avance de cierre, notas por cerrar, alumnos y casos en riesgo.','Navega de la vista general a un programa y luego a cada alumno para ver sus asignaturas pendientes y su promedio. Se destacan los alumnos en riesgo (bajo promedio o bajo avance).'],
+    ['⚖️ Control General','Antes llamado Resumen Carga Laboral. Compara <strong>Magister y Diplomados vs MBA</strong> con KPIs consolidados, gráfico Planificado vs Real, matriz de desviación y tendencia por sede. Filtra por Año y Sede.','Incluye la <strong>Distribución por Coordinadora</strong>: tarjetas con el puntaje de carga de cada una — haz clic en una tarjeta para desplegar su detalle (programas, sesiones, días y gráfico mensual). También lista los <strong>días críticos</strong>. El puntaje de carga es (sesiones ÷ 4) × factor de alumnos, acumulado por mes.'],
+    ['👥 Coordinadoras','El ítem Coordinadoras (en Administración) centraliza a todas las coordinadoras de ambas unidades: programas, sesiones, días presenciales, alumnos y puntaje de carga.','Haz clic en una coordinadora para ver su detalle completo: KPIs, la tabla de sus programas y un gráfico de sesiones por mes. Filtra por Año y Sede.'],
+    ['🗂️ Planificación Coordinadoras','En el Planificador, organiza la oferta por programa. Carga un Excel (arrastrar y soltar o clic) con columnas PROGRAMA, PERIODO ACADÉMICO, AÑO PERIODO, SIGLA y NOMBRE ASIGNATURA; las asignaturas se agrupan automáticamente bajo su programa.','Asigna una coordinadora a cada programa (con autocompletado), despliega cada tarjeta para ver sus asignaturas y usa el filtro: buscar por programa o sigla, por coordinadora (o sin coordinadora) y por año. Todo se guarda en el navegador.'],
+    ['⚙️ Administración','Accede con la contraseña <strong>admin</strong> al panel de gestión. Reúne Gestión, Carga por Programa, Carga por Puntaje, Turnos, <strong>Control General</strong> y <strong>Coordinadoras</strong>.','Desde aquí ves la matriz de sesiones, calculas la carga laboral y revisas la distribución y los días críticos por coordinadora.'],
   ];
   $('page').innerHTML=`<div class="page-title">Manual de Usuario</div>
   <div class="subtabs" style="margin:-20px -20px 20px;background:var(--bg1);border-radius:0">
@@ -32380,6 +32773,34 @@ document.addEventListener('DOMContentLoaded', init);
   </svg>
 </div>
 
+<!-- Botón flotante + popup del Agente -->
+<div onclick="_agToggle()" title="Agente" id="agFab"
+  style="position:fixed;bottom:88px;right:24px;z-index:10000;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#34d6ff);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(31,111,235,.45);transition:transform .15s;font-size:26px"
+  onmouseover="this.style.transform='scale(1.12)'" onmouseout="this.style.transform='scale(1)'">&#129302;</div>
+<div id="agPop" style="display:none;position:fixed;bottom:150px;right:24px;z-index:10000;width:380px;max-width:calc(100vw - 32px);max-height:70vh;flex-direction:column;background:#161b22;border:1px solid #30363d;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.6);overflow:hidden">
+  <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #21262d;background:#0d1117">
+    <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1f6feb,#34d6ff);display:flex;align-items:center;justify-content:center;font-size:16px">&#129302;</div>
+    <div style="flex:1"><div style="font-size:14px;font-weight:800;color:#f0f6ff">Agente</div><div style="font-size:10px;color:#8b949e">Consultas y alertas</div></div>
+    <button onclick="_agToggle()" style="background:transparent;border:none;color:#8b949e;font-size:18px;cursor:pointer;padding:2px 6px">&#10005;</button>
+  </div>
+  <div style="padding:12px 14px;overflow-y:auto;flex:1">
+    <div id="agAlerts"></div>
+    <div id="agLog" style="min-height:60px"></div>
+  </div>
+  <div style="padding:10px 14px;border-top:1px solid #21262d;background:#0d1117">
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+      <button onclick="_agAsk('¿Qué programas empiezan esta semana?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Inicios semana</button>
+      <button onclick="_agAsk('¿Hay topes?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Topes</button>
+      <button onclick="_agAsk('¿Quién está sobrecargada?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Sobrecarga</button>
+      <button onclick="_agAsk('¿Qué clases hay hoy?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Hoy</button>
+    </div>
+    <div style="display:flex;gap:6px">
+      <input id="agInput" placeholder="Escribe tu consulta…" onkeydown="if(event.key==='Enter')_agSend()" style="flex:1;padding:9px 11px;border:1px solid #30363d;border-radius:10px;background:#161b22;color:#e6edf3;font-size:13px">
+      <button onclick="_agSend()" style="padding:9px 15px;border:none;border-radius:10px;background:#1f6feb;color:#fff;font-weight:700;font-size:15px;cursor:pointer">&#8593;</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADN Académico Detail Panel -->
 <div class="adn-det-overlay" id="adnDetOv" onclick="adnCloseDet()"></div>
 <div class="adn-det-panel" id="adnDetPanel"><div id="adnDetCont" style="padding:20px"></div></div>
@@ -32395,3 +32816,4 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
+
