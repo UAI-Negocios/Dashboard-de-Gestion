@@ -1710,11 +1710,11 @@ function coordGetInfo(nombre) {
 
 const CATS = {
   dashboard:    ['home','global','coord','comp','analytics'],
-  programas:    ['resumen','calidad','cronograma','docentes','correos'],
+  programas:    ['resumen','calidad','cronograma','docentes','horasdoc','correos'],
   calendarios:  ['calendario','reservas','actterm'],
   planificador: ['plancursos','plancoord','malla','planreporte','propuestas','horario','asistencia'],
   admin:        ['gestion','cargaprog','cargapuntaje','turnos','cargalaboral','coordcarga'],
-  control:      ['declaracion','declarado','anualdecl','presupuesto','informe','cruce','controlhoras','valoreshora','areacg'],
+  control:      ['declaracion','infodecl','declarado','anualdecl','presupuesto','informe','cruce','controlhoras','valoreshora','areacg'],
   ayuda:        ['manual','faqs'],
   adn:          ['adnacademico','finalizados'],
 };
@@ -1731,8 +1731,10 @@ const TAB_LABELS = {
   calidad:      'Calidad & Sede',
   cronograma:   '📅 Cronograma',
   docentes:     '👨‍🏫 Asignación Docente',
+  horasdoc:     '⏱️ Horas por Mes',
   correos:      '📧 Correos de Bienvenida',
   declaracion:  'Declaración de Horas',
+  infodecl:     '📋 Informe Declaración Mes',
   anualdecl:    '📅 Declarado por Año',
   presupuesto:  '💰 Presupuesto vs Real',
   informe:      '📄 Informe Ejecutivo',
@@ -3360,7 +3362,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','finalizados','correos','asistencia','areacg'];
+  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','infodecl','finalizados','correos','asistencia','areacg'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -3382,6 +3384,8 @@ function refreshView() {
     informe:      renderInformeEjecutivo,
     cruce:        renderCruceInfo,
     controlhoras: renderControlHoras,
+    infodecl:     renderInfoDeclMes,
+    horasdoc:     renderHorasDoc,
     valoreshora:  renderValoresHora,
     areacg:       renderAreaCG,
     declarado:    renderDeclarado,
@@ -10458,7 +10462,21 @@ function buildProgDetail(rows){
       +'</tr>';
   });
 
+  // ── Ficha del programa: Nombre Abreviado + Centro de Costo ──
+  const _abrevs=[...new Set(rows.map(r=>r['NOMBRE ABREVIADO']).filter(Boolean))];
+  const _ccs=[...new Set(rows.map(r=>r['CC']!=null?String(r['CC']).trim():'').filter(Boolean))];
+  const fichaChip=(lbl,val,clr)=>'<span style="display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid '+clr+';border-radius:8px;padding:5px 12px">'
+    +'<span style="font-size:9px;font-weight:700;color:var(--t4);text-transform:uppercase;letter-spacing:.05em">'+lbl+'</span>'
+    +'<span style="font-size:11px;font-weight:800;color:var(--t1)">'+esc(val)+'</span></span>';
+  const fichaHtml=(_abrevs.length||_ccs.length)
+    ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+      +(_abrevs.length?fichaChip('Nombre Abreviado',_abrevs.join(' / '),'#34d6ff'):'')
+      +(_ccs.length?fichaChip('Centro de Costo',_ccs.join(' / '),'#f0b429'):'')
+      +'</div>'
+    : '';
+
   return '<div class="detail-title">Cursos / Asignaturas del programa</div>'
+    +fichaHtml
     +profSection
     +'<div class="tbl-wrap"><table class="dt" style="font-size:10.5px"><thead><tr>'
     +'<th>Asignatura / Curso</th><th>Inicio</th><th>Fin</th>'
@@ -16719,6 +16737,9 @@ function _chHandleFile(file) {
         var COL_NOMBRE = _chFindCol(sample, ['Nombre']);
         var COL_PROF   = _chFindCol(sample, ['Profesores','Profesor']);
         var COL_CC     = _chFindCol(sample, ['CC','Centro de Costo','CentroCosto']);
+        var COL_FECHAMOD = _chFindCol(sample, ['FechaCambio','Fecha Cambio','Fecha de Cambio','Fecha Modificación','Fecha Modificacion','Fecha de Modificación','Fecha de Modificacion','Fecha de Corte','Fecha Corte','Fecha REAL','Fecha Real','FechaMod','Modificado','Fecha Actualización','Fecha Actualizacion']);
+        var COL_CAMBIOS  = _chFindCol(sample, ['Cambios','Cambio','Tipo de Cambio','TipoCambio']);
+        var COL_MODPOR   = _chFindCol(sample, ['Modificado por','ModificadoPor','Modificó','Modifico','Usuario','Responsable','Editado por','Autor','Quien modifica','Quién modifica']);
 
         if (!COL_HORAS) { showToast('No se encontró columna Horas','err'); return; }
 
@@ -16750,7 +16771,10 @@ function _chHandleFile(file) {
             horas: _parseNumCL(r[COL_HORAS]),
             id: COL_ID ? r[COL_ID] : null,
             nombre: COL_NOMBRE ? (r[COL_NOMBRE]||'') : '',
-            prof: COL_PROF ? String(r[COL_PROF]||'') : ''
+            prof: COL_PROF ? String(r[COL_PROF]||'') : '',
+            fechaMod: COL_FECHAMOD ? r[COL_FECHAMOD] : null,
+            modPor: COL_MODPOR ? String(r[COL_MODPOR]||'') : '',
+            cambios: COL_CAMBIOS ? String(r[COL_CAMBIOS]||'').trim() : ''
           };
         });
 
@@ -16816,6 +16840,130 @@ function _chPLabel(p){
     return p;
   }
   return p;
+}
+
+/* ── Parseo del corte REAL: separa fecha+hora y persona que modificó ── */
+function _chParseCorte(raw){
+  var s=String(raw==null?'':raw);
+  var dm=s.match(/(\d{1,2})\s*[-\/]\s*(\d{1,2})\s*[-\/]\s*(\d{2,4})/);
+  var fecha='';
+  if(dm){ var dia=('0'+dm[1]).slice(-2), mes=('0'+dm[2]).slice(-2), anio=(dm[3].length===2?('20'+dm[3]):dm[3]); fecha=dia+'/'+mes+'/'+anio; }
+  var tm=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  var hora=tm?(('0'+tm[1]).slice(-2)+':'+tm[2]):'';
+  var rest=s;
+  if(dm) rest=rest.replace(dm[0],' ');
+  if(tm) rest=rest.replace(tm[0],' ');
+  rest=rest.replace(/\b(REAL|PPT|AL|CORTE|HORAS?|FECHA|HRS?|H)\b/ig,' ').replace(/[\-\/_.,;:|]+/g,' ').replace(/\b\d+\b/g,' ').replace(/\s+/g,' ').trim();
+  var persona=(rest.length>=2)?rest:'';
+  return {fecha:fecha, hora:hora, fechaHora:((fecha+(hora?(' '+hora):'')).trim())||'\u2014', persona:persona};
+}
+function _chFmtFechaHora(v){
+  if(v instanceof Date && !isNaN(v)){ var p=function(n){return('0'+n).slice(-2);}; var s=p(v.getDate())+'/'+p(v.getMonth()+1)+'/'+v.getFullYear(); var hh=v.getHours(),mm=v.getMinutes(); if(hh||mm) s+=' '+p(hh)+':'+p(mm); return s; }
+  if(v==null||v==='') return '';
+  var pc=_chParseCorte(v); return pc.fechaHora==='\u2014'?String(v).trim():pc.fechaHora;
+}
+function _chCorteInfo(rk){
+  var raw=(_ch.periodDates||{})[rk]||rk; var fecha='', pers='';
+  (_ch.rows||[]).forEach(function(r){ if(r.period!==rk) return; if(!fecha && r.fechaMod!=null && r.fechaMod!=='') fecha=_chFmtFechaHora(r.fechaMod); if(!pers && r.modPor) pers=String(r.modPor).trim(); });
+  var pc=_chParseCorte(raw);
+  if(!fecha) fecha=pc.fechaHora;
+  if(!pers) pers=pc.persona;
+  return {raw:String(raw), fechaHora:fecha||'\u2014', persona:pers||''};
+}
+var _CH_MESES_EN={JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+function _chParseFC(v){
+  /* Parsea valores tipo "marcela.lopez@uai.cl Aug 11 2025  4:24PM" */
+  if(v==null||v==='') return {d:null,persona:''};
+  if(v instanceof Date && !isNaN(v)) return {d:v,persona:''};
+  var s=String(v);
+  var em=s.match(/([\w.\-+]+@[\w.\-]+\.[A-Za-z]{2,})/);
+  var persona=em?em[1]:'';
+  var d=null;
+  var m=s.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*(AM|PM)?)?/i);
+  if(m){
+    var mo=_CH_MESES_EN[m[1].slice(0,3).toUpperCase()];
+    var hh=m[4]!=null?+m[4]:0, mm=m[5]!=null?+m[5]:0, ap=(m[6]||'').toUpperCase();
+    if(ap==='PM'&&hh<12)hh+=12; if(ap==='AM'&&hh===12)hh=0;
+    d=new Date(+m[3],mo,+m[2],hh,mm); if(isNaN(d))d=null;
+  }
+  if(!d){
+    var m2=s.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+    if(m2){ var y=+m2[3]; if(y<100)y+=2000; var t=s.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      var h2=t?+t[1]:0,mi=t?+t[2]:0,a2=t&&t[3]?t[3].toUpperCase():'';
+      if(a2==='PM'&&h2<12)h2+=12; if(a2==='AM'&&h2===12)h2=0;
+      d=new Date(y,(+m2[2])-1,+m2[1],h2,mi); if(isNaN(d))d=null; }
+  }
+  return {d:d,persona:persona};
+}
+function _chToDate(v){ return _chParseFC(v).d; }
+function _chFmtDH(d){ if(!(d instanceof Date)||isNaN(d)) return '\u2014'; var p=function(n){return('0'+n).slice(-2);}; var s=p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear(); if(d.getHours()||d.getMinutes()) s+=' '+p(d.getHours())+':'+p(d.getMinutes()); return s; }
+function _chModifList(){
+  var map={};
+  (_ch.rows||[]).forEach(function(r){
+    var key=(r.id!=null&&r.id!=='')?('id:'+r.id):('nm:'+(r.nombre||''));
+    if(key==='nm:') return;
+    var pc=_chParseFC(r.fechaMod); var fd=pc.d;
+    var pers=(r.modPor||pc.persona||'');
+    if(!map[key]) map[key]={nombre:r.nombre||'', tipo:r.tipo||'', prog:r.prog||'', fecha:r.fechaMod, fechaD:fd, persona:pers, cambios:r.cambios||''};
+    else {
+      if(fd && (!map[key].fechaD || fd>map[key].fechaD)){ map[key].fecha=r.fechaMod; map[key].fechaD=fd; if(pers) map[key].persona=pers; if(r.cambios) map[key].cambios=r.cambios; }
+      if(!map[key].persona && pers) map[key].persona=pers;
+      if(!map[key].cambios && r.cambios) map[key].cambios=r.cambios;
+      if(!map[key].tipo && r.tipo) map[key].tipo=r.tipo;
+      if(!map[key].prog && r.prog) map[key].prog=r.prog;
+    }
+  });
+  var arr=Object.keys(map).map(function(k){return map[k];});
+  arr.sort(function(a,b){ var av=a.fechaD?a.fechaD.getTime():0, bv=b.fechaD?b.fechaD.getTime():0; return bv-av; });
+  return arr;
+}
+function _chPersNice(p){
+  if(!p) return '';
+  var user=String(p).split('@')[0];
+  return user.split(/[._\-]+/).map(function(w){return w?w.charAt(0).toUpperCase()+w.slice(1):'';}).join(' ');
+}
+function _chVistaModif(el){
+  var list=_chModifList();
+  var conFecha=list.filter(function(x){return x.fechaD;}).length;
+  var conPers=list.filter(function(x){return x.persona;}).length;
+  if(!conFecha && !conPers){
+    el.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:26px;text-align:center;color:var(--t3);font-size:12px;line-height:1.8">No se detectaron columnas de <b style="color:var(--t1)">fecha de cambio</b> ni de <b style="color:var(--t1)">responsable</b> en el reporte cargado.<br>Vuelve a cargar el Excel, o dime el <b>nombre exacto</b> de esas columnas y las conecto.</div>';
+    return;
+  }
+  var personas=[...new Set(list.map(function(x){return x.persona;}).filter(Boolean))].sort(function(a,b){return a.localeCompare(b,'es');});
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  el.innerHTML=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+      '<input type="text" id="chModSearch" placeholder="\uD83D\uDD0D Buscar actividad o persona..." value="'+esc(_ch.modBuscar||'')+'" style="flex:1;min-width:220px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<select onchange="_ch.modPersona=this.value;_chFillModif()" style="'+selS+'"><option value="">Todas las personas</option>'+personas.map(function(p){return '<option value="'+esc(p)+'"'+((_ch.modPersona||'')===p?' selected':'')+'>'+esc(_chPersNice(p)||p)+'</option>';}).join('')+'</select>'+
+      '<span id="chModCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+    '</div>'+
+    '<div id="chModWrap"></div>';
+  var inp=document.getElementById('chModSearch'); if(inp) inp.oninput=function(){ _ch.modBuscar=this.value; clearTimeout(window._chModT); window._chModT=setTimeout(_chFillModif,150); };
+  _chFillModif();
+}
+function _chFillModif(){
+  var wrap=document.getElementById('chModWrap'); if(!wrap) return;
+  var list=_chModifList(); var q=(_ch.modBuscar||'').toLowerCase(); var pf=_ch.modPersona||'';
+  var rows=list.filter(function(x){ if(pf && x.persona!==pf) return false; if(q && (String(x.nombre).toLowerCase().indexOf(q)<0 && String(x.persona).toLowerCase().indexOf(q)<0)) return false; return true; });
+  var cnt=document.getElementById('chModCount'); if(cnt) cnt.textContent=rows.length+' actividad(es)';
+  wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:66vh"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Actividad</th>'+
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Tipo</th>'+
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Programa</th>'+
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:#a78bfa;text-transform:uppercase">Cambios</th>'+
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">\uD83D\uDCC5 Fecha de cambio</th>'+
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:#3fb950;text-transform:uppercase">\uD83D\uDC64 Modificado por</th>'+
+    '</tr></thead><tbody>'+
+    (rows.length? rows.map(function(x){ return '<tr style="border-top:1px solid var(--border)">'+
+      '<td style="padding:7px 10px;color:var(--t1);font-weight:600;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(x.nombre)+'">'+esc(x.nombre)+'</td>'+
+      '<td style="padding:7px 10px;color:var(--t3)">'+esc((x.tipo||'').replace('Actividad de ','').replace(' de Programa',''))+'</td>'+
+      '<td style="padding:7px 10px;color:var(--t3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(x.prog)+'">'+esc(x.prog||'\u2014')+'</td>'+
+      '<td style="padding:7px 10px">'+(x.cambios?'<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:8px;background:#a78bfa22;color:#a78bfa;border:1px solid #a78bfa44">'+esc(x.cambios)+'</span>':'<span style="color:var(--t4)">\u2014</span>')+'</td>'+
+      '<td style="padding:7px 10px;white-space:nowrap"><span style="color:var(--t1);font-weight:700;font-variant-numeric:tabular-nums">'+esc(x.fechaD?_chFmtDH(x.fechaD):'\u2014')+'</span></td>'+
+      '<td style="padding:7px 10px">'+(x.persona?('<div style="color:var(--t1);font-weight:700">'+esc(_chPersNice(x.persona))+'</div><div style="font-size:9px;color:var(--t4)">'+esc(x.persona)+'</div>'):'<span style="color:var(--t4)">\u2014</span>')+'</td>'+
+    '</tr>'; }).join('') : '<tr><td colspan="6" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
+    '</tbody></table></div>';
 }
 
 /* ── Construye tipos, programas, changed, docentes ─────────── */
@@ -16931,11 +17079,12 @@ function _chBuild(){
     var hEach = r.horas / profs.length;
     profs.forEach(function(prof){
       if (!prof || prof === 'Sin asignar') return;
-      if (!dmap[prof]) { dmap[prof] = { nombre:prof, tipos:{}, programas:{} }; allKeys.forEach(function(k){ dmap[prof][k]=0; }); }
+      if (!dmap[prof]) { dmap[prof] = { nombre:prof, tipos:{}, programas:{}, ext:0 }; allKeys.forEach(function(k){ dmap[prof][k]=0; }); }
       dmap[prof][r.period] = (dmap[prof][r.period]||0) + hEach;
       if (!/PPT/i.test(r.period)){
         if (r.tipo) dmap[prof].tipos[r.tipo] = (dmap[prof].tipos[r.tipo]||0) + hEach;
         if (r.prog) dmap[prof].programas[r.prog] = (dmap[prof].programas[r.prog]||0) + hEach;
+        if (_chEsExtension(r.tipo, r.prog)) dmap[prof].ext = (dmap[prof].ext||0) + hEach;
       }
     });
   });
@@ -17027,7 +17176,8 @@ function _chRender(){
         {k:'resumen',  l:'📊 Resumen'},
         {k:'programas',l:'🏛 Top Programas'},
         {k:'tabla',    l:'🔄 Cambios ('+_ch.changed.length+')'},
-        {k:'docentes', l:'👨‍🏫 Carga Docentes ('+_ch.docentes.length+')'}
+        {k:'docentes', l:'👨‍🏫 Carga Docentes ('+_ch.docentes.length+')'},
+        {k:'modif', l:'🕓 Modificaciones'}
       ].map(function(t){
         var on = _ch.vista === t.k;
         return '<button onclick="_ch.vista=\''+t.k+'\';_chRender()" '+
@@ -17055,6 +17205,7 @@ function _chRenderVista(){
   if (_ch.vista === 'programas') return _chVistaProgramas(el);
   if (_ch.vista === 'tabla')     return _chVistaTabla(el);
   if (_ch.vista === 'docentes')  return _chVistaDocentes(el);
+  if (_ch.vista === 'modif')     return _chVistaModif(el);
 }
 
 /* ── Vista Resumen: charts ─────────────────────────────────── */
@@ -17385,6 +17536,7 @@ var _CH_TIPO_COLORS = {
   'Curso Extra Programático':'#f85149'
 };
 
+function _chEsExtension(tipo, prog){ return /extensi/i.test((tipo||'')+' '+(prog||'')); }
 function _chVistaDocentes(el){
   var tipos = [...new Set(_ch.docentes.flatMap(function(d){ return Object.keys(d.tipos||{}); }))].sort();
   var selS = 'padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
@@ -17473,7 +17625,7 @@ function _chFillDocentes(){
     var te = Object.entries(d.tipos||{}).sort(function(a,b){ return b[1]-a[1]; });
     var totT = te.reduce(function(s,e){ return s+e[1]; }, 0) || 1;
     var segs = te.map(function(e){ var pct = Math.round(e[1]/totT*100); var col = _CH_TIPO_COLORS[e[0]]||'#6b7f93'; return '<div title="'+esc(e[0])+': '+_chFmt(e[1])+'h ('+pct+'%)" style="width:'+pct+'%;background:'+col+';min-width:'+(pct>0?2:0)+'px"></div>'; }).join('');
-    var legend = te.slice(0,4).map(function(e){ var col = _CH_TIPO_COLORS[e[0]]||'#6b7f93'; return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:9px;color:var(--t3)"><span style="width:7px;height:7px;border-radius:50%;background:'+col+'"></span>'+esc(e[0].replace('Actividad de ','').replace(' de Programa','').replace('Actividad ',''))+': <b style="color:var(--t2)">'+_chFmt(e[1])+'</b></span>'; }).join('');
+    var legend = te.slice(0,4).map(function(e){ var col = _CH_TIPO_COLORS[e[0]]||'#6b7f93'; return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:9px;color:var(--t3)"><span style="width:7px;height:7px;border-radius:50%;background:'+col+'"></span>'+(_chEsExtension(e[0])?'🎓 ':'')+esc(e[0].replace('Actividad de ','').replace(' de Programa','').replace('Actividad ',''))+': <b style="color:var(--t2)">'+_chFmt(e[1])+'</b></span>'; }).join('');
 
     var progs = (d.progList||[]).map(function(pp){ return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:10px"><span style="color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="'+esc(pp.p)+'">'+esc(pp.p.replace(/^\d+ /,''))+'</span><b style="color:var(--t1);flex-shrink:0;margin-left:8px">'+_chFmt(pp.h)+'h</b></div>'; }).join('');
 
@@ -17482,6 +17634,7 @@ function _chFillDocentes(){
         '<div style="font-size:12px;font-weight:700;color:var(--t1);line-height:1.3">'+esc(nameClean)+'</div>'+
         '<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:'+badgeBg+';color:'+badgeC+';white-space:nowrap;flex-shrink:0">'+badgeTxt+'</span>'+
       '</div>'+
+      (d.ext>0?'<div style="margin-top:8px"><span style="font-size:10px;font-weight:800;padding:2px 9px;border-radius:8px;background:#3fb95022;color:#3fb950;border:1px solid #3fb95055">🎓 Extensión: '+_chFmt(d.ext)+'h</span></div>':'')+
       '<div style="margin-top:10px">'+
         '<div style="font-size:9px;color:var(--t3);margin-bottom:6px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Horas por período</div>'+periodHtml+
       '</div>'+
@@ -31171,6 +31324,397 @@ function _agRefreshPanel(){
   _agRenderLog();
 }
 function _agToggle(){ var p=document.getElementById('agPop'); if(!p)return; var show=(p.style.display==='none'||!p.style.display); p.style.display=show?'flex':'none'; if(show){ _agRefreshPanel(); var i=document.getElementById('agInput'); if(i) setTimeout(function(){ try{i.focus();}catch(e){} },40); } }
+/* ══════════════════════════════════════════════════════
+   PROGRAMAS → HORAS POR MES (desde Calendario General)
+══════════════════════════════════════════════════════ */
+var _HD={q:'',doc:'',view:'detalle',metric:'horas',year:''};
+var _HD_MLBL=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function _hdFmt(n){ if(!n) return ''; var r=Math.round(n*10)/10; return (r%1===0? String(r) : r.toFixed(1)).replace('.',','); }
+function _hdDur(r){
+  var h=parseFloat(String(r['HORAS']==null?'':r['HORAS']).replace(',','.'));
+  if(!isNaN(h)&&h>0) return h;
+  var hh=_agHora(r['HORARIO']); return hh?(hh[1]-hh[0])/60:null;
+}
+function _hdBuild(){
+  var df=getDF()||[];
+  /* promedio de duración por programa (fallback para sesiones sin horario parseable) */
+  var pd={}, gs=0, gn=0;
+  df.forEach(function(r){ var d=_hdDur(r); if(d==null) return; var p=r['PROGRAMA']||''; if(!pd[p])pd[p]={s:0,n:0}; pd[p].s+=d; pd[p].n++; gs+=d; gn++; });
+  var gAvg=gn?gs/gn:0;
+  var map={}, years={};
+  df.forEach(function(r){
+    var prof=(r['PROFESOR']||'').trim();
+    if(!prof||IGNORE_NO_ASIG.has(prof.toLowerCase())) return;
+    var d=r['DIAS/FECHAS']; if(!(d instanceof Date)||isNaN(d)) return;
+    years[d.getFullYear()]=1;
+    if(_HD.year && String(d.getFullYear())!==_HD.year) return;
+    var progKey=r['PROGRAMA']||'\u2014';
+    var progLbl=r['NOMBRE ABREVIADO']||abbr(progKey,40);
+    var k=prof+'\u241F'+progKey;
+    if(!map[k]) map[k]={doc:prof,prog:progLbl,progFull:progKey,m:[0,0,0,0,0,0,0,0,0,0,0,0],ses:[0,0,0,0,0,0,0,0,0,0,0,0],total:0,totSes:0,est:0};
+    var e=map[k];
+    var dur=_hdDur(r);
+    if(dur==null){ var pp=pd[progKey]; dur=(pp&&pp.n)?pp.s/pp.n:gAvg; if(dur) e.est++; }
+    var mi=d.getMonth();
+    e.m[mi]+=dur; e.total+=dur; e.ses[mi]++; e.totSes++;
+  });
+  _HD._years=Object.keys(years).sort();
+  return Object.keys(map).map(function(k){return map[k];});
+}
+function _hdSetView(v){ _HD.view=v; renderHorasDoc(); }
+function _hdSetMetric(m){ _HD.metric=m; renderHorasDoc(); }
+function renderHorasDoc(){
+  var all=_hdBuild();
+  _HD._rows=all;
+  var docs=[...new Set(all.map(function(r){return r.doc;}))].sort(function(a,b){return a.localeCompare(b,'es');});
+  var progsN=[...new Set(all.map(function(r){return r.progFull;}))].length;
+  var esH=_HD.metric==='horas';
+  var totV=all.reduce(function(a,r){return a+(esH?r.total:r.totSes);},0);
+  var mesT=[0,0,0,0,0,0,0,0,0,0,0,0]; all.forEach(function(r){ (esH?r.m:r.ses).forEach(function(v,i){mesT[i]+=v;}); });
+  var pk=Math.max.apply(null,mesT), pi=mesT.indexOf(pk);
+  var estN=all.reduce(function(a,r){return a+r.est;},0);
+  var kpi=function(ico,val,lbl,clr){ return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:130px"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">'+ico+' '+lbl+'</div><div style="font-size:20px;font-weight:800;color:'+clr+';margin-top:4px">'+val+'</div></div>'; };
+  var btn=function(fn,v,cur,l){ var on=cur===v; return '<button onclick="'+fn+'(\''+v+'\')" style="padding:7px 14px;border-radius:7px;border:1px solid '+(on?'var(--blue)':'var(--border)')+';background:'+(on?'rgba(56,139,253,.15)':'var(--surface2)')+';color:'+(on?'var(--blue)':'var(--t3)')+';font-size:11px;font-weight:700;cursor:pointer">'+l+'</button>'; };
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  var uh=esH?'h':' ses.';
+  $('page').innerHTML='<div class="pg-title">\u23F1\uFE0F Horas por Mes <span style="font-size:10px;color:var(--t4);font-weight:400;margin-left:8px">calculado desde el Calendario General</span></div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      kpi('\uD83D\uDC68\u200D\uD83C\uDFEB',docs.length,'Docentes','var(--t1)')+
+      kpi('\uD83C\uDF93',progsN,'Programas','#34d6ff')+
+      kpi('\u23F1\uFE0F',_hdFmt(totV)||'0',(esH?'Horas totales':'Sesiones totales'),'#f0b429')+
+      kpi('\uD83D\uDCC8',pk?(_HD_MLBL[pi]+' \u00b7 '+_hdFmt(pk)+uh):'\u2014','Mes pico','#3fb950')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+      btn('_hdSetView','detalle',_HD.view,'\uD83D\uDCCB Detalle')+btn('_hdSetView','doc',_HD.view,'\uD83D\uDC64 Por Docente')+
+      '<span style="width:1px;height:22px;background:var(--border)"></span>'+
+      btn('_hdSetMetric','horas',_HD.metric,'\u23F1 Horas')+btn('_hdSetMetric','ses',_HD.metric,'\uD83D\uDCC5 Sesiones')+
+      '<select onchange="_HD.year=this.value;renderHorasDoc()" style="'+selS+'"><option value="">Todos los a\u00f1os</option>'+(_HD._years||[]).map(function(y){return '<option value="'+y+'"'+(_HD.year===y?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+      '<input type="text" id="hdSearch" placeholder="\uD83D\uDD0D Buscar docente o programa..." value="'+esc(_HD.q||'')+'" style="flex:1;min-width:200px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<select onchange="_HD.doc=this.value;_hdFill()" style="'+selS+'"><option value="">Todos los docentes</option>'+docs.map(function(d){return '<option value="'+escA(d)+'"'+(_HD.doc===d?' selected':'')+'>'+esc(abbr(d,34))+'</option>';}).join('')+'</select>'+
+      '<span id="hdCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+    '</div>'+
+    (estN?'<div style="font-size:10px;color:var(--t4);margin-bottom:10px">\u2139\uFE0F Horas seg\u00fan la columna HORAS del calendario (o duraci\u00f3n del HORARIO). '+estN+' sesi\u00f3n(es) sin horario legible usan el promedio de duraci\u00f3n de su programa.</div>':'')+
+    '<div id="hdWrap"></div>';
+  var inp=$('hdSearch'); if(inp) inp.oninput=function(){ _HD.q=this.value; clearTimeout(window._hdT); window._hdT=setTimeout(_hdFill,150); };
+  _hdFill();
+}
+function _hdRowsF(){
+  var q=(_HD.q||'').toLowerCase();
+  return (_HD._rows||[]).filter(function(r){
+    if(_HD.doc && r.doc!==_HD.doc) return false;
+    if(q && r.doc.toLowerCase().indexOf(q)<0 && r.prog.toLowerCase().indexOf(q)<0 && String(r.progFull).toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+function _hdCell(v,max){
+  if(!v) return '<td style="padding:6px 7px;text-align:right;color:var(--t4)">\u2014</td>';
+  var a=max?Math.min(1,v/max):0;
+  var bg='rgba(56,139,253,'+(0.06+a*0.30).toFixed(2)+')';
+  return '<td style="padding:6px 7px;text-align:right;background:'+bg+';color:var(--t1);font-weight:'+(a>0.6?800:600)+';font-variant-numeric:tabular-nums">'+_hdFmt(v)+'</td>';
+}
+function _hdFill(){
+  var wrap=$('hdWrap'); if(!wrap) return;
+  var rows=_hdRowsF();
+  var esH=_HD.metric==='horas';
+  var val=function(r){return esH?r.m:r.ses;}, tot=function(r){return esH?r.total:r.totSes;};
+  var cnt=$('hdCount'); if(cnt) cnt.textContent=rows.length+' fila(s)';
+  var thM=_HD_MLBL.map(function(l){return '<th style="padding:7px 7px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+l+'</th>';}).join('');
+  var thS='padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase';
+  if(_HD.view==='detalle'){
+    var sorted=rows.slice().sort(function(a,b){return tot(b)-tot(a);});
+    var max=0; sorted.forEach(function(r){ val(r).forEach(function(v){ if(v>max)max=v; }); });
+    wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:68vh"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1100px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+      '<th style="'+thS+'">Docente</th><th style="'+thS+'">Programa</th>'+thM+
+      '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Total</th></tr></thead><tbody>'+
+      (sorted.length? sorted.map(function(r){
+        return '<tr style="border-top:1px solid var(--border)">'+
+          '<td style="padding:6px 10px;color:var(--t1);font-weight:700;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.doc)+'">'+esc(abbr(r.doc,28))+'</td>'+
+          '<td style="padding:6px 10px;color:var(--t3);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.progFull)+'">'+esc(r.prog)+'</td>'+
+          val(r).map(function(v){return _hdCell(v,max);}).join('')+
+          '<td style="padding:6px 10px;text-align:right;color:#f0b429;font-weight:800;font-variant-numeric:tabular-nums">'+_hdFmt(tot(r))+'</td>'+
+        '</tr>';
+      }).join('') : '<tr><td colspan="15" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
+      '</tbody></table></div>';
+    return;
+  }
+  var dm={};
+  rows.forEach(function(r){ if(!dm[r.doc]) dm[r.doc]={doc:r.doc,m:[0,0,0,0,0,0,0,0,0,0,0,0],total:0,progs:[]}; var d=dm[r.doc]; val(r).forEach(function(v,i){d.m[i]+=v;}); d.total+=tot(r); d.progs.push(r); });
+  var list=Object.keys(dm).map(function(k){return dm[k];}).sort(function(a,b){return b.total-a.total;});
+  var max2=0; list.forEach(function(d){ d.m.forEach(function(v){ if(v>max2)max2=v; }); });
+  wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:68vh"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1100px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+    '<th style="'+thS+'">Docente</th><th style="'+thS+';text-align:right">Prog.</th>'+thM+
+    '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Total</th></tr></thead><tbody>'+
+    (list.length? list.map(function(d,i){
+      var sub=d.progs.slice().sort(function(a,b){return tot(b)-tot(a);}).map(function(r){
+        return '<tr class="hdSub hdSub'+i+'" style="display:none;border-top:1px solid var(--border);background:rgba(56,139,253,.03)">'+
+          '<td style="padding:5px 10px 5px 26px;color:var(--t3);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.progFull)+'">\u21B3 '+esc(abbr(r.prog,30))+'</td>'+
+          '<td></td>'+
+          val(r).map(function(v){return v?'<td style="padding:5px 7px;text-align:right;color:var(--t3);font-variant-numeric:tabular-nums">'+_hdFmt(v)+'</td>':'<td style="padding:5px 7px;text-align:right;color:var(--t4)">\u2014</td>';}).join('')+
+          '<td style="padding:5px 10px;text-align:right;color:var(--t2);font-weight:700;font-variant-numeric:tabular-nums">'+_hdFmt(tot(r))+'</td>'+
+        '</tr>';
+      }).join('');
+      return '<tr onclick="_hdTgl('+i+')" style="border-top:1px solid var(--border);cursor:pointer">'+
+        '<td style="padding:7px 10px;color:var(--t1);font-weight:800;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(d.doc)+'"><span id="hdTgl'+i+'" style="color:var(--t4);margin-right:5px">\u25B6</span>'+esc(abbr(d.doc,26))+'</td>'+
+        '<td style="padding:7px 10px;text-align:right;color:#34d6ff;font-weight:700">'+d.progs.length+'</td>'+
+        d.m.map(function(v){return _hdCell(v,max2);}).join('')+
+        '<td style="padding:7px 10px;text-align:right;color:#f0b429;font-weight:800;font-variant-numeric:tabular-nums">'+_hdFmt(d.total)+'</td>'+
+      '</tr>'+sub;
+    }).join('') : '<tr><td colspan="15" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
+    '</tbody></table></div>';
+}
+function _hdTgl(i){
+  var subs=document.querySelectorAll('.hdSub'+i); if(!subs.length) return;
+  var show=subs[0].style.display==='none';
+  subs.forEach(function(el){ el.style.display=show?'':'none'; });
+  var t=$('hdTgl'+i); if(t) t.textContent=show?'\u25BC':'\u25B6';
+}
+
+/* ══════════════════════════════════════════════════════
+   CONTROL → INFORME DECLARACIÓN MES
+   Cruza: Declarado (actividad, hrs oblig/declaradas, RUT, CC, mes)
+        + Contratos (monto, emisión) · granularidad por actividad
+══════════════════════════════════════════════════════ */
+var _IDM={mes:'',q:'',est:''};
+var _IDM_MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function _idmBuild(){
+  /* 1) Índice de contratos por docente+CC */
+  var contIdx={};
+  (_ctRawCont||[]).forEach(function(r){
+    var k=_ctNorm(r['NombreCompletoProfesor']||'')+'|'+_ctCCFromProg(r['NombrePrograma']||'');
+    if(!contIdx[k]) contIdx[k]={monto:0,n:0,fecha:'',estado:''};
+    var c=contIdx[k];
+    c.monto+=parseFloat(r['Monto'])||0; c.n++;
+    var f=_dvFechaNorm(r['FechaCreacion']);
+    if(f && f>c.fecha){ c.fecha=f; c.estado=String(r['Estado']||'').trim(); }
+  });
+  /* 2) Agrupar declarado por RUT+CC+ACTIVIDAD (+mes si hay filtro) */
+  var map={};
+  (_ctRawDecl||[]).forEach(function(r){
+    var mes=String(r['Mes']||'').trim();
+    if(_IDM.mes && mes!==_IDM.mes) return;
+    var rut=String(r['NumeroDocumento']||'').trim();
+    var prof=String(r['Profesor']||'').trim();
+    var cc=String(r['programa_centrocosto']||'').trim();
+    var aid=String(r['actividad_id']||'')||String(r['ActividadCodigo']||'');
+    var k=(rut||_ctNorm(prof))+'\u241F'+cc+'\u241F'+aid;
+    if(!map[k]) map[k]={rut:rut,doc:prof,cc:cc,progLbl:String(r['Programa']||'').trim(),
+      actCod:String(r['ActividadCodigo']||'').trim(),actNom:String(r['ActividadNombre']||'').trim(),
+      hrObl:0,hrDec:0,meses:{},ext:false};
+    var e=map[k];
+    if(!e.progLbl && r['Programa']) e.progLbl=String(r['Programa']).trim();
+    if(!e.actNom && r['ActividadNombre']) e.actNom=String(r['ActividadNombre']).trim();
+    var ho=parseFloat(r['Horas'])||0; if(ho>e.hrObl) e.hrObl=ho;
+    e.hrDec+=(parseFloat(r['movimiento_horas_lv'])||0)+(parseFloat(r['movimiento_horas_sd'])||0);
+    if(mes) e.meses[mes]=1;
+    if(String(r['EsExtension']||'').toLowerCase()==='si') e.ext=true;
+  });
+  /* 3) Cruce con contratos + mes ordenado */
+  var out=Object.keys(map).map(function(k){
+    var e=map[k];
+    var c=contIdx[_ctNorm(e.doc)+'|'+e.cc]||null;
+    e.monto=c?c.monto:0; e.nCont=c?c.n:0; e.fechaEmi=c?_dvFechaDisp(c.fecha):''; e.estCont=c?c.estado:'';
+    e.mesLbl=_IDM_MESES.filter(function(m){return e.meses[m];}).join(', ')||'\u2014';
+    e.pct=e.hrObl>0?Math.round(e.hrDec/e.hrObl*100):(e.hrDec>0?100:0);
+    e.ccLbl=e.progLbl||('CC '+e.cc);
+    return e;
+  });
+  out.sort(function(a,b){ return a.pct-b.pct || b.hrObl-a.hrObl; });
+  return out;
+}
+function _idmMesesDisp(){
+  var s={}; (_ctRawDecl||[]).forEach(function(r){ var m=String(r['Mes']||'').trim(); if(m)s[m]=1; });
+  return _IDM_MESES.filter(function(m){return s[m];});
+}
+function _idmCCSel(){ return (_DF['idmCC']&&_DF['idmCC'].selected)?_DF['idmCC'].selected:new Set(); }
+function renderInfoDeclMes(){
+  var pg=$('page'); if(!pg) return;
+  if(!(_ctRawDecl||[]).length){
+    pg.innerHTML='<div class="pg-title">\uD83D\uDCCB Informe Declaraci\u00f3n Mes</div>'+
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;text-align:center">'+
+        '<div style="font-size:32px;margin-bottom:10px">\uD83D\uDCC2</div>'+
+        '<div style="font-size:13px;font-weight:800;color:var(--t1)">Faltan los archivos de trabajo</div>'+
+        '<div style="font-size:11px;color:var(--t3);margin:10px 0 16px;line-height:1.7">Este informe cruza el archivo de <b style="color:var(--t2)">Declaraci\u00f3n</b> (actividades, horas obligatorias vs declaradas, RUT, CC)<br>con el de <b style="color:var(--t2)">Contratos</b> (monto y fecha de emisi\u00f3n). C\u00e1rgalos una sola vez en Gesti\u00f3n C./Declaraci\u00f3n.</div>'+
+        '<button onclick="goTo(\'control\',\'declarado\')" style="padding:9px 18px;border-radius:8px;border:1px solid var(--blue);background:rgba(56,139,253,.15);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer">\uD83D\uDCC2 Ir a Gesti\u00f3n C./Declaraci\u00f3n</button>'+
+      '</div>';
+    return;
+  }
+  var rows=_idmBuild();
+  window._idmRows=rows;
+  var meses=_idmMesesDisp();
+  var ccOpts=[...new Set(rows.map(function(r){return r.ccLbl;}))].sort(function(a,b){return a.localeCompare(b,'es');});
+  var fr=_idmFRows();
+  var docsN=new Set(fr.map(function(r){return r.rut||r.doc;})).size;
+  var totObl=fr.reduce(function(a,r){return a+r.hrObl;},0);
+  var totDec=fr.reduce(function(a,r){return a+r.hrDec;},0);
+  /* monto por docente×CC único (no repetir por actividad) */
+  var mSeen={}, totMon=0, sinContSet=new Set();
+  fr.forEach(function(r){ var k=(r.rut||r.doc)+'|'+r.cc; if(!mSeen[k]){ mSeen[k]=1; totMon+=r.monto; if(!r.nCont) sinContSet.add(k); } });
+  var pctG=totObl>0?Math.round(totDec/totObl*100):0;
+  var kpi=function(ico,val,lbl,clr){ return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:124px"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">'+ico+' '+lbl+'</div><div style="font-size:19px;font-weight:800;color:'+clr+';margin-top:4px">'+val+'</div></div>'; };
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  pg.innerHTML='<div class="pg-title">\uD83D\uDCCB Informe Declaraci\u00f3n Mes'+(_IDM.mes?' \u00b7 <span style="color:#34d6ff">'+esc(_IDM.mes)+'</span>':'')+'</div>'+
+    '<div id="idmKpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      kpi('\uD83D\uDCDA',fr.length,'Actividades','var(--t1)')+
+      kpi('\uD83D\uDC65',docsN,'Docentes','#34d6ff')+
+      kpi('\u23F1\uFE0F',fmt(Math.round(totObl))+'h','Hrs obligatorias','#f0b429')+
+      kpi('\u2705',fmt(Math.round(totDec))+'h','Hrs declaradas','#3fb950')+
+      kpi('\uD83D\uDCCA',pctG+'%','Cumplimiento',''+(pctG>=90?'#3fb950':pctG>=60?'#f0b429':'#f85149'))+
+      kpi('\uD83D\uDCB0','$'+fmt(Math.round(totMon)),'Monto contratos','#a78bfa')+
+      kpi('\u26A0\uFE0F',sinContSet.size,'Sin contrato','#f85149')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+      '<select onchange="_IDM.mes=this.value;renderInfoDeclMes()" style="'+selS+'"><option value="">Todos los meses</option>'+meses.map(function(m){return '<option value="'+m+'"'+(_IDM.mes===m?' selected':'')+'>'+m+'</option>';}).join('')+'</select>'+
+      mkDF('idmCC','CC / Programa',ccOpts,'renderInfoDeclMes()')+
+      '<select onchange="_IDM.est=this.value;renderInfoDeclMes()" style="'+selS+'"><option value="">Todos los estados</option><option value="sin"'+(_IDM.est==='sin'?' selected':'')+'>\u26A0\uFE0F Sin contrato</option><option value="inc"'+(_IDM.est==='inc'?' selected':'')+'>\uD83D\uDD36 Declaraci\u00f3n incompleta</option><option value="ok"'+(_IDM.est==='ok'?' selected':'')+'>\u2705 Completa</option></select>'+
+      '<input type="text" id="idmSearch" placeholder="\uD83D\uDD0D Buscar CC, actividad, RUT o docente..." value="'+esc(_IDM.q||'')+'" style="flex:1;min-width:220px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<span id="idmCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+      '<button onclick="_idmPDF()" style="padding:7px 14px;border-radius:7px;border:1px solid #a78bfa;background:rgba(167,139,250,.12);color:#a78bfa;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCC4 Descargar Informe</button>'+
+      '<button onclick="_idmExcel()" style="padding:7px 14px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Excel</button>'+
+    '</div>'+
+    '<div id="idmWrap"></div>';
+  var inp=$('idmSearch'); if(inp) inp.oninput=function(){ _IDM.q=this.value; clearTimeout(window._idmT); window._idmT=setTimeout(_idmFill,150); };
+  _idmFill();
+}
+function _idmFRows(){
+  var q=(_IDM.q||'').toLowerCase();
+  var ccSel=_idmCCSel();
+  return (window._idmRows||[]).filter(function(r){
+    if(ccSel.size && !ccSel.has(r.ccLbl)) return false;
+    if(_IDM.est==='sin'&&r.nCont) return false;
+    if(_IDM.est==='inc'&&(r.pct>=100||!r.hrObl)) return false;
+    if(_IDM.est==='ok'&&r.pct<100) return false;
+    if(q && r.cc.toLowerCase().indexOf(q)<0 && r.rut.toLowerCase().indexOf(q)<0 && r.doc.toLowerCase().indexOf(q)<0 && r.progLbl.toLowerCase().indexOf(q)<0 && r.actCod.toLowerCase().indexOf(q)<0 && r.actNom.toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+function _idmFill(){
+  var wrap=$('idmWrap'); if(!wrap) return;
+  var rows=_idmFRows();
+  var cnt=$('idmCount'); if(cnt) cnt.textContent=rows.length+' actividad(es)';
+  var thS='padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px';
+  wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:66vh"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1150px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+    '<th style="'+thS+';color:#34d6ff">CC / Programa</th>'+
+    '<th style="'+thS+'">\uD83D\uDCDA Asignatura / Actividad</th>'+
+    '<th style="'+thS+';color:#22d3ee">Mes</th>'+
+    '<th style="'+thS+';color:#f0b429">\u23F1 Hrs oblig. vs declaradas</th>'+
+    '<th style="'+thS+'">RUT</th>'+
+    '<th style="'+thS+'">Docente</th>'+
+    '<th style="'+thS+';color:#a78bfa;text-align:right">\uD83D\uDCB0 Monto contrato</th>'+
+    '<th style="'+thS+'">\uD83D\uDCC5 Fecha emisi\u00f3n</th>'+
+    '</tr></thead><tbody>'+
+    (rows.length? rows.map(function(r){
+      var clr=r.pct>=100?'#3fb950':r.pct>=60?'#f0b429':'#f85149';
+      var barW=Math.min(100,r.pct);
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:8px 10px;max-width:220px"><span style="display:inline-block;font-size:10px;font-weight:800;padding:2px 9px;border-radius:7px;background:rgba(52,214,255,.12);color:#34d6ff;border:1px solid rgba(52,214,255,.3);margin-bottom:3px">CC '+esc(r.cc||'\u2014')+'</span>'+(r.ext?' <span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:7px;background:#3fb95022;color:#3fb950;border:1px solid #3fb95055">\uD83C\uDF93 Ext</span>':'')+'<div style="font-size:10px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.progLbl)+'">'+esc(r.progLbl||'\u2014')+'</div></td>'+
+        '<td style="padding:8px 10px;max-width:220px"><div style="font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.actNom)+'">'+esc(r.actNom||'\u2014')+'</div>'+(r.actCod?'<div style="font-size:9px;color:var(--t4)">'+esc(r.actCod)+'</div>':'')+'</td>'+
+        '<td style="padding:8px 10px;color:#22d3ee;font-weight:700;white-space:nowrap">'+esc(r.mesLbl)+'</td>'+
+        '<td style="padding:8px 10px;min-width:180px"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap">'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+'h</span><span style="font-size:10px;font-weight:800;color:'+clr+'">'+r.pct+'%</span></div><div style="height:5px;background:#161b22;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+barW+'%;background:'+clr+';border-radius:4px"></div></div></td>'+
+        '<td style="padding:8px 10px;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap">'+esc(r.rut||'\u2014')+'</td>'+
+        '<td style="padding:8px 10px;color:var(--t1);font-weight:700;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.doc)+'">'+esc(r.doc)+'</td>'+
+        '<td style="padding:8px 10px;text-align:right;white-space:nowrap">'+(r.nCont?'<span style="color:#a78bfa;font-weight:800;font-variant-numeric:tabular-nums">$'+fmt(Math.round(r.monto))+'</span>'+(r.nCont>1?'<div style="font-size:9px;color:var(--t4)">'+r.nCont+' contratos \u00b7 total CC</div>':'<div style="font-size:9px;color:var(--t4)">total CC</div>'):'<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#f8514922;color:#f85149;border:1px solid #f8514955">\u26A0\uFE0F Sin contrato</span>')+'</td>'+
+        '<td style="padding:8px 10px;color:var(--t2);white-space:nowrap;font-variant-numeric:tabular-nums">'+esc(r.fechaEmi||'\u2014')+(r.estCont?'<div style="font-size:9px;color:var(--t4)">'+esc(r.estCont)+'</div>':'')+'</td>'+
+      '</tr>';
+    }).join('') : '<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
+    '</tbody></table></div>'+
+    '<div style="font-size:10px;color:var(--t4);margin-top:8px">\u2139\uFE0F Una fila por actividad: horas declaradas = suma de los movimientos de esa actividad (del mes filtrado) \u00b7 horas obligatorias seg\u00fan la actividad \u00b7 Monto contrato y fecha de emisi\u00f3n corresponden al total del docente en ese CC.</div>';
+}
+/* ── Exportar Excel ── */
+function _idmExcel(){
+  var rows=_idmFRows();
+  if(!rows.length){ showToast('No hay registros para exportar','err'); return; }
+  var data=rows.map(function(r){ return {
+    'CC': r.cc,
+    'Programa (CC alfanum\u00e9rico)': r.progLbl,
+    'C\u00f3digo Actividad': r.actCod,
+    'Asignatura / Actividad': r.actNom,
+    'Mes': r.mesLbl,
+    'Hrs Obligatorias': Math.round(r.hrObl*100)/100,
+    'Hrs Declaradas': Math.round(r.hrDec*100)/100,
+    '% Cumplimiento': r.pct+'%',
+    'RUT': r.rut,
+    'Docente': r.doc,
+    'Monto Contrato (total CC)': r.nCont?Math.round(r.monto):'',
+    'N\u00b0 Contratos': r.nCont||'',
+    'Fecha Emisi\u00f3n': r.fechaEmi||'',
+    'Estado Contrato': r.nCont?(r.estCont||''):'SIN CONTRATO',
+    'Extensi\u00f3n': r.ext?'S\u00ed':'No'
+  };});
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:7},{wch:40},{wch:12},{wch:34},{wch:12},{wch:13},{wch:12},{wch:11},{wch:13},{wch:32},{wch:16},{wch:9},{wch:12},{wch:18},{wch:9}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Informe Declaraci\u00f3n');
+  XLSX.writeFile(wb,'Informe_Declaracion_'+(_IDM.mes||'Todos')+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Excel descargado','ok');
+}
+/* ── Informe profesional imprimible (PDF) ── */
+function _idmPDF(){
+  var rows=_idmFRows();
+  if(!rows.length){ showToast('No hay registros para el informe','err'); return; }
+  var docsN=new Set(rows.map(function(r){return r.rut||r.doc;})).size;
+  var totObl=rows.reduce(function(a,r){return a+r.hrObl;},0);
+  var totDec=rows.reduce(function(a,r){return a+r.hrDec;},0);
+  var mSeen={}, totMon=0, sinCont=0;
+  rows.forEach(function(r){ var k=(r.rut||r.doc)+'|'+r.cc; if(!mSeen[k]){ mSeen[k]=1; totMon+=r.monto; if(!r.nCont) sinCont++; } });
+  var pctG=totObl>0?Math.round(totDec/totObl*100):0;
+  var hoy=new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
+  var periodo=_IDM.mes?(_IDM.mes+' '+new Date().getFullYear()):'Todos los meses';
+  var ccSel=_idmCCSel();
+  var ccTxt=ccSel.size?([...ccSel].slice(0,3).join(' \u00b7 ')+(ccSel.size>3?' y '+(ccSel.size-3)+' m\u00e1s':'')):'Todos';
+  var pkpi=function(val,lbl,clr){ return '<td style="border:1px solid #d8dce3;border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:17px;font-weight:800;color:'+clr+'">'+val+'</div><div style="font-size:9px;color:#667;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">'+lbl+'</div></td>'; };
+  var trs=rows.map(function(r,i){
+    var clr=r.pct>=100?'#1a7f37':r.pct>=60?'#9a6700':'#cf222e';
+    return '<tr style="background:'+(i%2?'#f6f8fa':'#fff')+'">'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec"><b style="color:#0969da">'+r.cc+'</b><br><span style="font-size:8px;color:#555">'+esc(r.progLbl)+'</span></td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec">'+esc(r.actNom||'\u2014')+(r.actCod?'<br><span style="font-size:8px;color:#888">'+esc(r.actCod)+'</span>':'')+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap">'+esc(r.mesLbl)+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap"><b>'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+' h</b> <span style="color:'+clr+';font-weight:800">('+r.pct+'%)</span></td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap">'+esc(r.rut||'\u2014')+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec">'+esc(r.doc)+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;text-align:right;white-space:nowrap">'+(r.nCont?('<b>$'+fmt(Math.round(r.monto))+'</b>'+(r.nCont>1?' <span style="font-size:8px;color:#888">('+r.nCont+')</span>':'')):'<span style="color:#cf222e;font-weight:700;font-size:8.5px">SIN CONTRATO</span>')+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap">'+esc(r.fechaEmi||'\u2014')+'</td>'+
+    '</tr>';
+  }).join('');
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe de Declaraci\u00f3n \u00b7 '+esc(periodo)+'</title>'+
+    '<style>@page{size:letter landscape;margin:12mm}body{font-family:Segoe UI,Arial,sans-serif;color:#1c2128;margin:0;font-size:9.5px}@media print{.noprint{display:none}}</style></head><body>'+
+    '<div style="border-bottom:3px solid #0969da;padding-bottom:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end">'+
+      '<div><div style="font-size:10px;font-weight:700;color:#0969da;letter-spacing:1.5px;text-transform:uppercase">Universidad Adolfo Ib\u00e1\u00f1ez \u00b7 Direcci\u00f3n de Postgrados</div>'+
+      '<div style="font-size:20px;font-weight:800;margin-top:4px">Informe de Declaraci\u00f3n de Horas por Actividad</div>'+
+      '<div style="font-size:10.5px;color:#555;margin-top:2px">Per\u00edodo: <b>'+esc(periodo)+'</b> \u00b7 CC/Programa: <b>'+esc(ccTxt)+'</b>'+(_IDM.est?' \u00b7 Filtro: '+(_IDM.est==='sin'?'Sin contrato':_IDM.est==='inc'?'Declaraci\u00f3n incompleta':'Completa'):'')+'</div></div>'+
+      '<div style="text-align:right;font-size:9px;color:#667">Fecha de emisi\u00f3n del informe<br><b style="font-size:11px;color:#1c2128">'+hoy+'</b></div>'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:separate;border-spacing:5px;margin-bottom:12px"><tr>'+
+      pkpi(rows.length,'Actividades','#1c2128')+
+      pkpi(docsN,'Docentes','#0969da')+
+      pkpi(fmt(Math.round(totObl))+' h','Hrs obligatorias','#9a6700')+
+      pkpi(fmt(Math.round(totDec))+' h','Hrs declaradas','#1a7f37')+
+      pkpi(pctG+'%','Cumplimiento',(pctG>=90?'#1a7f37':pctG>=60?'#9a6700':'#cf222e'))+
+      pkpi('$'+fmt(Math.round(totMon)),'Monto contratos','#6639ba')+
+      pkpi(sinCont,'Sin contrato','#cf222e')+
+    '</tr></table>'+
+    '<table style="width:100%;border-collapse:collapse">'+
+      '<thead><tr style="background:#0969da;color:#fff">'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">CC / Programa</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Asignatura / Actividad</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Mes</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Hrs Oblig. vs Declaradas</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">RUT</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Docente</th>'+
+        '<th style="padding:7px 8px;text-align:right;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Monto Contrato</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Fecha Emisi\u00f3n</th>'+
+      '</tr></thead><tbody>'+trs+'</tbody></table>'+
+    '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #d8dce3;font-size:8px;color:#778;display:flex;justify-content:space-between">'+
+      '<span>Una fila por actividad: horas declaradas = suma de movimientos de la actividad en el per\u00edodo \u00b7 horas obligatorias seg\u00fan la actividad \u00b7 Monto de contrato corresponde al total del docente en ese centro de costo (Reporte de Contratos de Honorarios).</span>'+
+      '<span>Dashboard Postgrado UAI \u00b7 Generado el '+hoy+'</span>'+
+    '</div>'+
+    '<div class="noprint" style="position:fixed;top:10px;right:10px"><button onclick="window.print()" style="padding:10px 20px;background:#0969da;color:#fff;border:none;border-radius:8px;font-weight:800;cursor:pointer;font-size:13px">\uD83D\uDDA8 Imprimir / Guardar PDF</button></div>'+
+    '</body></html>';
+  var w=window.open('','_blank');
+  if(!w){ showToast('Permite las ventanas emergentes para descargar el informe','err'); return; }
+  w.document.write(html); w.document.close();
+  setTimeout(function(){ try{w.print();}catch(e){} },400);
+}
+
 function _adnIsCerr(r){ return (r.estado==='APROBADO')||(r.nota!=null&&!isNaN(r.nota)&&r.nota>0); }
 function _adnBarHtml(pct,clr){ return '<div style="height:8px;background:#161b22;border-radius:6px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+clr+';border-radius:6px"></div></div>'; }
 function _adnClr(pct){ return pct>=85?'#3fb950':pct>=60?'#388bfd':pct>=40?'#f0b429':'#f85149'; }
@@ -32815,5 +33359,4 @@ document.addEventListener('DOMContentLoaded', init);
   </div>
 </div>
 </body>
-</html>
-
+</html
