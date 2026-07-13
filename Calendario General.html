@@ -1714,7 +1714,7 @@ const CATS = {
   calendarios:  ['calendario','reservas','actterm'],
   planificador: ['plancursos','plancoord','malla','planreporte','propuestas','horario','asistencia'],
   admin:        ['gestion','cargaprog','cargapuntaje','turnos','cargalaboral','coordcarga'],
-  control:      ['declaracion','infodecl','declarado','anualdecl','presupuesto','informe','cruce','controlhoras','valoreshora','areacg'],
+  control:      ['declaracion','infodecl','declarado','anualdecl','presupuesto','informe','cruce','crucedecl','controlhoras','valoreshora','areacg'],
   ayuda:        ['manual','faqs'],
   adn:          ['adnacademico','finalizados'],
 };
@@ -1735,6 +1735,7 @@ const TAB_LABELS = {
   correos:      '📧 Correos de Bienvenida',
   declaracion:  'Declaración de Horas',
   infodecl:     '📋 Informe Declaración Mes',
+  crucedecl:    '🔀 Cruce Declaraciones',
   anualdecl:    '📅 Declarado por Año',
   presupuesto:  '💰 Presupuesto vs Real',
   informe:      '📄 Informe Ejecutivo',
@@ -3362,7 +3363,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','infodecl','finalizados','correos','asistencia','areacg'];
+  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','infodecl','crucedecl','finalizados','correos','asistencia','areacg'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -3385,6 +3386,7 @@ function refreshView() {
     cruce:        renderCruceInfo,
     controlhoras: renderControlHoras,
     infodecl:     renderInfoDeclMes,
+    crucedecl:    renderCruceDecl,
     horasdoc:     renderHorasDoc,
     valoreshora:  renderValoresHora,
     areacg:       renderAreaCG,
@@ -17045,16 +17047,24 @@ function _chBuild(){
       }
     }
 
+    /* índices del primer y último REAL donde la actividad tiene valor */
+    var fi = -1, li = -1;
+    realList.forEach(function(v,i){ if (v !== null){ if (fi < 0) fi = i; li = i; } });
+
     var estado;
     if (!hasP && definedReals.length === 0) return;
     if (!hasP && definedReals.length > 0){
-      estado = lastReal === null ? 'Solo en '+realKeys[0]
-             : firstReal === null ? 'Nuevo en '+realKeys[realKeys.length-1]
-             : 'Agregado en REAL';
+      if (fi === li){
+        estado = 'Solo en '+realKeys[fi];
+      } else if (li === realList.length - 1){
+        estado = 'Nuevo desde '+realKeys[fi];
+      } else {
+        estado = 'Solo en '+realKeys[fi]+' a '+realKeys[li];
+      }
     } else if (hasP && definedReals.length === 0){
       estado = 'Solo en PPT';
-    } else if (hasP && lastReal === null && firstReal !== null){
-      estado = 'Eliminado en '+realKeys[realKeys.length-1];
+    } else if (hasP && lastReal === null && definedReals.length > 0){
+      estado = 'Eliminado desde '+realKeys[li+1];
     } else if (changedPeriods.length === 0){
       return;
     } else if (changedPeriods.length === 1){
@@ -17374,7 +17384,7 @@ function _chBadge(estado){
     'Nuevo en último REAL':       {bg:'#3fb95022',c:'#3fb950'}
   };
   if (map[estado]) return map[estado];
-  if (/^Nuevo en/.test(estado)) return {bg:'#3fb95022',c:'#3fb950'};
+  if (/^Nuevo (en|desde)/.test(estado)) return {bg:'#3fb95022',c:'#3fb950'};
   if (/^Solo en REAL/.test(estado)) return {bg:'#a78bfa22',c:'#a78bfa'};
   if (/^Agregado/.test(estado)) return {bg:'#22d3ee22',c:'#22d3ee'};
   if (/^Eliminado/.test(estado)) return {bg:'#f8514922',c:'#f85149'};
@@ -22925,20 +22935,8 @@ function renderPlanHorario() {
   // Construir lista de programas desde la Malla Curricular
   var programasMalla = mallas.map(function(m){ return m.nombre; }).filter(Boolean);
 
-  // También incluir programas del calendario cargado
-  var progCal = [];
-  if (APP.df && APP.df.length) {
-    var seen = {};
-    APP.df.forEach(function(r){
-      var p = r['PROGRAMA']||'';
-      if(p && !seen[p]){ seen[p]=1; progCal.push(p); }
-    });
-  }
-
-  // Todos los programas únicos (Malla primero)
-  var todosProgs = programasMalla.concat(
-    progCal.filter(function(p){ return !programasMalla.includes(p); })
-  );
+  // Fuente única: la Malla Curricular (NO se usa el Calendario General)
+  var todosProgs = programasMalla.slice();
 
   pg.innerHTML =
     // ── Header ───────────────────────────────────────────────────
@@ -22947,10 +22945,18 @@ function renderPlanHorario() {
       '<div>'+
         '<div class="pg-title" style="margin-bottom:4px">Planificador de Horarios</div>'+
         '<div style="font-size:11px;color:#8b949e">'+
-          'Diseña horarios desde la Malla Curricular · genera sesiones automáticamente · exporta a Excel'+
+          'Diseña horarios desde las Mallas cargadas (no usa el Calendario General) · genera sesiones automáticamente · exporta a Excel'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px">'+
+        '<button onclick="document.getElementById(\'phMallaInp\').click()" '+
+          'style="padding:8px 16px;background:rgba(63,185,80,.1);color:#3fb950;'+
+            'border:1px solid rgba(63,185,80,.3);border-radius:8px;font-size:12px;'+
+            'font-weight:700;cursor:pointer">'+
+          '\uD83D\uDCC1 Cargar Malla (Excel)'+
+        '</button>'+
+        '<input type="file" id="phMallaInp" accept=".xlsx,.xls,.csv" multiple '+
+          'style="display:none" onchange="phCargaMalla(this)">'+
         '<button onclick="phMostrarGuardados()" '+
           'style="padding:8px 16px;background:rgba(167,139,250,.1);color:#a78bfa;'+
             'border:1px solid rgba(167,139,250,.3);border-radius:8px;font-size:12px;'+
@@ -23255,23 +23261,7 @@ function phOnProgramaChange() {
   var malla   = mallas.find(function(m){ return m.nombre===progNombre; });
   var cursos  = malla ? (malla.cursos||[]) : [];
 
-  // Si no está en malla, buscar en calendario
-  var fuenteLabel = '🏫 Malla Curricular';
-  if(!cursos.length && APP.df && APP.df.length) {
-    fuenteLabel = '📅 Calendario';
-    var sigMap = {};
-    APP.df.filter(function(r){ return r['PROGRAMA']===progNombre; })
-      .forEach(function(r){
-        var sig=r['SIGLA']||'', nom=r['ASIGNATURA']||r['PROGRAMA']||'';
-        if(nom && !sigMap[nom]){
-          sigMap[nom]=1;
-          cursos.push({sigla:sig, nombre:nom, ha:0, hp:0, hnp:0, cs:0, periodo:1, ta:'—'});
-        }
-      });
-    // CC desde el calendario
-    var rowCC = APP.df.find(function(r){ return r['PROGRAMA']===progNombre && r['CC']; });
-    if(rowCC && ccEl) ccEl.value = rowCC['CC']||'';
-  }
+  var fuenteLabel = '🏫 Malla cargada';
 
   // Autocompletar CC desde la malla
   if(malla && malla.cc && ccEl) ccEl.value = malla.cc;
@@ -23363,14 +23353,6 @@ function phRefreshProgramas() {
   var mallas = mallaLoad();
   var programasMalla = mallas.map(function(m){ return m.nombre; }).filter(Boolean);
 
-  var progCal = [];
-  if(APP.df && APP.df.length) {
-    var seen = {};
-    APP.df.forEach(function(r){
-      var p = r['PROGRAMA']||'';
-      if(p && !seen[p] && !programasMalla.includes(p)){ seen[p]=1; progCal.push(p); }
-    });
-  }
 
   // Actualizar indicador de malla
   var infoEl = $('phMallaInfo');
@@ -23390,8 +23372,8 @@ function phRefreshProgramas() {
       infoEl.innerHTML =
         '<div style="font-size:10px;color:#f0b429;padding:8px 10px;margin-top:6px;'+
           'background:rgba(240,180,41,.06);border:1px solid rgba(240,180,41,.2);border-radius:6px">'+
-          '⚠️ Sin programas en Malla Curricular. '+
-          'Ve a <strong>Planificador → Malla Curricular</strong> para cargar un Excel.'+
+          '⚠️ Sin mallas cargadas. Usa el botón <strong>\uD83D\uDCC1 Cargar Malla (Excel)</strong> de arriba '+
+          '(uno o varios archivos, cada uno agrega un programa) o ve a <strong>Planificador → Malla Curricular</strong>.'+
         '</div>';
     }
   }
@@ -23408,21 +23390,13 @@ function phRefreshProgramas() {
     });
     opts += '</optgroup>';
   }
-  if(progCal.length) {
-    opts += '<optgroup label="📅 Calendario cargado">';
-    progCal.forEach(function(p){
-      var sel2 = valActual===p ? ' selected' : '';
-      opts += '<option value="'+esc(p)+'"'+sel2+' title="'+esc(p)+'">'+esc(p)+'</option>';
-    });
-    opts += '</optgroup>';
-  }
-  if(!programasMalla.length && !progCal.length) {
-    opts += '<option disabled>Sin programas disponibles</option>';
+  if(!programasMalla.length) {
+    opts += '<option disabled>Sin mallas cargadas — usa el botón 📁 Cargar Malla</option>';
   }
   sel.innerHTML = opts;
 
   // Si había una selección válida, re-disparar el change
-  if(valActual && (programasMalla.includes(valActual) || progCal.includes(valActual))) {
+  if(valActual && programasMalla.includes(valActual)) {
     sel.value = valActual;
     phOnProgramaChange();
   }
@@ -28705,6 +28679,19 @@ function mallaSelTipo(btn){
   }
 }
 
+/* ── Cargar malla(s) directo desde el Planificador de Horarios ── */
+function phCargaMalla(input){
+  var files = input && input.files ? Array.prototype.slice.call(input.files) : [];
+  if(!files.length) return;
+  var pend = files.length;
+  files.forEach(function(f){
+    mallaCargarFile(f, function(){
+      pend--;
+      if(pend<=0){ phRefreshProgramas(); }
+    });
+  });
+  input.value='';
+}
 function mallaCargaArchivo(input){
   var f = input.files[0]; if(!f) return;
   mallaCargarFile(f);
@@ -28726,7 +28713,7 @@ function mallaLimpiarTodo(){
 }
 
 
-function mallaCargarFile(file){
+function mallaCargarFile(file, cb){
   if(typeof XLSX === 'undefined'){ showToast('XLSX no disponible','err'); return; }
   var reader = new FileReader();
   reader.onload = function(e){
@@ -28757,7 +28744,9 @@ function mallaCargarFile(file){
       }
 
       mallaSave(existing);
-      renderMalla();
+      window._mallaCache = null;
+      if(typeof cb === 'function'){ cb(nombre, cursos.length); }
+      else renderMalla();
       showToast(cursos.length+' asignaturas cargadas en "'+nombre+'"','ok');
     } catch(err){
       showToast('Error leyendo la malla: '+err.message,'err');
@@ -31222,9 +31211,87 @@ function _agAgendaDate(qn){
   return null;
 }
 function _agBadge(txt,clr){ return '<span style="font-size:10px;font-weight:800;color:'+clr+';background:'+clr+'22;border:1px solid '+clr+'55;border-radius:5px;padding:1px 7px">'+txt+'</span>'; }
+/* ── Agente: dominio Declaración / Contratos / Informe ── */
+function _agDeclData(){
+  if(typeof _idmBuild!=='function' || !(window._ctRawDecl||[]).length) return null;
+  var m=_IDM.mes; _IDM.mes='';
+  var rows=null; try{ rows=_idmBuild(); }catch(e){ rows=null; }
+  _IDM.mes=m; return rows;
+}
+function _agDeclDoc(qn, rows){
+  var best=null,bs=0,seen={};
+  rows.forEach(function(r){
+    if(seen[r.doc])return; seen[r.doc]=1;
+    var toks=_agNorm(r.doc).replace(/,/g,' ').split(' ').filter(function(t){return t.length>=4;});
+    var sc=0,lg=false;
+    toks.forEach(function(t){ if(qn.indexOf(t)>=0){ sc++; if(t.length>=5)lg=true; } });
+    if((sc>=2||(sc>=1&&lg)) && sc>bs){ best=r.doc; bs=sc; }
+  });
+  return best;
+}
+function _agDeclCard(t){ return '<div style="margin:6px 0;padding:8px 10px;background:#161b22;border:1px solid #21262d;border-radius:8px;font-size:11px;color:#8b949e;line-height:1.5">'+t+'</div>'; }
+function _agDeclAnswer(qn){
+  if(!/declar|contrat|cumplimient|monto|informe mes|sin firmar|rut de/.test(qn)) return null;
+  var data=_agDeclData();
+  if(!data||!data.length) return 'Para consultas de declaraci\u00f3n y contratos primero carga los archivos en <b>Gesti\u00f3n C./Declaraci\u00f3n</b> (\uD83D\uDCC2). Luego preg\u00fantame de nuevo.';
+  var doc=_agDeclDoc(qn,data);
+  /* Docente específico */
+  if(doc){
+    var acts=data.filter(function(r){return r.doc===doc;});
+    var obl=acts.reduce(function(a,r){return a+r.hrObl;},0), dec=acts.reduce(function(a,r){return a+r.hrDec;},0);
+    var pct=obl>0?Math.round(dec/obl*100):0;
+    var ccs={}; acts.forEach(function(r){ if(!ccs[r.cc]) ccs[r.cc]=r; });
+    if(/monto|contrat|emision|emisi\u00f3n/.test(qn)){
+      var body=Object.keys(ccs).map(function(cc){ var r=ccs[cc];
+        return _agDeclCard('<b style="color:#34d6ff">CC '+esc(cc)+'</b> \u00b7 '+esc(r.progLbl)+'<br>'+(r.nCont?('\uD83D\uDCB0 <b style="color:#a78bfa">$'+fmt(Math.round(r.monto))+'</b>'+(r.nCont>1?' ('+r.nCont+' contratos)':'')+' \u00b7 \uD83D\uDCC5 Emitido: '+esc(r.fechaEmi||'\u2014')+(r.estCont?' \u00b7 '+esc(r.estCont):'')):_agBadge('Sin contrato','#f85149')));
+      }).join('');
+      return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCB0 Contratos de '+esc(doc)+'</div>'+body;
+    }
+    var clr=pct>=100?'#3fb950':pct>=60?'#f0b429':'#f85149';
+    var lst=acts.slice().sort(function(a,b){return a.pct-b.pct;}).slice(0,8).map(function(r){
+      var c2=r.pct>=100?'#3fb950':r.pct>=60?'#f0b429':'#f85149';
+      return _agDeclCard('<span style="color:#f0f6ff;font-weight:600">'+esc(r.actNom||r.actCod||'Actividad')+'</span> \u00b7 CC '+esc(r.cc)+(r.mesLbl!=='\u2014'?' \u00b7 '+esc(r.mesLbl):'')+'<br>'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+'h '+_agBadge(r.pct+'%',c2));
+    }).join('');
+    return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCCB '+esc(doc)+'</div><div style="font-size:12px;color:#8b949e;margin-bottom:4px">'+acts.length+' actividad(es) \u00b7 <b style="color:#f0f6ff">'+_hdFmt(dec)+' / '+_hdFmt(obl)+'h</b> declaradas '+_agBadge(pct+'%',clr)+(ccs[Object.keys(ccs)[0]]&&Object.keys(ccs).some(function(cc){return !ccs[cc].nCont;})?' \u00b7 '+_agBadge('CC sin contrato','#f85149'):'')+'</div>'+lst+(acts.length>8?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(acts.length-8)+' m\u00e1s en el Informe Declaraci\u00f3n Mes</div>':'');
+  }
+  /* Sin contrato */
+  if(/sin contrato|falta contrato|no tienen? contrato|sin firmar/.test(qn)){
+    var seen2={}, sc2=[];
+    data.forEach(function(r){ var k=(r.rut||r.doc)+'|'+r.cc; if(!seen2[k]){ seen2[k]=1; if(!r.nCont) sc2.push(r); } });
+    if(!sc2.length) return '\u2705 Todos los docentes con declaraci\u00f3n tienen contrato asociado en su CC.';
+    return '<div style="font-weight:700;margin-bottom:6px">\u26A0\uFE0F '+sc2.length+' docente(s)\u00d7CC sin contrato</div>'+sc2.slice(0,10).map(function(r){return _agDeclCard('<span style="color:#f0f6ff;font-weight:600">'+esc(r.doc)+'</span> \u00b7 CC '+esc(r.cc)+' \u00b7 '+esc(r.progLbl));}).join('')+(sc2.length>10?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(sc2.length-10)+' m\u00e1s</div>':'');
+  }
+  /* Sobre-declaración */
+  if(/sobre ?declar|exced|mas de lo obligat|demasiad/.test(qn)){
+    var ov=data.filter(function(r){return r.hrObl>0&&r.pct>100;}).sort(function(a,b){return b.pct-a.pct;});
+    if(!ov.length) return '\u2705 Nadie ha declarado m\u00e1s horas que las obligatorias.';
+    return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDD3A '+ov.length+' actividad(es) sobre-declaradas</div>'+ov.slice(0,10).map(function(r){return _agDeclCard('<span style="color:#f0f6ff;font-weight:600">'+esc(r.doc)+'</span> \u00b7 '+esc(r.actNom)+'<br>'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+'h '+_agBadge(r.pct+'%','#f85149'));}).join('')+(ov.length>10?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(ov.length-10)+' m\u00e1s</div>':'');
+  }
+  /* Pendientes / incompletos */
+  if(/pendient|falta|no han? declarad|incomplet|atrasad/.test(qn)){
+    var pe=data.filter(function(r){return r.hrObl>0&&r.pct<100;}).sort(function(a,b){return a.pct-b.pct;});
+    if(!pe.length) return '\u2705 Todas las actividades tienen la declaraci\u00f3n completa.';
+    return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDD36 '+pe.length+' actividad(es) con declaraci\u00f3n incompleta</div>'+pe.slice(0,10).map(function(r){var c3=r.pct>=60?'#f0b429':'#f85149';return _agDeclCard('<span style="color:#f0f6ff;font-weight:600">'+esc(r.doc)+'</span> \u00b7 '+esc(r.actNom)+' \u00b7 CC '+esc(r.cc)+'<br>'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+'h '+_agBadge(r.pct+'%',c3));}).join('')+(pe.length>10?'<div style="font-size:11px;color:#6e7681">\u2026 y '+(pe.length-10)+' m\u00e1s en el Informe Declaraci\u00f3n Mes</div>':'');
+  }
+  /* Resumen global */
+  var docsN=new Set(data.map(function(r){return r.rut||r.doc;})).size;
+  var obl2=data.reduce(function(a,r){return a+r.hrObl;},0), dec2=data.reduce(function(a,r){return a+r.hrDec;},0);
+  var pctG=obl2>0?Math.round(dec2/obl2*100):0;
+  var seen3={}, mon=0, sinC=0;
+  data.forEach(function(r){ var k=(r.rut||r.doc)+'|'+r.cc; if(!seen3[k]){ seen3[k]=1; mon+=r.monto; if(!r.nCont) sinC++; } });
+  var inc=data.filter(function(r){return r.hrObl>0&&r.pct<100;}).length;
+  var clrG=pctG>=90?'#3fb950':pctG>=60?'#f0b429':'#f85149';
+  return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCCA Estado de la declaraci\u00f3n</div>'+
+    _agDeclCard('\uD83D\uDCDA <b style="color:#f0f6ff">'+data.length+'</b> actividades \u00b7 \uD83D\uDC65 <b style="color:#f0f6ff">'+docsN+'</b> docentes')+
+    _agDeclCard('\u23F1 Declaradas <b style="color:#f0f6ff">'+_hdFmt(dec2)+'h</b> de <b style="color:#f0f6ff">'+_hdFmt(obl2)+'h</b> obligatorias '+_agBadge(pctG+'%',clrG)+' \u00b7 \uD83D\uDD36 '+inc+' incompletas')+
+    _agDeclCard('\uD83D\uDCB0 Monto contratos: <b style="color:#a78bfa">$'+fmt(Math.round(mon))+'</b> \u00b7 \u26A0\uFE0F '+sinC+' docente(s)\u00d7CC sin contrato')+
+    '<div style="font-size:11px;color:#6e7681;margin-top:4px">Detalle completo en Control \u2192 \uD83D\uDCCB Informe Declaraci\u00f3n Mes. Prueba: "pendientes de declarar", "sin contrato", "cu\u00e1nto declar\u00f3 [docente]", "monto contrato de [docente]".</div>';
+}
 function _agAnswer(qraw){
+  var qn=_agNorm(qraw);
+  var da=_agDeclAnswer(qn); if(da) return da;
   var rows=_agRows(); if(!rows.length) return 'A\u00fan no hay datos cargados. Carga el calendario acad\u00e9mico y podr\u00e9 responder.';
-  var qn=_agNorm(qraw); var E=_agEntities();
+  var E=_agEntities();
   // 1) Topes de profesor
   if(/\btope|choque|solap|cruce|colision/.test(qn)){
     var tp=_agProfTopes(); var profF=_agFind(qn,E.profs); var mesI=_AG_MESES.findIndex(function(m){return qn.indexOf(m)>=0;});
@@ -31267,7 +31334,7 @@ function _agAnswer(qraw){
   var sf3=_agFind(qn,E.sedes); if(sf3){ var rs6=_agRowsFor('SEDE',sf3); return '<b>'+esc(sf3)+'</b>: '+rs6.length+' sesiones.'; }
   return _agHelp();
 }
-function _agHelp(){ return 'Puedo ayudarte con:<div style="font-size:12px;color:#8b949e;margin-top:6px;line-height:1.9">\u2022 \u00bfQu\u00e9 programas empiezan esta semana?<br>\u2022 \u00bfCu\u00e1ndo empieza [programa]?<br>\u2022 \u00bfHay topes? / topes de [profesor]<br>\u2022 \u00bfQui\u00e9n est\u00e1 sobrecargada?<br>\u2022 \u00bfCu\u00e1ntas sesiones tiene [coordinadora]?<br>\u2022 \u00bfQu\u00e9 clases hay hoy / el 15/03?</div>'; }
+function _agHelp(){ return 'Puedo ayudarte con:<div style="font-size:12px;color:#8b949e;margin-top:6px;line-height:1.9">\u2022 \u00bfQu\u00e9 programas empiezan esta semana?<br>\u2022 \u00bfCu\u00e1ndo empieza [programa]?<br>\u2022 \u00bfHay topes? / topes de [profesor]<br>\u2022 \u00bfQui\u00e9n est\u00e1 sobrecargada?<br>\u2022 \u00bfCu\u00e1ntas sesiones tiene [coordinadora]?<br>\u2022 \u00bfQu\u00e9 clases hay hoy / el 15/03?<br>\u2022 \u00bfC\u00f3mo va la declaraci\u00f3n? / pendientes de declarar<br>\u2022 \u00bfQui\u00e9n est\u00e1 sin contrato? / monto contrato de [docente]<br>\u2022 \u00bfCu\u00e1nto declar\u00f3 [docente]?</div>'; }
 function _agAsk(t){ var inp=document.getElementById('agInput'); if(inp)inp.value=t; _agSend(); }
 function _agSend(){
   var inp=document.getElementById('agInput'); if(!inp)return; var q=inp.value.trim(); if(!q)return;
@@ -31295,7 +31362,7 @@ function renderAgente(){
     alertCard('\u26A0\uFE0F','Topes de profesor','#f0b429',tp.length,tBody)+
     alertCard('\uD83D\uDCC5','Pr\u00f3ximos inicios (7d)','#388bfd',b.prox.length,sBody)+
   '</div>';
-  var chips=['\u00bfQu\u00e9 programas empiezan esta semana?','\u00bfHay topes?','\u00bfQui\u00e9n est\u00e1 sobrecargada?','\u00bfQu\u00e9 clases hay hoy?'];
+  var chips=['\u00bfQu\u00e9 programas empiezan esta semana?','\u00bfHay topes?','\u00bfC\u00f3mo va la declaraci\u00f3n?','Pendientes de declarar','\u00bfQui\u00e9n est\u00e1 sin contrato?','\u00bfQu\u00e9 clases hay hoy?'];
   var head='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,#1f6feb,#34d6ff);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">\uD83E\uDD16</div><div><div style="font-size:18px;font-weight:900;color:#f0f6ff">Agente</div><div style="font-size:12px;color:#8b949e">Consulta los datos y revisa alertas de topes, sobrecarga e inicios</div></div></div>';
   var chat='<div style="background:#161b22;border:1px solid #21262d;border-radius:14px;padding:14px">'+
     '<div id="agLog" style="max-height:380px;overflow-y:auto;margin-bottom:10px;min-height:80px"></div>'+
@@ -31713,6 +31780,272 @@ function _idmPDF(){
   if(!w){ showToast('Permite las ventanas emergentes para descargar el informe','err'); return; }
   w.document.write(html); w.document.close();
   setTimeout(function(){ try{w.print();}catch(e){} },400);
+}
+
+/* ══════════════════════════════════════════════════════
+   CONTROL → CRUCE DECLARACIONES (v2)
+   Un solo Excel: pestaña 1 = Declaraciones (Docente·Programa·Actividad·Valor_Hora·meses·Total Horas)
+                  pestaña 2 = Consolidado solicitado por coordinadora (Docente·Programa·Actividad·meses)
+   Cruce difuso: nombres distintos, CC en formatos distintos y actividades similares.
+══════════════════════════════════════════════════════ */
+var _CD={q:'',est:''};
+var _CDKEY='cruce_decl_v1';
+var _CD_MESES=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+var _CD_MLBL=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function _cdNum(v){ if(v==null) return 0; if(typeof v==='number') return isNaN(v)?0:v; var s=String(v).replace(/[^\d,.\-]/g,'').trim(); if(!s||s==='-') return 0; var n=parseFloat(s.replace(/\./g,'').replace(',','.')); if(!isNaN(n)) return n; n=parseFloat(s.replace(',','.')); return isNaN(n)?0:n; }
+function _cdLoad(){ try{ var s=localStorage.getItem(_CDKEY); return s?JSON.parse(s):{}; }catch(e){ return {}; } }
+function _cdSave(d){ try{ localStorage.setItem(_CDKEY,JSON.stringify(d)); }catch(e){ showToast('No se pudo guardar (localStorage lleno)','err'); } }
+/* CC desde el programa: "8990 DEC_ BL_2026" → 8990 · "DEC - CC 8990" → 8990 */
+function _cdCC(prog){ var s=String(prog||''); var m=s.match(/CC\s*(\d{3,})/i); if(m) return m[1]; m=s.match(/^(\d{3,})/); if(m) return m[1]; m=s.match(/(\d{4,})/); return m?m[1]:''; }
+function _cdToks(s){ return _agNorm(s).replace(/[(),.:;\/\-_\u00b7]/g,' ').split(/\s+/).filter(function(t){return t.length>=3&&!/^(del|los|las|por|con|para|the|and|una|uno|hrs?|alumno|version|sem|seme)$/.test(t);}); }
+function _cdTokEq(a,b){ if(a===b) return true; if(a.length>=4&&b.length>=4){ if(a.indexOf(b)===0||b.indexOf(a)===0) return true; } return false; }
+/* similitud de actividades: proporción de tokens compartidos sobre el menor conjunto */
+function _cdSim(a,b){
+  var ta=_cdToks(a), tb=_cdToks(b);
+  if(!ta.length||!tb.length) return 0;
+  var hit=0;
+  ta.forEach(function(x){ if(tb.some(function(y){return _cdTokEq(x,y);})) hit++; });
+  return hit/Math.min(ta.length,tb.length);
+}
+/* match de docentes: nombre corto ("PATRICIO POLIZZI") ⊂ nombre formal ("POLIZZI RIVETTO PATRICIO ALEJANDRO") */
+function _cdDocMatch(shortName, formalNames){
+  var st=_cdToks(shortName); if(!st.length) return null;
+  var cands=formalNames.filter(function(f){
+    var ft=_cdToks(f);
+    return st.every(function(x){ return ft.some(function(y){return _cdTokEq(x,y);}); });
+  });
+  return cands.length===1?cands[0]:(cands.length>1?cands.sort(function(a,b){return a.length-b.length;})[0]:null);
+}
+function _cdParseRows(rows, tipo){
+  if(!rows||!rows.length) return null;
+  var s=rows[0], keys=Object.keys(s);
+  var cD=findCol(s,['DOCENTE','PROFESOR','NOMBRE DOCENTE']);
+  var cP=findCol(s,['PROGRAMA','NOMBRE PROGRAMA']);
+  var cA=findCol(s,['ACTIVIDAD','ASIGNATURA','NOMBRE ACTIVIDAD']);
+  if(!cD||!cA) return null;
+  var mcols=_CD_MESES.map(function(m){ var alt=(m==='SEPTIEMBRE')?['SEPTIEMBRE','SETIEMBRE']:[m]; for(var k=0;k<keys.length;k++){ var K=keys[k].toUpperCase().trim(); if(alt.indexOf(K)>=0) return keys[k]; } return null; });
+  if(!mcols.some(Boolean)) return null;
+  var cVH=tipo==='decl'?findCol(s,['VALOR_HORA','VALOR HORA','VALORHORA','VALOR']):null;
+  var cTH=findCol(s,['TOTAL HORAS','TOTAL_HORAS','TOTALHORAS','TOTAL']);
+  var cTP=tipo==='decl'?findCol(s,['TOTAL A PAGAR','TOTAL_A_PAGAR','TOTAL PAGAR','MONTO','MONTO TOTAL']):null;
+  var out=[];
+  rows.forEach(function(r){
+    var doc=String(r[cD]||'').trim(), prog=cP?String(r[cP]||'').trim():'', act=String(r[cA]||'').trim();
+    if(!doc&&!act) return;
+    if(/^total/i.test(doc)||/^total/i.test(act)) return;
+    var m=mcols.map(function(cc){ return cc?_cdNum(r[cc]):0; });
+    var sum=m.reduce(function(a,b){return a+b;},0);
+    var tot=cTH?_cdNum(r[cTH]):0; if(!tot) tot=sum;
+    if(!doc||(!tot&&!sum)) return;
+    var e={doc:doc,prog:prog,act:act,cc:_cdCC(prog),m:m,tot:tot};
+    if(tipo==='decl'){ e.vh=cVH?_cdNum(r[cVH]):0; e.pay=cTP?_cdNum(r[cTP]):0; if(!e.pay&&e.vh) e.pay=e.vh*tot; }
+    out.push(e);
+  });
+  return out.length?out:null;
+}
+/* Carga: un solo Excel con 2 pestañas (1=Declaraciones, 2=Consolidado) o archivos separados */
+function _cdHandleFile(file, tipo){
+  if(!file) return;
+  var rd=new FileReader();
+  rd.onload=function(e){ try{
+    var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    var D=_cdLoad();
+    if(tipo==='ambos'){
+      if(wb.SheetNames.length<2){ showToast('El archivo necesita 2 pesta\u00f1as: Declaraciones y Consolidado','err'); return; }
+      var r1=_cdParseRows(smartParseSheet(wb.Sheets[wb.SheetNames[0]]),'decl');
+      var r2=_cdParseRows(smartParseSheet(wb.Sheets[wb.SheetNames[1]]),'sol');
+      if(!r1||!r2){ showToast('No pude leer las 2 pesta\u00f1as (revisa columnas Docente/Actividad/meses)','err'); return; }
+      D.decl={rows:r1,archivo:file.name+' \u00b7 '+wb.SheetNames[0],fecha:new Date().toISOString()};
+      D.sol={rows:r2,archivo:file.name+' \u00b7 '+wb.SheetNames[1],fecha:new Date().toISOString()};
+      _cdSave(D);
+      showToast('Declaraciones: '+r1.length+' \u00b7 Consolidado: '+r2.length+' filas','ok');
+    } else {
+      var out=_cdParseRows(smartParseSheet(wb.Sheets[wb.SheetNames[0]]),tipo);
+      if(!out){ showToast('No se encontraron filas v\u00e1lidas','err'); return; }
+      D[tipo]={rows:out,archivo:file.name||'',fecha:new Date().toISOString()};
+      _cdSave(D);
+      showToast((tipo==='decl'?'Declaraciones':'Consolidado')+': '+out.length+' filas','ok');
+    }
+    renderCruceDecl();
+  }catch(err){ showToast('Error leyendo Excel: '+err.message,'err'); } };
+  rd.readAsArrayBuffer(file);
+}
+function _cdFile(inp,tipo){ var f=inp&&inp.files&&inp.files[0]; _cdHandleFile(f,tipo); if(inp)inp.value=''; }
+function _cdClear(tipo){ var D=_cdLoad(); if(tipo==='todo'){D={};}else delete D[tipo]; _cdSave(D); renderCruceDecl(); }
+/* ── Cruce difuso ── */
+function _cdCross(){
+  var D=_cdLoad();
+  var decl=(D.decl&&D.decl.rows)||[], sol=(D.sol&&D.sol.rows)||[];
+  /* 1) mapear docentes del consolidado al nombre formal de declaraciones */
+  var formales=[...new Set(decl.map(function(r){return r.doc;}))];
+  var dmap={};
+  [...new Set(sol.map(function(r){return r.doc;}))].forEach(function(sd){
+    dmap[sd]=_cdDocMatch(sd,formales)||sd;
+  });
+  /* 2) agrupar por docente(canónico)+CC */
+  var pairs={};
+  function pKey(doc,cc){ return _agNorm(doc)+'\u241F'+cc; }
+  decl.forEach(function(r){ var k=pKey(r.doc,r.cc); if(!pairs[k]) pairs[k]={doc:r.doc,cc:r.cc,progD:r.prog,progS:'',d:[],s:[]}; pairs[k].d.push(r); if(!pairs[k].progD)pairs[k].progD=r.prog; });
+  sol.forEach(function(r){ var cd=dmap[r.doc]; var k=pKey(cd,r.cc); if(!pairs[k]) pairs[k]={doc:cd,cc:r.cc,progD:'',progS:r.prog,d:[],s:[]}; pairs[k].s.push(r); if(!pairs[k].progS)pairs[k].progS=r.prog; });
+  /* 3) dentro de cada par, matchear actividades por similitud */
+  var out=[];
+  Object.keys(pairs).forEach(function(k){
+    var p=pairs[k];
+    var used={};
+    p.s.forEach(function(sr){
+      var best=-1,bs=0;
+      p.d.forEach(function(dr,i){ if(used[i])return; var sc=_cdSim(sr.act,dr.act); if(sc>bs){bs=sc;best=i;} });
+      if(best>=0&&bs>=0.5){
+        used[best]=1; var dr=p.d[best];
+        var dif=false; for(var i=0;i<12;i++){ if(Math.abs(dr.m[i]-sr.m[i])>0.01){dif=true;break;} }
+        out.push({doc:p.doc,cc:p.cc,prog:p.progD||p.progS,act:dr.act,actS:sr.act,d:{m:dr.m,tot:dr.tot,vh:dr.vh||0,pay:dr.pay||0},s:{m:sr.m,tot:sr.tot},est:dif?'dif':'ok',delta:Math.round((dr.tot-sr.tot)*100)/100,sim:bs});
+      } else {
+        out.push({doc:p.doc,cc:p.cc,prog:p.progS||p.progD,act:sr.act,actS:sr.act,d:null,s:{m:sr.m,tot:sr.tot},est:'soloS',delta:-sr.tot});
+      }
+    });
+    p.d.forEach(function(dr,i){ if(!used[i]) out.push({doc:p.doc,cc:p.cc,prog:p.progD,act:dr.act,actS:'',d:{m:dr.m,tot:dr.tot,vh:dr.vh||0,pay:dr.pay||0},s:null,est:'soloD',delta:dr.tot}); });
+  });
+  var ord={dif:0,soloS:1,soloD:2,ok:3};
+  out.sort(function(a,b){ return ord[a.est]-ord[b.est] || String(a.doc).localeCompare(String(b.doc),'es') || Math.abs(b.delta)-Math.abs(a.delta); });
+  return out;
+}
+function _cdMesesUsados(rows){
+  var use=[];
+  for(var i=0;i<12;i++){ var any=rows.some(function(e){ return (e.d&&e.d.m[i])||(e.s&&e.s.m[i]); }); if(any) use.push(i); }
+  return use;
+}
+function _cdUpCard(tipo,titulo,desc,clr){
+  var D=_cdLoad(); var d=D[tipo];
+  return '<div style="flex:1;min-width:270px;background:var(--surface);border:1px solid '+(d?clr:'var(--border)')+';border-radius:12px;padding:14px">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:16px">'+(tipo==='decl'?'\uD83D\uDCD1':'\uD83D\uDCCB')+'</span><span style="font-size:12px;font-weight:800;color:var(--t1)">'+titulo+'</span>'+(d?'<span style="margin-left:auto;font-size:10px;font-weight:800;color:'+clr+'">\u2713 '+d.rows.length+' filas</span>':'')+'</div>'+
+    '<div style="font-size:10px;color:var(--t3);line-height:1.6;margin-bottom:10px">'+desc+'</div>'+
+    (d?'<div style="font-size:10px;color:var(--t4);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(d.archivo)+'">\uD83D\uDCC4 '+esc(d.archivo)+'</div>':'')+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="document.getElementById(\'cdInp_'+tipo+'\').click()" style="flex:1;padding:8px;border-radius:8px;border:1px solid '+clr+';background:'+clr+'18;color:'+clr+';font-size:11px;font-weight:800;cursor:pointer">'+(d?'\uD83D\uDD04 Re-cargar':'\uD83D\uDCC1 Cargar')+'</button>'+
+      (d?'<button onclick="_cdClear(\''+tipo+'\')" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--red);font-size:11px;cursor:pointer">\uD83D\uDDD1</button>':'')+
+    '</div>'+
+    '<input type="file" id="cdInp_'+tipo+'" accept=".xlsx,.xls,.csv" style="display:none" onchange="_cdFile(this,\''+tipo+'\')">'+
+  '</div>';
+}
+function renderCruceDecl(){
+  var pg=$('page'); if(!pg) return;
+  var D=_cdLoad();
+  var head='<div class="pg-title">\uD83D\uDD00 Cruce Declaraciones <span style="font-size:10px;color:var(--t4);font-weight:400;margin-left:8px">declarado vs solicitado por coordinadora</span></div>'+
+    '<div style="background:var(--surface);border:1px solid var(--blue);border-radius:12px;padding:14px;margin-bottom:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:240px"><div style="font-size:12px;font-weight:800;color:var(--t1)">\uD83D\uDCE6 Reporte \u00fanico (recomendado)</div><div style="font-size:10px;color:var(--t3);margin-top:4px;line-height:1.6">Un solo Excel: <b style="color:var(--t2)">pesta\u00f1a 1</b> = Declaraciones (con Valor_Hora y Total Horas) \u00b7 <b style="color:var(--t2)">pesta\u00f1a 2</b> = Consolidado solicitado por la coordinadora</div></div>'+
+      '<button onclick="document.getElementById(\'cdInp_ambos\').click()" style="padding:10px 20px;border-radius:9px;border:1px solid var(--blue);background:rgba(56,139,253,.15);color:var(--blue);font-size:12px;font-weight:800;cursor:pointer">\uD83D\uDCC1 Cargar reporte \u00fanico</button>'+
+      ((D.decl||D.sol)?'<button onclick="_cdClear(\'todo\')" style="padding:10px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--red);font-size:11px;cursor:pointer">\uD83D\uDDD1 Borrar todo</button>':'')+
+      '<input type="file" id="cdInp_ambos" accept=".xlsx,.xls" style="display:none" onchange="_cdFile(this,\'ambos\')">'+
+    '</div>'+
+    '<details style="margin-bottom:14px"><summary style="font-size:10px;color:var(--t4);cursor:pointer">O cargar en archivos separados\u2026</summary>'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">'+
+      _cdUpCard('decl','Reporte de Declaraciones','Docente \u00b7 Programa \u00b7 Actividad \u00b7 <b style="color:var(--t2)">Valor_Hora</b> \u00b7 meses \u00b7 Total Horas','#388bfd')+
+      _cdUpCard('sol','Consolidado Coordinadora','Solicitado por la coordinadora: Docente \u00b7 Programa \u00b7 Actividad \u00b7 meses','#a78bfa')+
+    '</div></details>';
+  if(!D.decl||!D.sol){
+    pg.innerHTML=head+'<div style="background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:30px;text-align:center;color:var(--t3);font-size:12px">Carga el reporte para generar el cruce autom\u00e1tico.<br><span style="font-size:10px;color:var(--t4)">El cruce reconoce nombres en distinto formato (ej. "PATRICIO POLIZZI" = "POLIZZI RIVETTO PATRICIO ALEJANDRO"), el CC en distinto orden (ej. "8990 DEC_BL" = "DEC - CC 8990") y actividades escritas de forma similar.</span></div>';
+    return;
+  }
+  var rows=_cdCross();
+  window._cdRows=rows;
+  var nOk=rows.filter(function(r){return r.est==='ok';}).length;
+  var nDif=rows.filter(function(r){return r.est==='dif';}).length;
+  var nSD=rows.filter(function(r){return r.est==='soloD';}).length;
+  var nSS=rows.filter(function(r){return r.est==='soloS';}).length;
+  var totPay=rows.reduce(function(a,r){return a+((r.d&&r.d.pay)||0);},0);
+  var kpi=function(ico,val,lbl,clr){ return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:118px"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">'+ico+' '+lbl+'</div><div style="font-size:19px;font-weight:800;color:'+clr+';margin-top:4px">'+val+'</div></div>'; };
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  pg.innerHTML=head+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      kpi('\uD83D\uDCCE',rows.length,'Actividades','var(--t1)')+
+      kpi('\u2705',nOk,'Coinciden','#3fb950')+
+      kpi('\u26A0\uFE0F',nDif,'Con diferencias','#f0b429')+
+      kpi('\uD83D\uDFE3',nSS,'Solicitadas sin declarar','#a78bfa')+
+      kpi('\uD83D\uDD35',nSD,'Declaradas no solicitadas','#388bfd')+
+      kpi('\uD83D\uDCB0','$'+fmt(Math.round(totPay)),'Total a pagar','#f0b429')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+      '<select onchange="_CD.est=this.value;_cdFill()" style="'+selS+'"><option value="">Todos los estados</option><option value="dif"'+(_CD.est==='dif'?' selected':'')+'>\u26A0\uFE0F Con diferencias</option><option value="ok"'+(_CD.est==='ok'?' selected':'')+'>\u2705 Coinciden</option><option value="soloS"'+(_CD.est==='soloS'?' selected':'')+'>\uD83D\uDFE3 Solicitadas sin declarar</option><option value="soloD"'+(_CD.est==='soloD'?' selected':'')+'>\uD83D\uDD35 Declaradas no solicitadas</option></select>'+
+      '<input type="text" id="cdSearch" placeholder="\uD83D\uDD0D Buscar docente, CC o actividad..." value="'+esc(_CD.q||'')+'" style="flex:1;min-width:220px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<span id="cdCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+      '<button onclick="_cdExcel()" style="padding:7px 14px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Exportar cruce</button>'+
+    '</div>'+
+    '<div style="font-size:10px;color:var(--t4);margin-bottom:10px">Cada celda de mes muestra <b style="color:#388bfd">declarado</b> / <b style="color:#a78bfa">solicitado</b>. En rojo, los meses donde no coinciden. El cruce empareja nombres, CC y actividades aunque vengan escritos distinto en cada pesta\u00f1a.</div>'+
+    '<div id="cdWrap"></div>';
+  var inp=$('cdSearch'); if(inp) inp.oninput=function(){ _CD.q=this.value; clearTimeout(window._cdT); window._cdT=setTimeout(_cdFill,150); };
+  _cdFill();
+}
+function _cdFRows(){
+  var q=(_CD.q||'').toLowerCase();
+  return (window._cdRows||[]).filter(function(r){
+    if(_CD.est && r.est!==_CD.est) return false;
+    if(q && String(r.doc).toLowerCase().indexOf(q)<0 && String(r.cc).indexOf(q)<0 && String(r.prog).toLowerCase().indexOf(q)<0 && String(r.act).toLowerCase().indexOf(q)<0 && String(r.actS||'').toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+function _cdEstBadge(est){
+  if(est==='ok') return '<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#3fb95022;color:#3fb950;border:1px solid #3fb95055">\u2705 Coincide</span>';
+  if(est==='dif') return '<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#f0b42922;color:#f0b429;border:1px solid #f0b42955">\u26A0\uFE0F Difiere</span>';
+  if(est==='soloD') return '<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#388bfd22;color:#388bfd;border:1px solid #388bfd55">\uD83D\uDD35 No solicitada</span>';
+  return '<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#a78bfa22;color:#a78bfa;border:1px solid #a78bfa55">\uD83D\uDFE3 Sin declarar</span>';
+}
+function _cdFill(){
+  var wrap=$('cdWrap'); if(!wrap) return;
+  var rows=_cdFRows();
+  var cnt=$('cdCount'); if(cnt) cnt.textContent=rows.length+' actividad(es)';
+  var use=_cdMesesUsados(window._cdRows||[]);
+  var thS='padding:8px 9px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px';
+  var thM=use.map(function(i){return '<th style="padding:8px 7px;text-align:center;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+_CD_MLBL[i]+'</th>';}).join('');
+  wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:64vh"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:'+(780+use.length*74)+'px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+    '<th style="'+thS+'">Docente</th><th style="'+thS+'">CC / Actividad</th><th style="'+thS+'">Estado</th>'+thM+
+    '<th style="padding:8px 9px;text-align:center;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Total D/S</th>'+
+    '<th style="padding:8px 9px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Valor Hora</th>'+
+    '<th style="padding:8px 9px;text-align:right;font-size:9px;font-weight:700;color:#3fb950;text-transform:uppercase">Total a Pagar</th>'+
+    '</tr></thead><tbody>'+
+    (rows.length? rows.map(function(r){
+      var cells=use.map(function(i){
+        var dv=r.d?r.d.m[i]:null, sv=r.s?r.s.m[i]:null;
+        var dif=(dv!=null&&sv!=null)?Math.abs(dv-sv)>0.01:((dv||0)!==(sv||0));
+        var dTxt=r.d?(_hdFmt(dv)||'0'):'\u2014', sTxt=r.s?(_hdFmt(sv)||'0'):'\u2014';
+        if((dv==null||dv===0)&&(sv==null||sv===0)) return '<td style="padding:6px 7px;text-align:center;color:var(--t4)">\u2014</td>';
+        return '<td style="padding:6px 7px;text-align:center;font-variant-numeric:tabular-nums;background:'+(dif?'rgba(248,81,73,.10)':'transparent')+'"><span style="color:#388bfd;font-weight:700">'+dTxt+'</span><span style="color:var(--t4)"> / </span><span style="color:#a78bfa;font-weight:700">'+sTxt+'</span></td>';
+      }).join('');
+      var dT=r.d?_hdFmt(r.d.tot)||'0':'\u2014', sT=r.s?_hdFmt(r.s.tot)||'0':'\u2014';
+      var totDif=r.est!=='ok';
+      var actLine='<div style="color:var(--t1);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.act)+'">'+esc(abbr(r.act,42)||'\u2014')+'</div>';
+      if(r.actS&&r.actS!==r.act) actLine+='<div style="font-size:9px;color:#a78bfa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.actS)+'">\u2248 '+esc(abbr(r.actS,44))+'</div>';
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:7px 9px;color:var(--t1);font-weight:700;max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.doc)+'">'+esc(abbr(r.doc,26))+'</td>'+
+        '<td style="padding:7px 9px;max-width:250px"><span style="font-size:9px;font-weight:800;color:#34d6ff">CC '+esc(r.cc||'\u2014')+'</span> <span style="font-size:9px;color:var(--t4)">'+esc(abbr(r.prog,26))+'</span>'+actLine+'</td>'+
+        '<td style="padding:7px 9px;white-space:nowrap">'+_cdEstBadge(r.est)+'</td>'+
+        cells+
+        '<td style="padding:7px 9px;text-align:center;font-variant-numeric:tabular-nums;font-weight:800;background:'+(totDif?'rgba(240,180,41,.08)':'transparent')+'"><span style="color:#388bfd">'+dT+'</span><span style="color:var(--t4)"> / </span><span style="color:#a78bfa">'+sT+'</span>'+(r.est==='dif'?'<div style="font-size:9px;color:'+(r.delta>0?'#f0b429':'#f85149')+'">'+(r.delta>0?'+':'')+_hdFmt(r.delta)+'h</div>':'')+'</td>'+
+        '<td style="padding:7px 9px;text-align:right;color:var(--t2);font-variant-numeric:tabular-nums">'+(r.d&&r.d.vh?'$'+fmt(Math.round(r.d.vh)):'\u2014')+'</td>'+
+        '<td style="padding:7px 9px;text-align:right;font-variant-numeric:tabular-nums">'+(r.d&&r.d.pay?'<span style="color:#3fb950;font-weight:800">$'+fmt(Math.round(r.d.pay))+'</span>':'\u2014')+'</td>'+
+      '</tr>';
+    }).join('') : '<tr><td colspan="'+(6+use.length)+'" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
+    '</tbody></table></div>';
+}
+function _cdExcel(){
+  var rows=_cdFRows();
+  if(!rows.length){ showToast('No hay registros para exportar','err'); return; }
+  var use=_cdMesesUsados(window._cdRows||[]);
+  var EST={ok:'Coincide',dif:'Difiere',soloD:'Declarada no solicitada',soloS:'Solicitada sin declarar'};
+  var data=rows.map(function(r){
+    var o={'Docente':r.doc,'CC':r.cc,'Programa':r.prog,'Actividad (declaraci\u00f3n)':r.d?r.act:'','Actividad (consolidado)':r.actS||'','Estado':EST[r.est]};
+    use.forEach(function(i){ o[_CD_MLBL[i]+' Declarado']=r.d?Math.round(r.d.m[i]*100)/100:''; o[_CD_MLBL[i]+' Solicitado']=r.s?Math.round(r.s.m[i]*100)/100:''; });
+    o['Total Declarado']=r.d?Math.round(r.d.tot*100)/100:'';
+    o['Total Solicitado']=r.s?Math.round(r.s.tot*100)/100:'';
+    o['Diferencia (h)']=(r.d&&r.s)?Math.round((r.d.tot-r.s.tot)*100)/100:'';
+    o['Valor Hora']=r.d&&r.d.vh?Math.round(r.d.vh):'';
+    o['Total a Pagar']=r.d&&r.d.pay?Math.round(r.d.pay):'';
+    return o;
+  });
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Cruce Declaraciones');
+  XLSX.writeFile(wb,'Cruce_Declaraciones_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Cruce exportado','ok');
 }
 
 function _adnIsCerr(r){ return (r.estado==='APROBADO')||(r.nota!=null&&!isNaN(r.nota)&&r.nota>0); }
@@ -33337,6 +33670,8 @@ document.addEventListener('DOMContentLoaded', init);
       <button onclick="_agAsk('¿Hay topes?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Topes</button>
       <button onclick="_agAsk('¿Quién está sobrecargada?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Sobrecarga</button>
       <button onclick="_agAsk('¿Qué clases hay hoy?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Hoy</button>
+      <button onclick="_agAsk('¿Cómo va la declaración?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Declaración</button>
+      <button onclick="_agAsk('¿Quién está sin contrato?')" style="font-size:10px;padding:4px 9px;border:1px solid #30363d;border-radius:12px;background:#161b22;color:#8b949e;cursor:pointer">Sin contrato</button>
     </div>
     <div style="display:flex;gap:6px">
       <input id="agInput" placeholder="Escribe tu consulta…" onkeydown="if(event.key==='Enter')_agSend()" style="flex:1;padding:9px 11px;border:1px solid #30363d;border-radius:10px;background:#161b22;color:#e6edf3;font-size:13px">
@@ -33359,4 +33694,4 @@ document.addEventListener('DOMContentLoaded', init);
   </div>
 </div>
 </body>
-</html
+</html>
