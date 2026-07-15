@@ -10511,7 +10511,7 @@ var _dvoPag  = 1;
 const _PP = 40;
 
 // Filtros tab Declaraciones
-var _dfCC='', _dfMes='', _dfTipo='', _dfBus='', _dfEst='', _dfTipoProf='';
+var _dfCC='', _dfMes='', _dfTipo='', _dfBus='', _dfEst='', _dfTipoProf='', _dfVH='';
 // Filtros tab Pendientes
 var _dpCC='', _dpPer='', _dpSolo=false;
 
@@ -10961,7 +10961,8 @@ function _dvTabDecl(){
       '<input id="dfBusInput" type="text" value="'+esc(_dfBus)+'" placeholder="Docente, sigla…" '+
         'oninput="_dfBus=this.value;_dvoPag=1;_dvTabDecl()" '+
         'style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 10px;font-size:12px;width:170px"></div>'+
-    '<button onclick="_dfCC=\'\';_dfMes=\'\';_dfTipo=\'\';_dfTipoProf=\'\';_dfBus=\'\';_dfEst=\'\';_dvoPag=1;_dvTabDecl()" class="btn btn-ghost btn-sm" style="align-self:flex-end">✕ Limpiar</button>'+
+    '<button onclick="_dfCC=\'\';_dfMes=\'\';_dfTipo=\'\';_dfTipoProf=\'\';_dfBus=\'\';_dfEst=\'\';_dfVH=\'\';_dvoPag=1;_dvTabDecl()" class="btn btn-ghost btn-sm" style="align-self:flex-end">✕ Limpiar</button>'+
+    mkS('dfSelVH','Valor Hora',[{v:'1',l:'⚠️ Distinto valor hora'}],_dfVH,'_dfVH=this.value;_dvoPag=1;_dvTabDecl()')+
     '<button onclick="_dvExportDecl()" class="btn btn-ghost btn-sm" style="align-self:flex-end">📊 Exportar</button>'+
   '</div>';
 
@@ -10975,13 +10976,35 @@ function _dvTabDecl(){
       '(mismo Docente + CC + Sigla). Las horas fueron sumadas correctamente.</span>'+
     '</div>':'';
 
+  // ── Indicador: docentes con distinto Valor Hora ───────────────
+  var vh=_dvVHData();
+  window._dvVHProfs=vh.profs;
+  var vhAlert='';
+  if(vh.docs.length){
+    var prev=vh.docs.slice(0,3).map(function(dd){
+      return '<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--t1)">'+
+        esc(abbr(dd.prof,24))+' <b style="color:#f85149">'+dd.vals.map(function(v){return '$'+fmt(Math.round(v.ph));}).join(' \u2260 ')+'</b></span>';
+    }).join(' ');
+    vhAlert='<div style="padding:11px 14px;margin-bottom:10px;background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.35);border-radius:9px">'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<span style="font-size:17px">🚨</span>'+
+        '<span style="font-size:12px;color:var(--t1)"><strong style="color:#f85149">'+vh.docs.length+' docente(s) con distinto Valor Hora</strong> en sus declaraciones — esto no debe ocurrir.</span>'+
+        '<button onclick="_dfVH=_dfVH?\'\':\'1\';_dvoPag=1;_dvTabDecl()" style="padding:5px 12px;border-radius:7px;border:1px solid #f85149;background:'+(_dfVH?'#f85149':'rgba(248,81,73,.12)')+';color:'+(_dfVH?'#fff':'#f85149')+';font-size:11px;font-weight:800;cursor:pointer">'+(_dfVH?'✓ Filtro activo · quitar':'🔎 Filtrar afectados')+'</button>'+
+        '<button onclick="_dvVHExcel()" style="padding:5px 12px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">📊 Descargar para corregir</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+prev+(vh.docs.length>3?'<span style="font-size:10px;color:var(--t4);align-self:center">… y '+(vh.docs.length-3)+' más</span>':'')+'</div>'+
+    '</div>';
+  } else if(_dvo.length){
+    vhAlert='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;margin-bottom:10px;background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.25);border-radius:8px;font-size:11px;color:var(--t2)"><span>✅</span> Valor hora consistente: ningún docente tiene valores distintos.</div>';
+  }
+
   var d=_dvFiltDecl();
   var tp=Math.max(1,Math.ceil(d.length/_PP));
   if(_dvoPag>tp)_dvoPag=tp;
   var st=(_dvoPag-1)*_PP, sl=d.slice(st,st+_PP);
 
   // ── Thead ─────────────────────────────────────────────────────
-  var h=filHtml+status+dupeAlert+
+  var h=filHtml+status+vhAlert+dupeAlert+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">'+
       'Mostrando <strong>'+(st+1)+'–'+Math.min(st+_PP,d.length)+'</strong> de <strong>'+d.length+'</strong> registros consolidados'+
     '</div>'+
@@ -11057,6 +11080,7 @@ function _dvTabDecl(){
         esc(abbr(r.profesor,24))+
         (isHora?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;'+
           'background:rgba(37,99,235,.12);color:var(--blue);margin-left:4px">HORA</span>':'')+
+        ((window._dvVHProfs&&window._dvVHProfs.has(r.profesor))?'<span title="Este docente tiene DISTINTOS valores hora en sus declaraciones \u2014 revisar" style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:6px;background:rgba(248,81,73,.15);color:#f85149;margin-left:4px;cursor:help">\u2260 VH</span>':'')+
       '</td>'+
 
       '<td style="font-size:10px;color:var(--t4)">'+esc(r.rut)+'</td>'+
@@ -11402,8 +11426,59 @@ function _dvFmtFecha(v) {
 function _dvPad(n) { return String(n).padStart(2,'0'); }
 
 
+/* ── Docentes con distinto Valor Hora (no debe ocurrir) ────── */
+function _dvVHData(){
+  var map={};
+  _dvo.forEach(function(r){
+    if(!r.phora||r.phora<=0) return;
+    var k=r.rut||r.profesor; if(!k) return;
+    if(!map[k]) map[k]={rut:r.rut,prof:r.profesor,vals:{}};
+    var e=map[k]; if(r.profesor&&(!e.prof||r.profesor.length>e.prof.length)) e.prof=r.profesor;
+    var pk=String(Math.round(r.phora));
+    if(!e.vals[pk]) e.vals[pk]={ph:r.phora,n:0,ccs:{},acts:{},tipos:{}};
+    e.vals[pk].n++; if(r.cc)e.vals[pk].ccs[r.cc]=1; if(r.actNom)e.vals[pk].acts[r.actNom]=1; if(r.tipoProf)e.vals[pk].tipos[r.tipoProf]=1;
+  });
+  var docs=[];
+  Object.keys(map).forEach(function(k){
+    var e=map[k]; var vs=Object.keys(e.vals).map(function(p){return e.vals[p];});
+    if(vs.length<2) return;
+    vs.sort(function(a,b){return b.ph-a.ph;});
+    docs.push({rut:e.rut,prof:e.prof,vals:vs,max:vs[0].ph,min:vs[vs.length-1].ph});
+  });
+  docs.sort(function(a,b){return (b.max-b.min)-(a.max-a.min);});
+  var profs=new Set(); docs.forEach(function(d){profs.add(d.prof);});
+  return {docs:docs,profs:profs};
+}
+function _dvVHExcel(){
+  var vh=_dvVHData();
+  if(!vh.docs.length){ showToast('No hay docentes con distinto valor hora','ok'); return; }
+  var data=[];
+  vh.docs.forEach(function(d){
+    d.vals.forEach(function(v,i){
+      data.push({
+        'RUT':d.rut,'Docente':d.prof,
+        'Tipo Profesor':Object.keys(v.tipos||{}).join(', '),
+        'Valor Hora':Math.round(v.ph),
+        'N\u00b0 Movimientos':v.n,
+        'CC(s)':Object.keys(v.ccs).join(', '),
+        'Actividades (ejemplos)':Object.keys(v.acts).slice(0,4).join(' \u00b7 '),
+        'Diferencia vs menor':i<d.vals.length-1?Math.round(v.ph-d.min):0,
+        'Observaci\u00f3n':i===0?('Tiene '+d.vals.length+' valores hora distintos \u2014 REVISAR Y CORREGIR'):''
+      });
+    });
+    data.push({'RUT':'','Docente':'','Tipo Profesor':'','Valor Hora':'','N\u00b0 Movimientos':'','CC(s)':'','Actividades (ejemplos)':'','Diferencia vs menor':'','Observaci\u00f3n':''});
+  });
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:13},{wch:34},{wch:18},{wch:11},{wch:13},{wch:16},{wch:52},{wch:16},{wch:44}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Valor Hora Inconsistente');
+  XLSX.writeFile(wb,'Docentes_Valor_Hora_Distinto_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Informe descargado \u2014 listo para enviar a correcci\u00f3n','ok');
+}
 function _dvFiltDecl(){
+  var vhProfs=_dfVH?(window._dvVHProfs||new Set()):null;
   return _dvoCons.filter(function(r){
+    if(vhProfs && !vhProfs.has(r.profesor)) return false;
     if(_dfCC   && r.cc!==_dfCC)        return false;
     if(_dfMes  && r.mesIni!==_dfMes)   return false;
     if(_dfTipo && r.tipoAct!==_dfTipo) return false;
@@ -11687,7 +11762,7 @@ function dvoToggleHora(idx) {
 
 /* ── Reset ────────────────────────────────────────────── */
 function dvoReset(){
-  _dvo=[]; _dvoCons=[]; _dfCC=''; _dfMes=''; _dfTipo=''; _dfTipoProf=''; _dfBus=''; _dfEst=''; _dvoPag=1;
+  _dvo=[]; _dvoCons=[]; _dfCC=''; _dfMes=''; _dfTipo=''; _dfTipoProf=''; _dfBus=''; _dfEst=''; _dfVH=''; _dvoPag=1;
   renderDeclarado();
 }
 function dvoCargar(file){
@@ -11779,7 +11854,7 @@ function dvoCargar(file){
         '<a href="#" onclick="dvoReset();return false" style="color:var(--blue)">cambiar archivo</a>';
 
       // Resetear filtros y mostrar tabla
-      _dfCC='';_dfMes='';_dfTipo='';_dfBus='';_dfEst='';_dvoPag=1;
+      _dfCC='';_dfMes='';_dfTipo='';_dfBus='';_dfEst='';_dfVH='';_dvoPag=1;
       _dvKpi(); _dvSetTab('decl');
 
     }catch(err){
