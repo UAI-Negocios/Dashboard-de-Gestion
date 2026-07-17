@@ -31713,7 +31713,8 @@ function renderInfoDeclMes(){
       '<button onclick="_idmPDF()" style="padding:7px 14px;border-radius:7px;border:1px solid #a78bfa;background:rgba(167,139,250,.12);color:#a78bfa;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCC4 Descargar Informe</button>'+
       '<button onclick="_idmExcel()" style="padding:7px 14px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Excel</button>'+
     '</div>'+
-    '<div id="idmWrap"></div>';
+    '<div id="idmWrap"></div>'+
+    '<div id="idmMesWrap" style="margin-top:22px"></div>';
   var inp=$('idmSearch'); if(inp) inp.oninput=function(){ _IDM.q=this.value; clearTimeout(window._idmT); window._idmT=setTimeout(_idmFill,150); };
   _idmFill();
 }
@@ -31760,8 +31761,104 @@ function _idmFill(){
     }).join('') : '<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
     '</tbody></table></div>'+
     '<div style="font-size:10px;color:var(--t4);margin-top:8px">\u2139\uFE0F Una fila por actividad: horas declaradas = suma de los movimientos de esa actividad (del mes filtrado) \u00b7 horas obligatorias seg\u00fan la actividad \u00b7 Monto contrato y fecha de emisi\u00f3n corresponden al total del docente en ese CC.</div>';
+  _idmMesFill();
 }
 /* ── Exportar Excel ── */
+/* ── Consolidado mensual (formato coordinadora) ────────────── */
+function _idmShortName(formal){
+  var s=String(formal||'').trim(); if(!s) return '';
+  if(s.indexOf(',')>=0){
+    var p=s.split(',');
+    var ap=p[0].trim().split(/\s+/)[0]||'';
+    var no=(p[1]||'').trim().split(/\s+/)[0]||'';
+    return (no+' '+ap).trim();
+  }
+  return s;
+}
+function _idmProgFmt(prog){
+  var s=String(prog||'').trim();
+  var cc=(s.match(/^(\d{3,})/)||[])[1]||'';
+  var rest=s.replace(/^\d+\s*/,'');
+  var ab=(rest.match(/[A-Za-z\u00c0-\u00ff&]+/)||[])[0]||rest.split(/\s+/)[0]||'';
+  return cc?(ab.toUpperCase()+' - CC '+cc):s;
+}
+function _idmMesBuild(){
+  var MES_IDX={}; _IDM_MESES.forEach(function(m,i){MES_IDX[m]=i;});
+  var map={};
+  (_ctRawDecl||[]).forEach(function(r){
+    var mes=String(r['Mes']||'').trim(); var mi=MES_IDX[mes];
+    var rut=String(r['NumeroDocumento']||'').trim();
+    var prof=String(r['Profesor']||'').trim();
+    var cc=String(r['programa_centrocosto']||'').trim();
+    var act=String(r['ActividadNombre']||'').trim()||String(r['ActividadCodigo']||'').trim();
+    if(!prof&&!act) return;
+    var k=(rut||prof)+'\u241F'+cc+'\u241F'+act;
+    if(!map[k]) map[k]={doc:_idmShortName(prof),prog:_idmProgFmt(String(r['Programa']||'').trim()),progFull:String(r['Programa']||'').trim(),act:act,m:[0,0,0,0,0,0,0,0,0,0,0,0],tot:0};
+    var hrs=(parseFloat(r['movimiento_horas_lv'])||0)+(parseFloat(r['movimiento_horas_sd'])||0);
+    if(mi!=null&&mi>=0) map[k].m[mi]+=hrs;
+    map[k].tot+=hrs;
+  });
+  var out=Object.keys(map).map(function(k){return map[k];}).filter(function(r){return r.tot>0.001;});
+  out.sort(function(a,b){ return b.tot-a.tot || a.doc.localeCompare(b.doc,'es'); });
+  return out;
+}
+function _idmMesRows(){
+  var all=_idmMesBuild();
+  var ccSel=_idmCCSel(); var q=(_IDM.q||'').toLowerCase();
+  var rows=all.filter(function(r){
+    if(ccSel.size && !ccSel.has(r.progFull)) return false;
+    if(_IDM.mes){ var mi=_IDM_MESES.indexOf(_IDM.mes); if(mi<0||!r.m[mi]) return false; }
+    if(q && r.doc.toLowerCase().indexOf(q)<0 && r.prog.toLowerCase().indexOf(q)<0 && r.act.toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+  if(_IDM.mes){ var mi2=_IDM_MESES.indexOf(_IDM.mes); rows=rows.slice().sort(function(a,b){return b.m[mi2]-a.m[mi2];}); }
+  return rows;
+}
+function _idmMesFill(){
+  var wrap=$('idmMesWrap'); if(!wrap) return;
+  var rows=_idmMesRows();
+  var use=[];
+  for(var i=0;i<12;i++){ if(rows.some(function(r){return r.m[i]>0.001;})) use.push(i); }
+  var thS='padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px';
+  wrap.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<div style="font-size:12px;font-weight:800;color:var(--t1)">\uD83D\uDCC5 Consolidado mensual por actividad</div>'+
+      '<span style="font-size:10px;color:var(--t4)">formato coordinadora \u00b7 desde el reporte de declaraciones de Gesti\u00f3n C./Declaraci\u00f3n \u00b7 '+rows.length+' actividad(es)</span>'+
+      '<button onclick="_idmMesExcel()" style="margin-left:auto;padding:6px 13px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Descargar tabla</button>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:60vh"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:'+(560+use.length*72)+'px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+      '<th style="'+thS+'">Docente</th><th style="'+thS+'">Programa</th><th style="'+thS+'">Actividad</th>'+
+      use.map(function(i){return '<th style="padding:8px 8px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">'+_IDM_MESES[i]+'</th>';}).join('')+
+      '<th style="padding:8px 10px;text-align:right;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Total</th>'+
+    '</tr></thead><tbody>'+
+    (rows.length? rows.map(function(r){
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:7px 10px;color:var(--t1);font-weight:700;white-space:nowrap">'+esc(r.doc)+'</td>'+
+        '<td style="padding:7px 10px;white-space:nowrap"><span style="font-size:10px;font-weight:800;color:#34d6ff">'+esc(r.prog)+'</span></td>'+
+        '<td style="padding:7px 10px;color:var(--t2);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.act)+'">'+esc(r.act)+'</td>'+
+        use.map(function(i){ var v=r.m[i]; return '<td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:'+(v?'var(--t1)':'var(--t4)')+';font-weight:'+(v?'700':'400')+'">'+(v?_hdFmt(v):'-')+'</td>'; }).join('')+
+        '<td style="padding:7px 10px;text-align:right;color:#f0b429;font-weight:800;font-variant-numeric:tabular-nums">'+_hdFmt(r.tot)+'</td>'+
+      '</tr>';
+    }).join('') : '<tr><td colspan="'+(4+use.length)+'" style="padding:26px;text-align:center;color:var(--t3)">Sin datos</td></tr>')+
+    '</tbody></table></div>';
+}
+function _idmMesExcel(){
+  var rows=_idmMesRows();
+  if(!rows.length){ showToast('No hay datos para exportar','err'); return; }
+  var use=[]; for(var i=0;i<12;i++){ if(rows.some(function(r){return r.m[i]>0.001;})) use.push(i); }
+  var data=rows.map(function(r){
+    var o={'Docente':r.doc,'Programa':r.prog,'Actividad':r.act};
+    use.forEach(function(i){ o[_IDM_MESES[i]]=r.m[i]?Math.round(r.m[i]*100)/100:'-'; });
+    o['Total']=Math.round(r.tot*100)/100;
+    return o;
+  });
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:24},{wch:16},{wch:52}].concat(use.map(function(){return {wch:9};})).concat([{wch:9}]);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Consolidado Mensual');
+  XLSX.writeFile(wb,'Consolidado_Mensual_Declaracion_'+(_IDM.mes||'Todos')+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Tabla descargada','ok');
+}
 function _idmExcel(){
   var rows=_idmFRows();
   if(!rows.length){ showToast('No hay registros para exportar','err'); return; }
@@ -31817,11 +31914,49 @@ function _idmPDF(){
       '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap">'+esc(r.fechaEmi||'\u2014')+'</td>'+
     '</tr>';
   }).join('');
+
+  /* ── Sección 2: Consolidado mensual por actividad ── */
+  var mesRows=_idmMesRows();
+  var mesUse=[]; for(var mi=0;mi<12;mi++){ if(mesRows.some(function(r){return r.m[mi]>0.001;})) mesUse.push(mi); }
+  var mesThs=mesUse.map(function(i){return '<th style="padding:7px 8px;text-align:right;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">'+_IDM_MESES[i]+'</th>';}).join('');
+  var mesTrs=mesRows.map(function(r,i){
+    return '<tr style="background:'+(i%2?'#f6f8fa':'#fff')+'">'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap;font-weight:600">'+esc(r.doc)+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap"><b style="color:#0969da">'+esc(r.prog)+'</b></td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec">'+esc(r.act)+'</td>'+
+      mesUse.map(function(mi2){ var v=r.m[mi2]; return '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;text-align:right;white-space:nowrap;color:'+(v?'#1c2128':'#aab')+'">'+(v?_hdFmt(v):'-')+'</td>'; }).join('')+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;text-align:right;white-space:nowrap"><b>'+_hdFmt(r.tot)+'</b></td>'+
+    '</tr>';
+  }).join('');
+  var mesTots=mesUse.map(function(mi3){ var s=0; mesRows.forEach(function(r){s+=r.m[mi3];}); return s; });
+  var mesGran=mesRows.reduce(function(a,r){return a+r.tot;},0);
+  var mesSection=!mesRows.length?'':
+    '<div style="page-break-before:always"></div>'+
+    '<div style="border-bottom:2px solid #0969da;padding-bottom:8px;margin:4px 0 12px;display:flex;justify-content:space-between;align-items:flex-end">'+
+      '<div><div style="font-size:9px;font-weight:700;color:#0969da;letter-spacing:1.5px;text-transform:uppercase">Secci\u00f3n 2</div>'+
+      '<div style="font-size:16px;font-weight:800">Consolidado Mensual por Actividad</div>'+
+      '<div style="font-size:9.5px;color:#555;margin-top:2px">Horas declaradas por mes seg\u00fan el reporte de declaraciones \u00b7 '+mesRows.length+' actividades</div></div>'+
+      '<div style="font-size:9px;color:#667;text-align:right">Total general<br><b style="font-size:12px;color:#1c2128">'+_hdFmt(mesGran)+' h</b></div>'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse">'+
+      '<thead><tr style="background:#0969da;color:#fff">'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Docente</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Programa</th>'+
+        '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Actividad</th>'+
+        mesThs+
+        '<th style="padding:7px 8px;text-align:right;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Total</th>'+
+      '</tr></thead><tbody>'+mesTrs+
+      '<tr style="background:#eef2f7;border-top:2px solid #0969da"><td colspan="3" style="padding:7px 8px;font-weight:800;text-align:right">TOTAL</td>'+
+        mesUse.map(function(mi4,ix){return '<td style="padding:7px 8px;text-align:right;font-weight:800;white-space:nowrap">'+_hdFmt(mesTots[ix])+'</td>';}).join('')+
+        '<td style="padding:7px 8px;text-align:right;font-weight:800;white-space:nowrap">'+_hdFmt(mesGran)+'</td></tr>'+
+      '</tbody></table>';
+
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe de Declaraci\u00f3n \u00b7 '+esc(periodo)+'</title>'+
     '<style>@page{size:letter landscape;margin:12mm}body{font-family:Segoe UI,Arial,sans-serif;color:#1c2128;margin:0;font-size:9.5px}@media print{.noprint{display:none}}</style></head><body>'+
     '<div style="border-bottom:3px solid #0969da;padding-bottom:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end">'+
       '<div><div style="font-size:10px;font-weight:700;color:#0969da;letter-spacing:1.5px;text-transform:uppercase">Universidad Adolfo Ib\u00e1\u00f1ez \u00b7 Direcci\u00f3n de Postgrados</div>'+
       '<div style="font-size:20px;font-weight:800;margin-top:4px">Informe de Declaraci\u00f3n de Horas por Actividad</div>'+
+      '<div style="font-size:9px;color:#0969da;font-weight:700;margin-top:2px;letter-spacing:.5px">SECCI\u00d3N 1: DETALLE POR ACTIVIDAD \u00b7 SECCI\u00d3N 2: CONSOLIDADO MENSUAL</div>'+
       '<div style="font-size:10.5px;color:#555;margin-top:2px">Per\u00edodo: <b>'+esc(periodo)+'</b> \u00b7 CC/Programa: <b>'+esc(ccTxt)+'</b>'+(_IDM.est?' \u00b7 Filtro: '+(_IDM.est==='sin'?'Sin contrato':_IDM.est==='inc'?'Declaraci\u00f3n incompleta':'Completa'):'')+'</div></div>'+
       '<div style="text-align:right;font-size:9px;color:#667">Fecha de emisi\u00f3n del informe<br><b style="font-size:11px;color:#1c2128">'+hoy+'</b></div>'+
     '</div>'+
@@ -31845,6 +31980,7 @@ function _idmPDF(){
         '<th style="padding:7px 8px;text-align:right;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Monto Contrato</th>'+
         '<th style="padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.4px">Fecha Emisi\u00f3n</th>'+
       '</tr></thead><tbody>'+trs+'</tbody></table>'+
+    mesSection+
     '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #d8dce3;font-size:8px;color:#778;display:flex;justify-content:space-between">'+
       '<span>Una fila por actividad: horas declaradas = suma de movimientos de la actividad en el per\u00edodo \u00b7 horas obligatorias seg\u00fan la actividad \u00b7 Monto de contrato corresponde al total del docente en ese centro de costo (Reporte de Contratos de Honorarios).</span>'+
       '<span>Dashboard Postgrado UAI \u00b7 Generado el '+hoy+'</span>'+
