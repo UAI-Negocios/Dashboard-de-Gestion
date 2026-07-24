@@ -359,7 +359,7 @@ function leerCalendarioMejor(hojas) {
       t + b.sesiones.filter(s => s.fecha).length, 0);
     if (conFecha < MIN_SESIONES) { if (conFecha) omitidas.push(h.nombre); continue; }
     return Object.assign({}, r, {
-      hoja: h.nombre, hojas: [h.nombre], conFecha,
+      hoja: h.nombre, hojas: [h.nombre], conFecha, totales: r.totales || [],
       otrasHojas: hojas.filter(x => x.nombre !== h.nombre).map(x => x.nombre),
     });
   }
@@ -482,9 +482,11 @@ function detectarEncabezado(filas) {
 }
 
 function leerCalendarioTabular(filas, hdr) {
-  const map = hdr.map, bloques = [], notas = [], porNombre = new Map();
+  const map = hdr.map, bloques = [], notas = [], porNombre = new Map(), totales = [];
   const cel = (r, k) => (map[k] !== undefined && r[map[k]] != null) ? r[map[k]] : '';
   let tituloModulo = '', colHoras = map.horas;
+  // acumulador del tramo actual: horas leídas desde el último total declarado
+  let segAcc = 0, segN = 0, segIni = 0, segClaves = new Set();
 
   // ¿La columna TEMA hace de nombre de asignatura? Ocurre cuando no hay columna
   // "Asignatura" y los temas no son etiquetas genéricas ("Clase 1", "Examen").
@@ -540,6 +542,22 @@ function leerCalendarioTabular(filas, hdr) {
         if (nom) tituloModulo = nom;
         continue;
       }
+      // fila de TOTAL declarado: un número suelto (en la columna de horas, o el único
+      // valor numérico de la fila) sin día/asignatura/tema. Cierra el tramo y se compara
+      // con la suma de horas realmente leídas desde el total anterior.
+      let numTot = colHoras !== undefined ? num(r[colHoras]) : 0;
+      const hayTexto = [cel(r, 'dia'), asigCel, temaCel].some(x => String(x).trim());
+      if (!numTot && !hayTexto) {
+        const nums = r.map(num).filter(x => x > 0);
+        if (nums.length === 1) numTot = nums[0];
+      }
+      if (numTot > 0 && !hayTexto) {
+        if (segN > 0) totales.push({ fila: n, declarado: numTot,
+          leido: Math.round(segAcc * 100) / 100, sesiones: segN, desde: segIni,
+          bloques: segClaves.size });
+        segAcc = 0; segN = 0; segIni = 0; segClaves.clear();
+        continue;
+      }
       if (temaCel && !asigCel) notas.push({ fila: n, texto: temaCel });
       continue;
     }
@@ -553,33 +571,44 @@ function leerCalendarioTabular(filas, hdr) {
     const horas = colHoras !== undefined ? num(r[colHoras]) : 0;
     if (!horas && !horario) continue;               // fila vacía / feriado
 
-    const principal = asigCel || (temaEsAsignatura ? temaCel : '') || tituloModulo;
+    // Nombre de la asignatura a la que pertenece la sesión, por prioridad:
+    //  1) columna "Asignatura" explícita
+    //  2) el MÓDULO vigente (cada módulo es una asignatura; sus sesiones —clases,
+    //     examen, charla— se agrupan juntas aunque el TEMA de cada fila difiera)
+    //  3) la columna TEMA, solo cuando no hay módulos y el TEMA hace de asignatura (DGN)
+    let principal, alt = '';
+    if (asigCel) { principal = asigCel; alt = tituloModulo; }
+    else if (tituloModulo) { principal = tituloModulo; }
+    else if (temaEsAsignatura) { principal = temaCel; }
+    else { principal = ''; }
     const nombre = tituloBase(principal);
     if (!nombre) continue;
-    // nombre alternativo: si agrupamos por tema, el módulo que lo contiene puede ser
-    // la asignatura real de la malla (y viceversa). El emparejador probará ambos.
-    const alt = (tituloModulo && norm(tituloModulo) !== norm(nombre)) ? tituloModulo : '';
+    // el TEMA es el nombre de la asignatura solo cuando agrupamos por él (caso 3)
+    const temaComoNombre = !asigCel && !tituloModulo && temaEsAsignatura;
+    if (alt && norm(alt) === norm(nombre)) alt = '';
     const clave = norm(nombre);
     if (!porNombre.has(clave)) {
       const b = { titulo: nombre, alt, sesiones: [], total: null, fila: n };
       porNombre.set(clave, b); bloques.push(b);
     }
-    // si TEMA es el nombre de la asignatura, el tipo de sesión sale de la columna Sesión
+    // tipo de sesión: si el TEMA es el nombre de la asignatura, se deriva de la columna
+    // Sesión; en cualquier otro caso el TEMA describe el contenido/tipo de la sesión.
     const sesCel = String(cel(r, 'sesion')).trim();
     let tipo;
-    if (temaEsAsignatura) tipo = /^EX(AMEN)?$/.test(norm(sesCel)) ? 'Examen' : (sesCel || 'Clase');
+    if (temaComoNombre) tipo = /^EX(AMEN)?$/.test(norm(sesCel)) ? 'Examen' : (sesCel || 'Clase');
     else tipo = temaCel || 'Clase';
 
     porNombre.get(clave).sesiones.push({
       dia: String(cel(r, 'dia')).trim(), fecha, horario,
-      tipo, temaCol: !temaEsAsignatura && map.tema !== undefined && !!temaCel, horas,
+      tipo, temaCol: !temaComoNombre && map.tema !== undefined && !!temaCel, horas,
       docente: String(cel(r, 'profesor')).trim(), fila: n,
       sede: String(cel(r, 'sede')).trim(), sala: String(cel(r, 'sala')).trim(),
       modalidad: String(cel(r, 'modalidad')).trim(),
       sesion: String(cel(r, 'sesion')).trim(),
     });
+    segAcc += horas; segN++; if (!segIni) segIni = n; segClaves.add(clave);
   }
-  return { bloques: bloques.filter(b => b.sesiones.length), notas, formato: 'tabular' };
+  return { bloques: bloques.filter(b => b.sesiones.length), notas, totales, formato: 'tabular' };
 }
 
 function leerCalendario(filas) {
@@ -588,7 +617,7 @@ function leerCalendario(filas) {
 }
 
 function leerCalendarioBloques(filas) {
-  const bloques = [], notas = [];
+  const bloques = [], notas = [], totales = [];
   let actual = null;
   filas.forEach((r0, i) => {
     const n = i + 1;
@@ -609,7 +638,12 @@ function leerCalendarioBloques(filas) {
       return;
     }
     if (!c0 && !c1 && !c2 && !c3 && horas > 0) {
-      if (actual && actual.total === null) actual.total = horas;
+      if (actual && actual.total === null) {
+        actual.total = horas;
+        const leido = actual.sesiones.reduce((t, s) => t + s.horas, 0);
+        totales.push({ fila: n, declarado: horas, leido: Math.round(leido * 100) / 100,
+          sesiones: actual.sesiones.length, titulo: actual.titulo, bloques: 1 });
+      }
       return;
     }
     if (!c0 && !c1 && c2 && horas > 0) {
@@ -624,7 +658,7 @@ function leerCalendarioBloques(filas) {
       bloques.push(actual);
     }
   });
-  return { bloques: bloques.filter(b => b.sesiones.length), notas, formato: 'bloques' };
+  return { bloques: bloques.filter(b => b.sesiones.length), notas, totales, formato: 'bloques' };
 }
 
 const horasProg = b => b.sesiones.reduce((t, s) => t + s.horas, 0);
@@ -669,7 +703,7 @@ function emparejar(bloques, malla) {
 }
 
 /* ----------------------------- validaciones ----------------------------- */
-function analizar(malla, bloques, notas, modalidad) {
+function analizar(malla, bloques, notas, modalidad, totales) {
   const H = [];
   const add = (nivel, categoria, entidad, mensaje, recomendacion = '') =>
     H.push({ nivel, categoria, entidad, mensaje, recomendacion, modalidad });
@@ -773,12 +807,8 @@ function analizar(malla, bloques, notas, modalidad) {
       add('OK', 'HP vs programado', `${a.sigla} ${a.nombre}`, `HP calzan exactamente: ${a.hp} h.`);
     }
 
-    if (totDec !== null && Math.abs(totDec - prog) > 0.01) {
-      add('ADVERTENCIA', 'Total declarado', `${a.sigla} ${a.nombre}`,
-        `El total escrito en el calendario (${totDec} h) no coincide con la suma real de sesiones (${prog} h).`,
-        'Corregir la fórmula/celda de total en el calendario.');
-      fila.hallazgos.push('Total declarado inconsistente');
-    }
+    // (la coherencia de los totales declarados vs la suma de sesiones se valida de forma
+    //  global y por tramo en la sección "Integridad de horas")
 
     const sinDoc = ses.filter(s => !String(s.docente).trim());
     if (sinDoc.length) {
@@ -848,6 +878,32 @@ function analizar(malla, bloques, notas, modalidad) {
       hallazgos: ['CRITICO: sin calendario'], detalle_sesiones: [],
     });
   });
+
+  /* 4b. Cross-check de integridad: los totales declarados en el calendario (las filas
+     con el número de horas del módulo) deben coincidir con la suma de las sesiones que
+     el lector agrupó en ese tramo. Detecta automáticamente sesiones perdidas, duplicadas
+     o mal leídas, sin depender de la malla. */
+  let totOK = 0, totMal = 0;
+  (totales || []).forEach(t => {
+    const calza = Math.abs(t.declarado - t.leido) < 0.01;
+    if (calza) { totOK++; return; }
+    // Solo se marca cuando el total corresponde a UNA asignatura (señal inequívoca de
+    // lectura). Si el tramo mezcla varias asignaturas y no calza, el total podría ser
+    // parcial (cubre solo un módulo del tramo), así que no se marca para no dar falsos
+    // positivos.
+    if ((t.bloques || 1) > 1) return;
+    totMal++;
+    const ent = t.titulo ? t.titulo : (t.desde ? `tramo desde fila ${t.desde}` : `fila ${t.fila}`);
+    add('CRITICO', 'Integridad de horas', ent,
+      `El total declarado en el calendario (fila ${t.fila}) dice ${t.declarado} h, pero la ` +
+      `suma de las ${t.sesiones} sesión(es) leídas en ese tramo es ${t.leido} h ` +
+      `(diferencia ${(t.leido - t.declarado > 0 ? '+' : '')}${Math.round((t.leido - t.declarado) * 100) / 100} h).`,
+      'Revisar el calendario: puede haber una sesión sin registrar, una fila repetida o una ' +
+      'celda de horas mal escrita en ese tramo.');
+  });
+  if (totales && totales.length && !totMal)
+    add('OK', 'Integridad de horas', 'Calendario',
+      `Los ${totOK} total(es) declarado(s) coinciden con la suma de sus sesiones.`);
 
   /* 5. bloques fuera de malla */
   const extras = [];
@@ -1321,7 +1377,7 @@ async function cargarCalendarios(files){
       if(m) et=m[0][0].toUpperCase()+m[0].slice(1).toLowerCase();
       else et=et.replace(/calendario\s*/i,'').split(/[_(]/)[0].trim().slice(0,28)||et;
       ST.calendarios.push({archivo:f.name, etiqueta:et, bloques:R.bloques, notas:R.notas,
-                           hoja:R.hoja, formato:R.formato, otrasHojas:R.otrasHojas||[]});
+                           totales:R.totales||[], hoja:R.hoja, formato:R.formato, otrasHojas:R.otrasHojas||[]});
       ST.datos=null;
     }catch(e){ ST.error='Error al leer "'+f.name+'": '+e.message; }
   }
@@ -1338,7 +1394,7 @@ function ejecutar(){
   ST.error='';
   try{
     const mods=ST.calendarios.map((c,i)=>{
-      const r=analizar(ST.malla,c.bloques,c.notas,c.etiqueta);
+      const r=analizar(ST.malla,c.bloques,c.notas,c.etiqueta,c.totales);
       return {id:'m'+i, modalidad:c.etiqueta, archivo:c.archivo, ...r};
     });
     const d={programa:ST.programa||'(sin plan)', generado:new Date().toISOString().slice(0,19),
