@@ -1248,6 +1248,166 @@ function reporteProgramacion(datos, meta) {
   return rows;
 }
 
+/* ================= validación contra el reporte SPA ===================== */
+/* El SPA (sistema de registro de actividades) trae la sigla de malla en la columna
+   "Codigo" y el nombre en "Nombre". Se cruza contra las asignaturas del calendario
+   (que ya están emparejadas a la malla) por sigla y, si no, por nombre. */
+
+function leerSPA(filas) {
+  let hi = -1, map = {};
+  for (let i = 0; i < Math.min(15, filas.length); i++) {
+    const r = (filas[i] || []).map(norm), idx = {};
+    r.forEach((t, j) => {
+      if (t === 'CODIGO' && idx.codigo === undefined) idx.codigo = j;
+      else if (t === 'NOMBRE' && idx.nombre === undefined) idx.nombre = j;
+      else if (t === 'PROGRAMA' && idx.programa === undefined) idx.programa = j;
+      else if (t === 'HORAS' && idx.horas === undefined) idx.horas = j;
+      else if (t === 'TIPO' && idx.tipo === undefined) idx.tipo = j;
+      else if (t === 'PROFESORES' && idx.profesores === undefined) idx.profesores = j;
+    });
+    if (idx.codigo !== undefined && idx.nombre !== undefined && idx.programa !== undefined) {
+      hi = i; map = idx; break;
+    }
+  }
+  if (hi < 0) return null;
+  const g = (r, k) => (map[k] !== undefined && r[map[k]] != null) ? String(r[map[k]]).trim() : '';
+  const out = [];
+  for (let i = hi + 1; i < filas.length; i++) {
+    const r = filas[i] || [];
+    const codigo = g(r, 'codigo'), nombre = g(r, 'nombre');
+    if (!nombre && !codigo) continue;
+    out.push({ codigo, nombre, programa: g(r, 'programa'), horas: num(g(r, 'horas')),
+               tipo: g(r, 'tipo'), profesores: g(r, 'profesores') });
+  }
+  return out;
+}
+
+/** Prueba todas las hojas y devuelve las filas SPA de la primera hoja válida. */
+function leerSPAMejor(hojas) {
+  for (const h of hojas) {
+    const r = leerSPA(h.filas);
+    if (r && r.length) return { filas: r, hoja: h.nombre };
+  }
+  return null;
+}
+
+// Una sigla de malla luce así: 2-6 letras + 2-6 dígitos (FIN400, MKT00924, MACH223,
+// PHIL427, TICS107). Se usa para separar asignaturas reales de filas administrativas
+// del SPA (DIRECCIÓN, DA, ADM, TRASLADO, s/codigo, "ACTIVIDAD TERMINO"…).
+const SIGLA_RE = /^[A-Z]{2,6}\d{2,6}[A-Z]?$/;
+const esSiglaSPA = cod => SIGLA_RE.test(norm(cod).replace(/\s+/g, ''));
+
+/** Elige el grupo (Programa / centro de costo) del SPA cuyas siglas más calzan con la
+    malla activa. El cruce se restringe a ESE grupo — el CC que estamos analizando. */
+function grupoSPA(spaRows, malla) {
+  const sig = new Set(malla.map(a => norm(a.sigla)));
+  const grupos = {};
+  spaRows.forEach(r => {
+    // se agrupa por programa/CC; no se filtra por TIPO (los diplomados usan
+    // "Actividad de CDC" y los magísters "Asignatura Regular").
+    (grupos[r.programa] = grupos[r.programa] || []).push(r);
+  });
+  let best = null, bn = -1, ranking = [];
+  Object.entries(grupos).forEach(([p, rs]) => {
+    const m = new Set(rs.filter(r => sig.has(norm(r.codigo))).map(r => norm(r.codigo))).size;
+    if (!m) return;                       // grupos sin ninguna sigla de la malla se descartan
+    ranking.push({ programa: p, calzan: m, total: rs.length });
+    if (m > bn) { bn = m; best = p; }
+  });
+  ranking.sort((a, b) => b.calzan - a.calzan);
+  return { grupo: best, filas: grupos[best] || [], ranking: ranking.slice(0, 6), calzan: Math.max(0, bn) };
+}
+
+/* Conciliación de TRES fuentes, anclada en la SIGLA de la malla:
+   Malla (HP) · Calendario (horas programadas) · SPA (horas registradas).
+   La malla es la base; para cada una de sus siglas se busca el mismo código en el
+   calendario y en el SPA y se traen las horas para compararlas. */
+function validarSPA(malla, detalle, spaRows) {
+  const { grupo, filas, ranking, calzan } = grupoSPA(spaRows, malla);
+
+  // SPA del CC elegido: una entrada por FILA (no se pre-suman por código, porque el SPA
+  // puede reutilizar un mismo código para asignaturas distintas). Se descartan filas admin.
+  const spaList = filas
+    .filter(r => esSiglaSPA(norm(r.codigo).replace(/\s+/g, '')))
+    .map(r => ({ codigo: r.codigo, cod: norm(r.codigo).replace(/\s+/g, ''),
+                 nombre: r.nombre, horas: r.horas, used: false }));
+
+  // Entre un conjunto de filas SPA, toma el subgrupo con el mismo NOMBRE que mejor calza
+  // (así se suman solo las filas de LA MISMA asignatura, no dos asignaturas con igual código).
+  const mejorSub = (cand, nombre) => {
+    const porNom = new Map();
+    cand.forEach(r => { const k = norm(r.nombre); (porNom.get(k) || porNom.set(k, []).get(k)).push(r); });
+    let best = null, bs = -1;
+    porNom.forEach(rs => { const s = similitud(nombre, rs[0].nombre); if (s > bs) { bs = s; best = rs; } });
+    return { filas: best, horas: best.reduce((t, r) => t + r.horas, 0),
+             codigo: best[0].codigo, nombre: best[0].nombre, sim: bs };
+  };
+
+  const calBySig = new Map();
+  detalle.filter(d => d.sesiones > 0 && d.sigla).forEach(d => calBySig.set(norm(d.sigla), d));
+
+  const rows = [];
+  const dif = (sigla, nombre, hpM, hCal, hSpa, spaCod, spaNom, tipos) =>
+    rows.push({ sigla, nombre, hp_malla: hpM, horas_cal: hCal, horas_spa: hSpa,
+                spa_codigo: spaCod, spa_nombre: spaNom, tipos });
+
+  // 1) recorrer la malla (base)
+  malla.forEach(a => {
+    const k = norm(a.sigla);
+    const cal = calBySig.get(k);
+    let spa = null, spaCod = '', siglaDistinta = false;
+    // por código exacto (varias filas del mismo código → se toma la del nombre que calza)
+    const porCod = spaList.filter(r => !r.used && r.cod === k);
+    if (porCod.length) {
+      const g = mejorSub(porCod, a.nombre);
+      g.filas.forEach(r => r.used = true);
+      spa = g; spaCod = g.codigo;
+    } else {
+      // por nombre (código distinto)
+      const porNom = spaList.filter(r => !r.used && similitud(a.nombre, r.nombre) >= 0.72);
+      if (porNom.length) {
+        const g = mejorSub(porNom, a.nombre);
+        g.filas.forEach(r => r.used = true);
+        spa = g; spaCod = g.codigo; siglaDistinta = true;
+      }
+    }
+    const hCal = cal ? cal.horas_programadas : null;
+    const hSpa = spa ? spa.horas : null;
+    const tipos = [];
+    if (hCal === null) tipos.push('Falta en calendario');
+    if (hSpa === null) tipos.push('Falta en SPA');
+    if (siglaDistinta) tipos.push('Sigla distinta en SPA');
+    if (spa && !siglaDistinta && similitud(a.nombre, spa.nombre) < 0.72) tipos.push('Nombre distinto en SPA');
+    if (hCal !== null && Math.abs(hCal - a.hp) > 0.5) tipos.push('Horas calendario ≠ malla');
+    if (hSpa !== null && Math.abs(hSpa - a.hp) > 0.5) tipos.push('Horas SPA ≠ malla');
+    if (tipos.length) dif(a.sigla, a.nombre, a.hp, hCal, hSpa, spaCod, spa ? spa.nombre : '', tipos);
+  });
+
+  // 2) filas SPA no usadas → adicional (se suman solo las de mismo código + nombre)
+  const extra = new Map();
+  spaList.filter(r => !r.used).forEach(r => {
+    const k = r.cod + '|' + norm(r.nombre);
+    if (!extra.has(k)) extra.set(k, { codigo: r.codigo, nombre: r.nombre, horas: 0 });
+    extra.get(k).horas += r.horas;
+  });
+  extra.forEach(v => dif(v.codigo, v.nombre, null, null, v.horas, v.codigo, v.nombre, ['Adicional en SPA']));
+
+  const spaSig = new Set(spaList.map(r => r.cod));
+
+  const cnt = t => rows.filter(r => r.tipos.includes(t)).length;
+  return {
+    grupo, ranking, diffs: rows,
+    resumen: {
+      asignaturas_malla: malla.length, asignaturas_cal: calBySig.size,
+      asignaturas_spa: spaSig.size, calzan,
+      falta_spa: cnt('Falta en SPA'), falta_cal: cnt('Falta en calendario'),
+      adicional: cnt('Adicional en SPA'), nombre: cnt('Nombre distinto en SPA'),
+      sigla: cnt('Sigla distinta en SPA'),
+      horas: cnt('Horas calendario ≠ malla') + cnt('Horas SPA ≠ malla'),
+    },
+  };
+}
+
 /* --------------------------- comparación -------------------------------- */
 function compararModalidades(detA, detB, na, nb) {
   const ia = {}, ib = {};
@@ -1284,7 +1444,8 @@ function compararModalidades(detA, detB, na, nb) {
 /* ===================== estado ===================== */
 const ST = { malla:null, mallaNombre:'', programas:[], programa:'', calendarios:[], datos:null, error:'',
              reporteMeta:{ programa:'', abrev:'', alumnos:'', sede:'', coordinadora:'' },
-             creador:{ nombre:'', hojas:[], error:'' } };
+             creador:{ nombre:'', hojas:[], error:'' },
+             spa:{ nombre:'', filas:null, error:'' } };
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const nz  = v => (v==null||v==='')?'—':v;
 const $ = id => document.getElementById(id);
@@ -1386,6 +1547,20 @@ async function cargarCalendarios(files){
   render();
 }
 
+async function cargarSPA(file){
+  ST.spa.error='';
+  try{
+    const hojas=await leerArchivoHojas(file);
+    const R=leerSPAMejor(hojas);
+    if(!R){ ST.spa.error='"'+file.name+'" no parece un reporte SPA (no se encontraron las columnas '+
+      'Codigo, Nombre, Programa). Verifique el archivo.'; ST.spa.filas=null; }
+    else { ST.spa.nombre=file.name; ST.spa.filas=R.filas; }
+    ST.datos=null;
+  }catch(e){ ST.spa.error='Error al leer "'+file.name+'": '+e.message; }
+  render();
+}
+function quitarSPA(){ ST.spa={nombre:'',filas:null,error:''}; ST.datos=null; render(); }
+
 function quitarCalendario(i){ ST.calendarios.splice(i,1); ST.datos=null; render(); }
 function limpiar(){ Object.assign(ST,{malla:null,mallaNombre:'',programas:[],programa:'',calendarios:[],datos:null,error:'',_mallaFilas:null}); render(); }
 
@@ -1403,6 +1578,27 @@ function ejecutar(){
     if(mods.length>=2){
       const na=mods[0].modalidad, nb=mods[1].modalidad;
       d.comparacion={a:na,b:nb,filas:compararModalidades(mods[0].detalle,mods[1].detalle,na,nb)};
+    }
+    if(ST.spa.filas && ST.malla && ST.malla.length){
+      // cruce contra todas las asignaturas calendarizadas (unión de modalidades)
+      const detTodas=[]; const vistas=new Set();
+      mods.forEach(m=>m.detalle.forEach(x=>{ if(x.sigla && !vistas.has(x.sigla)){vistas.add(x.sigla);detTodas.push(x);} }));
+      d.spa=validarSPA(ST.malla,detTodas,ST.spa.filas);
+      d.spaArchivo=ST.spa.nombre;
+      // fila en el cuadro de mando
+      const R=d.spa.resumen, cols=d.resumen_ejecutivo.columnas;
+      const totDif=d.spa.diffs.length;
+      const vals={}; cols.forEach(c=>vals[c]=String(totDif));
+      const estado=totDif===0?'🟢 CUMPLIDO':((R.falta_spa||R.falta_cal||R.sigla)?'🔴 CRÍTICO':'🟡 DESVIACIÓN');
+      d.resumen_ejecutivo.filas.push({
+        indicador:'Conciliación Malla·Calendario·SPA', malla_base:R.asignaturas_malla+' asig.', valores:vals, estado,
+        observacion:`CC SPA «${d.spa.grupo||'—'}»: ${R.falta_spa} faltan en SPA, `+
+          `${R.falta_cal} sin calendarizar, ${R.sigla} sigla(s) distinta(s), `+
+          `${R.nombre} nombre(s) distinto(s), ${R.horas} con horas distintas.`,
+        detalle:d.spa.diffs.map(x=>({txt:`${x.sigla||x.spa_codigo||'—'} ${x.nombre}: `+
+          `malla ${x.hp_malla==null?'—':x.hp_malla+'h'} · calendario ${x.horas_cal==null?'—':x.horas_cal+'h'} · `+
+          `SPA ${x.horas_spa==null?'—':x.horas_spa+'h'}  [${x.tipos.join(', ')}]`}))
+      });
     }
     ST.datos=d;
   }catch(e){ ST.error='Error durante el análisis: '+e.message; }
@@ -1575,6 +1771,22 @@ function descargarExcel(){
     agregarHoja(wb,'Reporte de Programación',aoa);
   }
 
+  /* --- 6b. Validación SPA --- */
+  if(D.spa){
+    const S=D.spa;
+    const aoa=[
+      ['CONCILIACIÓN MALLA · CALENDARIO · SPA — '+D.programa],
+      ['CC/grupo SPA usado (por siglas): '+(S.grupo||'—')+' · archivo: '+(D.spaArchivo||'')+' · '+hoy+
+       ' · Nota: el grupo SPA puede listar solo un semestre/cohorte del plan'],
+      [],
+      ['Sigla malla','Sigla SPA','Nombre asignatura','Nombre en SPA',
+       'HP Malla','Horas Calendario','Horas SPA','Diferencia(s)'],
+      ...S.diffs.map(x=>[x.sigla||'', (x.spa_codigo&&norm(x.spa_codigo)!==norm(x.sigla))?x.spa_codigo:'',
+        x.nombre, x.spa_nombre||'', x.hp_malla, x.horas_cal, x.horas_spa, x.tipos.join(' · ')]),
+    ];
+    agregarHoja(wb,'Validación SPA',aoa,[M(0,0,0,7),M(1,0,1,7)],new Set([0,1]));
+  }
+
   /* --- 7. Parámetros normativos aplicados --- */
   {
     const et={creditos_totales_esperados:'Créditos totales esperados (vacío = se infiere)',
@@ -1670,6 +1882,20 @@ function bloqueCarga(){
             <button class="x" data-x="${i}" title="Quitar">✕</button></div>`).join('')}</div>
       </div>
     </div>
+    <div style="margin-top:14px">
+      <div class="dz ${ST.spa.filas?'lleno':''}" id="dzSPA" style="padding:16px 18px">
+        <div style="display:flex;align-items:center;gap:12px;text-align:left">
+          <div class="ic" style="font-size:22px">${ST.spa.filas?'✅':'📋'}</div>
+          <div><div class="t">${ST.spa.filas?'Reporte SPA cargado':'Reporte SPA (opcional)'}</div>
+          <div class="d" style="margin-top:2px">${ST.spa.filas
+            ? esc(ST.spa.nombre)+' · '+ST.spa.filas.length+' registros'
+            : 'Para conciliar el calendario con el sistema de registro. Arrastre el .xlsx del SPA o haga clic.'}</div></div>
+          ${ST.spa.filas?`<button class="x" data-spax="1" style="margin-left:auto">✕</button>`:''}
+        </div>
+      </div>
+      <input type="file" id="fSPA" class="hide" accept=".xlsx,.xls,.xlsm">
+      ${ST.spa.error?`<div class="err">⚠️ ${esc(ST.spa.error)}</div>`:''}
+    </div>
     ${ST.error?`<div class="err">⚠️ ${esc(ST.error)}</div>`:''}
     <div class="acciones">
       <button class="btn" id="btnRun" ${(ST._mallaFilas&&ST.calendarios.length)?'':'disabled'}>
@@ -1713,6 +1939,13 @@ function wireCarga(){
     dzC.onclick=()=>fC.click();
     fC.onchange=e=>{ if(e.target.files.length) cargarCalendarios([...e.target.files]); e.target.value=''; };
     dragdrop(dzC, files=>cargarCalendarios(files));
+  }
+  const dzS=$('dzSPA'), fS=$('fSPA');
+  if(dzS){
+    dzS.onclick=e=>{ if(!e.target.closest('[data-spax]')) fS.click(); };
+    fS.onchange=e=>{ if(e.target.files[0]) cargarSPA(e.target.files[0]); e.target.value=''; };
+    dragdrop(dzS, files=>{ if(files[0]) cargarSPA(files[0]); });
+    const bx=dzS.querySelector('[data-spax]'); if(bx) bx.onclick=e=>{e.stopPropagation();quitarSPA();};
   }
   const sp=$('selProg'); if(sp) sp.onchange=e=>{
     ST.programa=e.target.value; ST.programaManual=true; ST.error='';
@@ -2010,6 +2243,84 @@ function wireCreador(){
   }
 }
 
+/* ===================== validación SPA ===================== */
+const SPA_PILL={'Falta en SPA':'CRITICO','Falta en calendario':'CRITICO',
+  'Adicional en SPA':'ADVERTENCIA','Sigla distinta en SPA':'CRITICO',
+  'Nombre distinto en SPA':'ADVERTENCIA','Horas calendario ≠ malla':'ADVERTENCIA',
+  'Horas SPA ≠ malla':'ADVERTENCIA'};
+const hcell=(v,ref)=>{
+  if(v===null||v===undefined) return '<span style="color:#cbd5e1">—</span>';
+  const dis=(ref!==null&&ref!==undefined&&Math.abs(v-ref)>0.5);
+  return `<span class="${dis?'delta-pos':''}">${v} h</span>`;
+};
+
+function seccionSPA(D){
+  const S=D.spa, R=S.resumen;
+  const total=S.diffs.length;
+  const fila=(v)=>v||0;
+  const tipos=[...new Set(S.diffs.flatMap(x=>x.tipos))].sort();
+  return `<div class="kpis">
+    ${kpi(total,'Asignaturas con diferencia',total?'warn':'ok')}
+    ${kpi(R.asignaturas_malla,'Asignaturas en malla')}
+    ${kpi(R.asignaturas_cal,'En calendario')}
+    ${kpi(R.asignaturas_spa,'En SPA (mismo CC)')}
+    ${kpi(fila(R.falta_spa),'Faltan en SPA',R.falta_spa?'crit':'ok')}
+    ${kpi(fila(R.falta_cal),'Sin calendarizar',R.falta_cal?'crit':'ok')}
+    ${kpi(fila(R.sigla),'Siglas distintas',R.sigla?'crit':'ok')}
+    ${kpi(fila(R.horas),'Horas distintas',R.horas?'warn':'ok')}
+  </div>
+  <div class="card">
+    <h2>Conciliación Malla ↔ Calendario ↔ SPA</h2>
+    <div class="sub">Base: <b>malla de ${esc(D.programa)}</b>. Para cada sigla se buscan las
+      horas en el calendario y en el SPA y se comparan. Archivo SPA: <b>${esc(D.spaArchivo||'')}</b>
+      · CC/grupo usado (elegido por siglas): <b>${esc(S.grupo||'—')}</b>.</div>
+    <div class="nota"><b>Alcance:</b> el grupo del SPA suele listar solo las asignaturas de un
+      semestre/cohorte y puede ser de otro año que el calendario. Por eso «Falta en SPA» puede
+      ser una asignatura de otro período, no un error. Contraste el año/cohorte antes de actuar.</div>
+  </div>
+  <div class="card">
+    <h2>Diferencias por asignatura</h2>
+    <div class="sub">${total} asignatura(s) con diferencia entre las tres fuentes.
+      Las horas en rojo difieren de las HP de la malla.</div>
+    <div class="filters">
+      <select id="spa_t"><option value="">Todos los tipos</option>
+        ${tipos.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+      <input type="search" id="spa_q" placeholder="Buscar sigla o nombre…">
+      <span class="legend" id="spa_cnt"></span></div>
+    <table><thead><tr>
+      <th style="width:90px">Sigla malla</th><th>Nombre asignatura</th>
+      <th class="num">HP Malla</th><th class="num">Horas Calendario</th><th class="num">Horas SPA</th>
+      <th>Diferencia(s) detectada(s)</th></tr></thead>
+    <tbody id="spa_tb">${S.diffs.map(x=>`
+      <tr data-t="${esc(x.tipos.join('|'))}" data-s="${esc((x.sigla+' '+x.nombre).toLowerCase())}">
+        <td class="mono">${esc(x.sigla)||'—'}${x.spa_codigo&&norm(x.spa_codigo)!==norm(x.sigla)?
+          `<br><small style="color:#b91c1c">SPA: ${esc(x.spa_codigo)}</small>`:''}</td>
+        <td>${esc(x.nombre)}${x.spa_nombre&&x.tipos.includes('Nombre distinto en SPA')?
+          `<span class="rec">SPA: ${esc(x.spa_nombre)}</span>`:''}</td>
+        <td class="num">${x.hp_malla==null?'<span style="color:#cbd5e1">—</span>':x.hp_malla+' h'}</td>
+        <td class="num">${hcell(x.horas_cal,x.hp_malla)}</td>
+        <td class="num">${hcell(x.horas_spa,x.hp_malla)}</td>
+        <td>${x.tipos.map(t=>`<span class="pill ${SPA_PILL[t]||'ADVERTENCIA'}" style="margin:1px 2px">${esc(t)}</span>`).join('')}</td>
+      </tr>`).join('')
+      ||'<tr><td colspan="6">Sin diferencias: malla, calendario y SPA coinciden.</td></tr>'}
+    </tbody></table>
+  </div>`;
+}
+
+function wireSPA(){
+  const tb=$('spa_tb'); if(!tb) return;
+  const f=()=>{
+    const t=$('spa_t').value, q=$('spa_q').value.toLowerCase(); let v=0;
+    [...tb.rows].forEach(r=>{
+      const ok=(!t||(r.dataset.t||'').split('|').includes(t))&&(!q||(r.dataset.s||'').includes(q));
+      r.classList.toggle('hide',!ok); if(ok)v++;
+    });
+    const c=$('spa_cnt'); if(c) c.textContent=v+' de '+tb.rows.length;
+  };
+  ['spa_t','spa_q'].forEach(id=>{const e=$(id);if(e)e.addEventListener('input',f);});
+  f();
+}
+
 /* ===================== render ===================== */
 let TAB_ACTIVA=0;
 
@@ -2094,6 +2405,9 @@ function render(forzarTab){
         ${tablaComparacion(C,na,nb)}</div>`});
   }
 
+  /* --- validación SPA --- */
+  if(D&&D.spa) secciones.push({titulo:'Validación SPA', after:wireSPA, html:seccionSPA(D)});
+
   /* --- reporte de programación --- */
   if(D) secciones.push({titulo:'Reporte de Programación', after:wireReporte, html:seccionReporte()});
 
@@ -2125,3 +2439,4 @@ function render(forzarTab){
 
 render();
 </script></body></html>
+
