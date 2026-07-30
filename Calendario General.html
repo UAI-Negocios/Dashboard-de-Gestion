@@ -13599,6 +13599,9 @@ var _adCmbMetric = 'horas'; // 'horas' | 'monto' | 'phora'
 var _adCmbEstados = [];     // multi-select estado en Comparar por Año
 var _adCmbBusca = '';
 var _adCmbRows = []; var _adCmbPeriodos = []; var _adCmbEstList = [];
+var _adFiltDoc = '';   // filtro docente (vista gráficos)
+var _adGYear=''; var _adGCC=''; var _adGDoc=''; // filtros de la vista Gráficos
+var _adVHDesde='';   // filtro 'sin ajuste desde el año' en el aviso de Valor Hora
 var _adPendiente= null; // archivo pendiente de asignar período
 
 var _AD_YC = ['#2563eb','#10b981','#f59e0b','#7c3aed','#ef4444','#06b6d4'];
@@ -13689,14 +13692,14 @@ function renderAnualDecl() {
         '<div id="adUpZone" ' +
           'ondragover="event.preventDefault();document.getElementById(\'adUpZone\').style.borderColor=\'#2563eb\'" ' +
           'ondragleave="document.getElementById(\'adUpZone\').style.borderColor=\'var(--border)\'" ' +
-          'ondrop="adHandleDrop(event)" ' +
+          'ondrop="adHandleDropMulti(event)" ' +
           'style="border:2px dashed var(--border);border-radius:8px;padding:14px 20px;' +
             'text-align:center;min-width:220px;cursor:pointer;transition:border-color .2s;flex:1" ' +
           'onclick="document.getElementById(\'adFileIn\').click()">' +
           '<div style="font-size:22px;margin-bottom:4px">📅</div>' +
           '<div style="font-size:12px;font-weight:600;color:var(--t1)">Arrastra el Excel aquí</div>' +
-          '<div style="font-size:10px;color:var(--t3);margin-top:2px">o clic para seleccionar</div>' +
-          '<input id="adFileIn" type="file" accept=".xlsx,.xls" style="display:none" onchange="adSelFile(this.files[0])">' +
+          '<div style="font-size:10px;color:var(--t3);margin-top:2px">o clic para seleccionar (uno o varios archivos)</div>' +
+          '<input id="adFileIn" type="file" accept=".xlsx,.xls" multiple style="display:none" onchange="adSelFiles(this.files)">' +
         '</div>' +
 
         // Selector de período (se activa al cargar archivo)
@@ -13859,6 +13862,43 @@ function adHandleDrop(e) {
   var f = e.dataTransfer.files[0]; if (f) adSelFile(f);
 }
 
+/* ── Carga múltiple: cada archivo = un período (etiqueta auto) ── */
+function adHandleDropMulti(e){
+  e.preventDefault();
+  var z=document.getElementById('adUpZone'); if(z)z.style.borderColor='var(--border)';
+  var fs=(e.dataTransfer&&e.dataTransfer.files)?e.dataTransfer.files:[];
+  if(fs.length>1) adSelFiles(fs); else if(fs.length===1) adSelFile(fs[0]);
+}
+function adSelFiles(files){
+  files=Array.prototype.slice.call(files||[]);
+  if(!files.length) return;
+  if(files.length===1){ adSelFile(files[0]); return; }
+  var msg=document.getElementById('adUpMsg');
+  if(msg){msg.style.color='var(--blue)';msg.textContent='\u23F3 Procesando '+files.length+' archivos\u2026';}
+  var pend=files.length, ok=0, usadas={};
+  Object.keys(_adPeriodos).forEach(function(l){usadas[l]=1;});
+  files.forEach(function(file){
+    var rd=new FileReader();
+    rd.onload=function(ev){
+      try{
+        var wb=XLSX.read(ev.target.result,{type:'array'});
+        var raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+        var label=_adDetectarLabel(raw,file.name)||file.name.replace(/\.(xlsx|xls)$/i,'');
+        var base=label,n=2; while(usadas[label]){ label=base+' ('+n+')'; n++; } usadas[label]=1;
+        _adPeriodos[label]=_adProcesar(raw);
+        if(!_adOpen.hasOwnProperty(label)) _adOpen[label]=false;
+        ok++;
+      }catch(err){}
+      pend--;
+      if(pend<=0){
+        _adFiltCC='';
+        if(msg){msg.style.color='var(--green)';msg.textContent='\u2705 '+ok+' de '+files.length+' archivos cargados como per\u00edodos.';}
+        renderAnualDecl();
+      }
+    };
+    rd.readAsArrayBuffer(file);
+  });
+}
 function adSelFile(file) {
   if (!file) return;
   var msg = document.getElementById('adUpMsg');
@@ -13970,7 +14010,7 @@ function _adDetectarLabel(raw, filename) {
 
 /* ── Reset / Eliminar ───────────────────────────────────────────── */
 function adReset(){
-  _adPeriodos={}; _adOpen={}; _adFiltCC=''; _adFiltTA=''; _adFiltTP=''; _adPendiente=null; _adView='general'; _adTAperiodo=''; _adCmbMetric='horas'; _adCmbEstados=[]; _adCmbBusca='';
+  _adPeriodos={}; _adOpen={}; _adFiltCC=''; _adFiltTA=''; _adFiltTP=''; _adPendiente=null; _adView='general'; _adTAperiodo=''; _adCmbMetric='horas'; _adCmbEstados=[]; _adCmbBusca=''; _adGYear=''; _adGCC=''; _adGDoc=''; _adVHDesde='';
   Object.keys(_adCharts).forEach(function(k){try{_adCharts[k].destroy();}catch(e){}});
   _adCharts={};
   renderAnualDecl();
@@ -14186,7 +14226,7 @@ function _adRender(periodos) {
   // ── Sub-tabs: Comparativa general | Por Tipo de Actividad ──
   var tabBar =
     '<div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px">'+
-      [{k:'general',l:'📊 Comparativa general'},{k:'tipoact',l:'🎯 Por Tipo de Actividad (PPT vs Real)'},{k:'cambios',l:'📋 Comparar por Año'}].map(function(t){
+      [{k:'graficos',l:'📈 Gráficos'},{k:'general',l:'📊 Comparativa general'},{k:'tipoact',l:'🎯 Por Tipo de Actividad (PPT vs Real)'},{k:'cambios',l:'📋 Comparar por Año'}].map(function(t){
         var on = _adView===t.k;
         return '<button onclick="_adSetView(\''+t.k+'\')" style="background:transparent;border:none;'+
           'color:'+(on?'#2563eb':'var(--t3)')+';padding:10px 16px;border-bottom:2px solid '+(on?'#2563eb':'transparent')+';'+
@@ -14194,6 +14234,12 @@ function _adRender(periodos) {
       }).join('')+
     '</div>';
 
+  if (_adView === 'graficos') {
+    el.innerHTML = tabBar + _adRenderGraficos(periodos);
+    var drawG = function(){ _adDrawGraficos(periodos); };
+    if (typeof requestAnimationFrame!=='undefined') requestAnimationFrame(drawG); else setTimeout(drawG,0);
+    return;
+  }
   if (_adView === 'tipoact') {
     el.innerHTML = tabBar + _adRenderTipoBoard(periodos);
     var drawT = function(){ _adDrawTABoard(periodos); };
@@ -14436,6 +14482,307 @@ function _adAggTipoAct(label){
   return Object.values(agg).sort(function(a,b){ return b.ppt - a.ppt; });
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   VISTA GRÁFICOS — filtros Año · CC · Docente, con Chart.js
+   ═══════════════════════════════════════════════════════════════ */
+function _adGAllRows(){
+  var out=[];
+  Object.keys(_adPeriodos).forEach(function(p){
+    (_adPeriodos[p]||[]).forEach(function(r){ out.push(Object.assign({__per:p},r)); });
+  });
+  return out;
+}
+function _adGFilt(){
+  return _adGAllRows().filter(function(r){
+    if(_adGYear && r.__per!==_adGYear) return false;
+    if(_adGCC && r.cc!==_adGCC) return false;
+    if(_adGDoc && r.profesor!==_adGDoc) return false;
+    return true;
+  });
+}
+function _adGSel(id,val,opts,onch){
+  return '<select onchange="'+onch+'" style="padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--t1);font-size:12px;cursor:pointer;min-width:150px">'+opts+'</select>';
+}
+function _adRenderGraficos(periodos){
+  var years=periodos.slice();
+  var base=_adGAllRows();
+  var ccs=[...new Set(base.filter(function(r){return !_adGYear||r.__per===_adGYear;}).map(function(r){return r.cc;}).filter(Boolean))].sort();
+  var docs=[...new Set(base.filter(function(r){return (!_adGYear||r.__per===_adGYear)&&(!_adGCC||r.cc===_adGCC);}).map(function(r){return r.profesor;}).filter(Boolean))].sort(function(a,b){return a.localeCompare(b,'es');});
+  var optY='<option value="">Todos los años</option>'+years.map(function(y){return '<option value="'+escA(y)+'"'+(_adGYear===y?' selected':'')+'>'+esc(y)+'</option>';}).join('');
+  var optC='<option value="">Todos los CC</option>'+ccs.map(function(x){return '<option value="'+escA(x)+'"'+(_adGCC===x?' selected':'')+'>CC '+esc(x)+'</option>';}).join('');
+  var optD='<option value="">Todos los docentes</option>'+docs.map(function(x){return '<option value="'+escA(x)+'"'+(_adGDoc===x?' selected':'')+'>'+esc(abbr(x,34))+'</option>';}).join('');
+
+  var rows=_adGFilt();
+  var hrObl=0,hrDec=0,monto=0,dset={},cset={};
+  rows.forEach(function(r){ hrObl+=r.hrObl; hrDec+=r.hrDec; monto+=r.monto; if(r.profesor)dset[r.profesor]=1; if(r.cc)cset[r.cc]=1; });
+  var pct=hrObl>0?Math.round(hrDec/hrObl*1000)/10:0;
+  var kpi=function(ico,val,lbl,clr){ return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:120px"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">'+ico+' '+lbl+'</div><div style="font-size:19px;font-weight:800;color:'+clr+';margin-top:4px">'+val+'</div></div>'; };
+
+  var html=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px">'+
+      '<span style="font-size:11px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.5px">\uD83C\uDF9A\uFE0F Filtros</span>'+
+      _adGSel('gY',_adGYear,optY,'_adGYear=this.value;_adGCC=\'\';_adGDoc=\'\';_adRenderUpdate()')+
+      _adGSel('gC',_adGCC,optC,'_adGCC=this.value;_adGDoc=\'\';_adRenderUpdate()')+
+      _adGSel('gD',_adGDoc,optD,'_adGDoc=this.value;_adRenderUpdate()')+
+      ((_adGYear||_adGCC||_adGDoc)?'<button onclick="_adGYear=\'\';_adGCC=\'\';_adGDoc=\'\';_adRenderUpdate()" style="padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--t3);font-size:11px;cursor:pointer">\u2715 Limpiar</button>':'')+
+      '<span style="margin-left:auto;font-size:11px;color:var(--t3);font-weight:700">'+rows.length+' registro(s)</span>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">'+
+      kpi('\u23F1\uFE0F',fmt(Math.round(hrDec))+'h','Hrs declaradas','#3fb950')+
+      kpi('\uD83D\uDCD0',fmt(Math.round(hrObl))+'h','Hrs planificadas','#f0b429')+
+      kpi('\uD83D\uDCCA',pct+'%','Cumplimiento',(pct>=90?'#3fb950':pct>=60?'#f0b429':'#f85149'))+
+      kpi('\uD83D\uDCB0','$'+fmt(Math.round(monto)),'Monto','#a78bfa')+
+      kpi('\uD83D\uDC65',Object.keys(dset).length,'Docentes','#34d6ff')+
+      kpi('\uD83C\uDFE2',Object.keys(cset).length,'CC','#388bfd')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px">'+
+      _adGCard('Horas declaradas por año','g_year')+
+      _adGCard(_adGDoc?'Actividades del docente':(_adGCC?'Docentes del CC':'Top 10 docentes por horas'),'g_top')+
+      _adGCard('Distribución por Centro de Costo','g_cc')+
+      _adGCard('Planificado vs Declarado','g_pvd')+
+      _adGCard('Tendencia del Valor Hora por año','g_vh')+
+    '</div>'+
+    _adVHSinCambioHTML();
+  return html;
+}
+function _adVHSinCambioHTML(){
+  var periodos=Object.keys(_adPeriodos);
+  var anios=periodos.map(_adPerYear).filter(function(x){return x!=null;});
+  var span=anios.length?(Math.max.apply(null,anios)-Math.min.apply(null,anios)+1):0;
+  if(periodos.length<2 || span<2){
+    return '<div style="margin-top:18px;padding:12px 16px;background:rgba(56,139,253,.06);border:1px solid rgba(56,139,253,.25);border-radius:10px;font-size:11px;color:var(--t3);line-height:1.6">'+
+      '\u2139\uFE0F Para detectar docentes <b style="color:var(--t2)">sin cambio de valor hora \u22653 a\u00f1os</b>, carga los reportes de <b>3 o m\u00e1s a\u00f1os distintos</b> (ej. 2024, 2025, 2026). Actualmente hay '+periodos.length+' per\u00edodo(s).</div>';
+  }
+  var listaFull=_adVHSinCambio().filter(function(d){return !d.soloUno && d.antig>=3;});
+  if(!listaFull.length){
+    return '<div style="margin-top:18px;padding:12px 16px;background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.3);border-radius:10px;font-size:12px;color:var(--t2)"><span>\u2705</span> Ning\u00fan docente lleva 3 a\u00f1os o m\u00e1s con el mismo valor hora.</div>';
+  }
+  var desdeYears=[...new Set(listaFull.map(function(d){return d.desde;}))].sort(function(a,b){return a-b;});
+  var lista=listaFull.filter(function(d){ return !_adVHDesde || String(d.desde)===String(_adVHDesde); });
+  var cards=lista.map(function(d){
+    var sev=d.antig>=5?'#f85149':d.antig>=4?'#f0b429':'#fb923c';
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid '+sev+';border-radius:10px;padding:13px 15px">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">'+
+        '<div style="min-width:0">'+
+          '<div style="font-size:13px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(d.prof)+'">'+esc(d.prof)+'</div>'+
+          '<div style="font-size:11px;color:var(--t3);margin-top:2px;font-variant-numeric:tabular-nums">RUT '+esc(d.rut||'\u2014')+(d.tipo?' \u00b7 '+esc(d.tipo):'')+'</div>'+
+        '</div>'+
+        '<span style="flex:none;font-size:10px;font-weight:800;padding:3px 10px;border-radius:8px;background:'+sev+'22;color:'+sev+';border:1px solid '+sev+'55;white-space:nowrap">'+d.antig+' a\u00f1o'+(d.antig===1?'':'s')+' sin ajuste</span>'+
+      '</div>'+
+      '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border)">'+
+        '<div><div style="font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:.4px;font-weight:700">Valor hora sin ajustar</div>'+
+          '<div style="font-size:19px;font-weight:800;color:'+sev+';font-variant-numeric:tabular-nums;margin-top:2px">$'+fmt(Math.round(d.cur))+'</div></div>'+
+        '<div style="text-align:right"><div style="font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:.4px;font-weight:700">Sin modificar desde</div>'+
+          '<div style="font-size:17px;font-weight:800;color:var(--t1);margin-top:2px">'+d.desde+'</div></div>'+
+      '</div>'+
+      (function(){
+        if(d.actUltimo!=null){
+          var tip=d.actAsig.slice(0,6).join(' \u00b7 ');
+          var activo=d.actActual;
+          var bg=activo?'rgba(63,185,80,.1)':'rgba(240,180,41,.1)';
+          var bd=activo?'rgba(63,185,80,.3)':'rgba(240,180,41,.3)';
+          var cl=activo?'#3fb950':'#f0b429';
+          var ico=activo?'\u2705':'\uD83D\uDCC6';
+          var txt=activo?('Con actividad este a\u00f1o ('+d.actUltimo+')'):('\u00daltima actividad en '+d.actUltimo);
+          return '<div title="'+escA(tip)+'" style="margin-top:10px;display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;background:'+bg+';border:1px solid '+bd+'">'+
+            '<span style="font-size:13px">'+ico+'</span>'+
+            '<span style="font-size:11px;color:var(--t1);line-height:1.4"><b style="color:'+cl+'">'+txt+'</b> \u00b7 '+d.actNum+' sesi\u00f3n(es) en '+d.actAsig.length+' asignatura(s)</span>'+
+          '</div>';
+        }
+        return '<div style="margin-top:10px;display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;background:rgba(139,148,158,.08);border:1px solid var(--border)">'+
+          '<span style="font-size:13px">\u2298</span>'+
+          '<span style="font-size:11px;color:var(--t3);line-height:1.4">Sin actividad registrada en el Calendario General</span>'+
+        '</div>';
+      })()+
+    '</div>';
+  }).join('');
+  return '<div style="margin-top:18px;background:var(--surface);border:1px solid rgba(248,81,73,.35);border-radius:12px;overflow:hidden">'+
+    '<div style="padding:12px 16px;background:rgba(248,81,73,.07);display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<span style="font-size:17px">\u23F3</span>'+
+      '<span style="font-size:12px;color:var(--t1)"><strong style="color:#f85149">'+lista.length+' docente(s) sin cambio de valor hora hace \u22653 a\u00f1os</strong>'+(_adVHDesde?' desde '+_adVHDesde:'')+' \u2014 candidatos a revisi\u00f3n de tarifa.</span>'+
+      '<select onchange="_adVHDesde=this.value;_adRenderUpdate()" style="margin-left:auto;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer">'+
+        '<option value="">Sin ajuste desde: todos</option>'+
+        desdeYears.map(function(y){return '<option value="'+y+'"'+(String(_adVHDesde)===String(y)?' selected':'')+'>Desde '+y+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="_adVHSinCambioExcel()" style="padding:5px 12px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Descargar</button>'+
+    '</div>'+
+    (lista.length?'<div style="padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;max-height:58vh;overflow:auto">'+cards+'</div>':'<div style="padding:20px;text-align:center;font-size:12px;color:var(--t3)">Ning\u00fan docente con valor hora sin ajuste desde '+_adVHDesde+'.</div>')+
+  '</div>';
+}
+function _adVHSinCambioExcel(){
+  var lista=_adVHSinCambio().filter(function(d){return !d.soloUno && d.antig>=3 && (!_adVHDesde||String(d.desde)===String(_adVHDesde));});
+  if(!lista.length){ showToast('No hay docentes en esta condici\u00f3n','ok'); return; }
+  var data=lista.map(function(d){
+    var o={
+      'Docente':d.prof,'RUT':d.rut,'Tipo Profesor':d.tipo,
+      'Valor Hora actual':Math.round(d.cur),'Sin cambios desde':d.desde,
+      'Antig\u00fcedad (a\u00f1os)':d.antig
+    };
+    o['\u00daltimo a\u00f1o con actividad']=d.actUltimo!=null?d.actUltimo:'Sin registro';
+    o['\u00bfActivo este a\u00f1o?']=d.actActual?'S\u00ed':'No';
+    o['Sesiones (\u00faltimo a\u00f1o)']=d.actNum||'';
+    o['Asignaturas (\u00faltimo a\u00f1o)']=(d.actAsig||[]).slice(0,6).join(' \u00b7 ');
+    o['Observaci\u00f3n']='Sin cambio de valor hora hace '+d.antig+' a\u00f1os \u2014 revisar tarifa'+(d.actActual?' (docente activo este a\u00f1o)':(d.actUltimo!=null?' (\u00faltima actividad '+d.actUltimo+')':''));
+    return o;
+  });
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:34},{wch:13},{wch:16},{wch:16},{wch:16},{wch:16},{wch:11},{wch:11},{wch:40},{wch:58}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Valor Hora sin cambio');
+  XLSX.writeFile(wb,'Docentes_ValorHora_SinCambio_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Listado descargado','ok');
+}
+function _adGCard(titulo,cid){
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">'+
+    '<div style="font-size:12px;font-weight:800;color:var(--t1);margin-bottom:12px">'+titulo+'</div>'+
+    '<div style="height:260px;position:relative"><canvas id="'+cid+'"></canvas></div>'+
+  '</div>';
+}
+function _adPerYear(p){ var m=String(p).match(/20\d{2}/); return m?parseInt(m[0],10):null; }
+function _adVHByPeriodoDoc(){
+  var out={};
+  _adGAllRows().forEach(function(r){
+    if(_adGCC&&r.cc!==_adGCC) return;
+    if(_adGDoc&&r.profesor!==_adGDoc) return;
+    if(!r.phora||r.phora<=0) return;
+    var per=r.__per, k=r.rut||r.profesor;
+    if(!out[per]) out[per]={};
+    if(!out[per][k]) out[per][k]={prof:r.profesor,s:0,w:0};
+    var w=r.hrDec>0?r.hrDec:1;
+    out[per][k].s+=r.phora*w; out[per][k].w+=w;
+  });
+  return out;
+}
+function _adVHSinCambio(){
+  var map={};
+  _adGAllRows().forEach(function(r){
+    if(!r.phora||r.phora<=0) return;
+    var y=_adPerYear(r.__per); if(y==null) return;
+    var k=r.rut||r.profesor; if(!k) return;
+    if(!map[k]) map[k]={prof:r.profesor,rut:r.rut,tipo:r.tipoProf,byYear:{}};
+    var e=map[k]; if(r.profesor&&r.profesor.length>(e.prof||'').length)e.prof=r.profesor;
+    var pk=Math.round(r.phora);
+    if(!e.byYear[y]) e.byYear[y]={};
+    e.byYear[y][pk]=(e.byYear[y][pk]||0)+1;
+  });
+  var thisYear=(new Date()).getFullYear();
+  var actProf={};  /* profesor(norm) → { años: {year:{n,asigs}} } */
+  try{
+    (getDF()||[]).forEach(function(r){
+      var p=_agNorm(r['PROFESOR']||''); if(!p) return;
+      var yr=null, f=r['FECHAS']; if(f instanceof Date) yr=f.getFullYear();
+      else { var ai=r['AÑO IMPARTE']||r['ANO IMPARTE']; var mm=String(ai).match(/(20\d\d)/); if(mm)yr=+mm[1]; }
+      if(yr==null) return;
+      if(!actProf[p]) actProf[p]={};
+      if(!actProf[p][yr]) actProf[p][yr]={n:0,asigs:{}};
+      actProf[p][yr].n++; var a=r['ASIGNATURA']||''; if(a)actProf[p][yr].asigs[a]=1;
+    });
+  }catch(_e){}
+  function _actDe(prof){
+    var key=_agNorm(prof), byY=actProf[key];
+    if(!byY){
+      var toks=key.split(' ').filter(function(t){return t.length>2;});
+      Object.keys(actProf).forEach(function(kk){
+        if(byY) return;
+        var shared=toks.filter(function(t){return kk.indexOf(t)>=0;}).length;
+        if(toks.length && shared>=Math.min(2,toks.length)) byY=actProf[kk];
+      });
+    }
+    if(!byY) return null;
+    var years=Object.keys(byY).map(Number).sort(function(a,b){return b-a;}); /* reciente primero */
+    var ultimo=years[0];
+    return {ultimo:ultimo, esActual:ultimo===thisYear, n:byY[ultimo].n, asigs:Object.keys(byY[ultimo].asigs), years:years};
+  }
+  var res=[];
+  Object.keys(map).forEach(function(k){
+    var e=map[k]; var years=Object.keys(e.byYear).map(Number).sort(function(a,b){return a-b;});
+    if(!years.length) return;
+    var vals=years.map(function(y){ var m=e.byYear[y],best=0,bv=0; Object.keys(m).forEach(function(p){if(m[p]>bv){bv=m[p];best=+p;}}); return {y:y,v:best}; });
+    var cur=vals[vals.length-1].v, lastChangeYear=vals[0].y;
+    for(var i=vals.length-1;i>=0;i--){ if(vals[i].v===cur){ lastChangeYear=vals[i].y; } else { break; } }
+    var antig=thisYear-lastChangeYear;
+    var ac=_actDe(e.prof);
+    res.push({prof:e.prof,rut:e.rut,tipo:e.tipo,cur:cur,desde:lastChangeYear,antig:antig,nYears:years.length,soloUno:years.length<2,
+      actUltimo:ac?ac.ultimo:null, actActual:ac?ac.esActual:false, actNum:ac?ac.n:0, actAsig:ac?ac.asigs:[], anioAct:thisYear});
+  });
+  res.sort(function(a,b){return b.antig-a.antig;});
+  return res;
+}
+function _adDrawGraficos(periodos){
+  if(typeof Chart==='undefined') return;
+  Object.keys(_adCharts).forEach(function(k){try{_adCharts[k].destroy();}catch(e){}});
+  _adCharts={};
+  var rows=_adGFilt();
+  var grid=(getComputedStyle(document.body).getPropertyValue('--border')||'#30363d').trim();
+  var txt=(getComputedStyle(document.body).getPropertyValue('--t3')||'#8b949e').trim();
+  var baseOpt={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:txt,font:{size:10}}}},scales:{x:{ticks:{color:txt,font:{size:9}},grid:{color:grid}},y:{ticks:{color:txt,font:{size:9}},grid:{color:grid},beginAtZero:true}}};
+  var mk=function(id,cfg){ var el=document.getElementById(id); if(!el)return; try{_adCharts[id]=new Chart(el.getContext('2d'),cfg);}catch(e){} };
+
+  /* 1) Horas declaradas por año (respeta CC/docente, ignora año) */
+  var byY={}; _adGAllRows().forEach(function(r){
+    if(_adGCC&&r.cc!==_adGCC)return; if(_adGDoc&&r.profesor!==_adGDoc)return;
+    byY[r.__per]=(byY[r.__per]||0)+r.hrDec;
+  });
+  var yl=periodos.filter(function(p){return byY[p]!=null;});
+  mk('g_year',{type:'bar',data:{labels:yl,datasets:[{label:'Hrs declaradas',data:yl.map(function(p){return Math.round(byY[p]);}),backgroundColor:yl.map(function(p,i){return _AD_YC[i%_AD_YC.length];}),borderRadius:6}]},options:Object.assign({},baseOpt,{plugins:{legend:{display:false}}})});
+
+  /* 2) Top docentes / actividades */
+  var g2Label,g2Data,g2L;
+  if(_adGDoc){
+    var byA={}; rows.forEach(function(r){ var k=r.actNom||r.actCod||'—'; byA[k]=(byA[k]||0)+r.hrDec; });
+    var arr=Object.keys(byA).map(function(k){return[k,byA[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+    g2L=arr.map(function(x){return abbr(x[0],26);}); g2Data=arr.map(function(x){return Math.round(x[1]);}); g2Label='Horas';
+  } else {
+    var byD={}; rows.forEach(function(r){ if(!r.profesor)return; byD[r.profesor]=(byD[r.profesor]||0)+r.hrDec; });
+    var arr2=Object.keys(byD).map(function(k){return[k,byD[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+    g2L=arr2.map(function(x){return abbr(x[0],24);}); g2Data=arr2.map(function(x){return Math.round(x[1]);}); g2Label='Horas';
+  }
+  mk('g_top',{type:'bar',data:{labels:g2L,datasets:[{label:g2Label,data:g2Data,backgroundColor:'#34d6ff',borderRadius:5}]},options:Object.assign({},baseOpt,{indexAxis:'y',plugins:{legend:{display:false}}})});
+
+  /* 3) Distribución por CC (dona) */
+  var byC={}; rows.forEach(function(r){ if(!r.cc)return; byC[r.cc]=(byC[r.cc]||0)+r.hrDec; });
+  var cArr=Object.keys(byC).map(function(k){return[k,byC[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  mk('g_cc',{type:'doughnut',data:{labels:cArr.map(function(x){return 'CC '+x[0];}),datasets:[{data:cArr.map(function(x){return Math.round(x[1]);}),backgroundColor:['#2563eb','#10b981','#f59e0b','#7c3aed','#ef4444','#06b6d4','#ec4899','#84cc16']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:txt,font:{size:9},boxWidth:12}}}}});
+
+  /* 4) Planificado vs Declarado por año */
+  var po={},pd={}; _adGAllRows().forEach(function(r){
+    if(_adGCC&&r.cc!==_adGCC)return; if(_adGDoc&&r.profesor!==_adGDoc)return;
+    po[r.__per]=(po[r.__per]||0)+r.hrObl; pd[r.__per]=(pd[r.__per]||0)+r.hrDec;
+  });
+  var pl=periodos.filter(function(p){return po[p]!=null||pd[p]!=null;});
+  mk('g_pvd',{type:'bar',data:{labels:pl,datasets:[
+    {label:'Planificadas',data:pl.map(function(p){return Math.round(po[p]||0);}),backgroundColor:'#f59e0b',borderRadius:5},
+    {label:'Declaradas',data:pl.map(function(p){return Math.round(pd[p]||0);}),backgroundColor:'#10b981',borderRadius:5}
+  ]},options:baseOpt});
+
+  /* 5) Tendencia del Valor Hora por año */
+  var vhP=_adVHByPeriodoDoc();
+  var perOrd=periodos.slice().sort(function(a,b){ var ya=_adPerYear(a),yb=_adPerYear(b); return (ya||0)-(yb||0) || String(a).localeCompare(String(b)); });
+  var vhLabels=perOrd.filter(function(p){return vhP[p]&&Object.keys(vhP[p]).length;});
+  var vhDatasets;
+  if(_adGDoc){
+    var serie=vhLabels.map(function(p){ var m=vhP[p]; var k=Object.keys(m)[0]; return m[k]?Math.round(m[k].s/m[k].w):null; });
+    vhDatasets=[{label:'Valor hora',data:serie,borderColor:'#a78bfa',backgroundColor:'#a78bfa33',fill:true,tension:.25,spanGaps:true,pointRadius:4}];
+  } else {
+    var avg=[],mx=[],mn=[];
+    vhLabels.forEach(function(p){
+      var m=vhP[p]; var arr=Object.keys(m).map(function(k){return m[k].s/m[k].w;});
+      if(!arr.length){avg.push(null);mx.push(null);mn.push(null);return;}
+      avg.push(Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length));
+      mx.push(Math.round(Math.max.apply(null,arr))); mn.push(Math.round(Math.min.apply(null,arr)));
+    });
+    vhDatasets=[
+      {label:'Promedio',data:avg,borderColor:'#a78bfa',backgroundColor:'#a78bfa22',fill:true,tension:.25,spanGaps:true,pointRadius:3},
+      {label:'Máximo',data:mx,borderColor:'#f0b429',fill:false,tension:.25,spanGaps:true,pointRadius:2,borderDash:[4,3]},
+      {label:'Mínimo',data:mn,borderColor:'#34d6ff',fill:false,tension:.25,spanGaps:true,pointRadius:2,borderDash:[4,3]}
+    ];
+  }
+  var vhOpt={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:!_adGDoc,labels:{color:txt,font:{size:10}}}},
+    scales:{x:{ticks:{color:txt,font:{size:9}},grid:{color:grid}},
+      y:{ticks:{color:txt,font:{size:9},callback:function(v){return '$'+Math.round(v/1000)+'k';}},grid:{color:grid}}}};
+  mk('g_vh',{type:'line',data:{labels:vhLabels,datasets:vhDatasets},options:vhOpt});
+}
 function _adRenderTipoBoard(periodos){
   // Período activo (default: último)
   if (!_adTAperiodo || periodos.indexOf(_adTAperiodo) < 0) _adTAperiodo = periodos[periodos.length-1];
@@ -33906,3 +34253,4 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
+
