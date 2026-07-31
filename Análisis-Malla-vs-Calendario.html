@@ -79,6 +79,25 @@ ul.detlist li{font-size:12.5px;color:#334155;padding:4px 0 4px 16px;position:rel
 ul.detlist li:last-child{border-bottom:none}
 ul.detlist li::before{content:"·";position:absolute;left:4px;color:#94a3b8;font-weight:700}
 .dmod{display:inline-block;min-width:74px;color:#0f2b46;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+/* --- malla visual flotante (hover sobre HP de la malla) --- */
+.hpmalla{cursor:help;text-decoration:underline dotted #94a3b8;text-underline-offset:2px}
+td.hpmalla:hover{background:#eef4fb}
+#mallaPop{position:fixed;z-index:9999;display:none;max-width:460px;max-height:70vh;overflow:auto;
+  background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 30px rgba(15,43,70,.22);
+  padding:12px 14px;font-size:12px;color:#1b2733}
+#mallaPop h4{margin:0 0 2px;font-size:12.5px;color:#0f2b46}
+#mallaPop .mp-sub{color:#64748b;font-size:11px;margin-bottom:8px}
+#mallaPop .mp-per{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;
+  margin:8px 0 3px;border-top:1px solid #eef2f7;padding-top:5px}
+#mallaPop .mp-row{display:grid;grid-template-columns:56px 1fr 78px;gap:6px;align-items:center;padding:2px 0}
+#mallaPop .mp-row .mp-sig{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#475569}
+#mallaPop .mp-row .mp-nom{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mallaPop .mp-bar{height:9px;background:#e2e8f0;border-radius:4px;position:relative;overflow:hidden}
+#mallaPop .mp-bar>span{display:block;height:100%;background:#1d4e79}
+#mallaPop .mp-hp{font-variant-numeric:tabular-nums;font-size:11px;color:#334155;text-align:right}
+#mallaPop .mp-on{background:#fff7ed;border-radius:5px;box-shadow:0 0 0 2px #f59e0b inset}
+#mallaPop .mp-on .mp-bar>span{background:#b45309}
+#mallaPop .mp-tot{margin-top:8px;border-top:2px solid #e2e8f0;padding-top:5px;font-weight:650;color:#0f2b46}
 /* ---------- zona de carga ---------- */
 .carga{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:900px){.carga{grid-template-columns:1fr}}
@@ -593,15 +612,21 @@ function leerCalendarioTabular(filas, hdr) {
     //  2) el MÓDULO vigente (cada módulo es una asignatura; sus sesiones —clases,
     //     examen, charla— se agrupan juntas aunque el TEMA de cada fila difiera)
     //  3) la columna TEMA, solo cuando no hay módulos y el TEMA hace de asignatura (DGN)
-    let principal, alt = '';
-    if (asigCel) { principal = asigCel; alt = tituloModulo; }
-    else if (tituloModulo) { principal = tituloModulo; }
-    else if (temaEsAsignatura) { principal = temaCel; }
-    else { principal = ''; }
+    // La columna "Asignatura/Módulo" a veces trae etiquetas GENÉRICAS ("Módulo 1",
+    // "Taller", "Sesión 2") que no son el nombre real de la asignatura. En ese caso el
+    // nombre está en el encabezado del módulo (para clases) o en el TEMA (para talleres,
+    // que suelen ser una asignatura aparte).
+    const sesCel0 = String(cel(r, 'sesion')).trim();
+    const asigGen = /^(M[ÓO]DULO|SESI[ÓO]N|CLASE|UNIDAD|BLOQUE|TALLER)\b\s*[IVXLC\d]*$/i.test(asigCel);
+    const esTaller = /^TALLER\b/i.test(asigCel) || /^TALLER\b/i.test(sesCel0);
+    let principal, alt = '', temaComoNombre = false;
+    if (asigCel && !asigGen) { principal = asigCel; alt = tituloModulo; }
+    else if (esTaller && temaCel) { principal = temaCel; alt = tituloModulo; temaComoNombre = true; }
+    else if (tituloModulo) { principal = tituloModulo; alt = (temaEsAsignatura ? temaCel : ''); }
+    else if (temaEsAsignatura) { principal = temaCel; temaComoNombre = true; }
+    else { principal = asigCel || ''; }
     const nombre = tituloBase(principal);
     if (!nombre) continue;
-    // el TEMA es el nombre de la asignatura solo cuando agrupamos por él (caso 3)
-    const temaComoNombre = !asigCel && !tituloModulo && temaEsAsignatura;
     if (alt && norm(alt) === norm(nombre)) alt = '';
     const clave = norm(nombre);
     if (!porNombre.has(clave)) {
@@ -1306,6 +1331,62 @@ function leerCalculador(hojas) {
   return out;
 }
 
+/** Lee la tabla maestra "formato_FF_..._COMPLETAR" (hoja Hoja1): una fila por programa
+    con TODOS los campos de la ficha. Devuelve null si el archivo no tiene ese formato. */
+function leerCompletarFF(hojas) {
+  const COLS = {
+    nombre: /NOMBRE PROGRAMA/, sigla: /SIGLA DEL PROGRAMA|^SIGLA$/, formato: /^FORMATO/,
+    continuacion: /CONTINUACION|CONTINUACIÓN/, facultad: /^FACULTAD/, subarea: /SUB ?AREA/,
+    subtipo: /SUBTIPO/, tipoPrograma: /TIPO DE PROGRAMA/, tipoVenta: /TIPO DE VENTA/,
+    tipoDocencia: /TIPO DOCENCIA/, link: /LINK COHORTE/, nCohorte: /N[UÚ]MERO DE COHORTE/,
+    inicio: /FECHA INICIO/, termino: /FECHA T[EÉ]RMINO/, coordinador: /^COORDINADOR/,
+    director: /DIRECTOR/, definicionUso: /DEFINICION DE USO|DEFINICIÓN DE USO/,
+    codigoSence: /C[OÓ]DIGO SENCE/, horasCron: /HORAS CRONOL/, solicitante: /SOLICITANTE/,
+    aprobador: /APROBADOR/, monedaPost: /MONEDA POSTULACI/, valorPost: /VALOR POSTULACI/,
+    monedaMat: /MONEDA MATR[IÍ]CULA/, valorMat: /VALOR MATR[IÍ]CULA/,
+    monedaAra: /MONEDA ARANCEL/, valorAra: /VALOR ARANCEL/,
+    nDev: /N[UÚ]MERO DE DEVENGOS/, mesesDev: /MESES DEVENGOS/,
+    nVenc: /N[UÚ]MERO DE VENCIMIENTOS/, mesesVenc: /MESES VENCIMIENTOS/,
+  };
+  const hoja = hojas.find(h => (h.filas[0] || []).some(c => /SIGLA DEL PROGRAMA/.test(norm(c)))
+    && (h.filas[0] || []).some(c => /FACULTAD/.test(norm(c)))) || null;
+  if (!hoja) return null;
+  const hdr = (hoja.filas[0] || []).map(norm);
+  const map = {};
+  Object.keys(COLS).forEach(k => { const j = hdr.findIndex(t => COLS[k].test(t)); if (j >= 0) map[k] = j; });
+  if (map.nombre === undefined) return null;
+  const g = (r, k) => (map[k] !== undefined && r[map[k]] != null) ? r[map[k]] : '';
+  const out = [];
+  for (let i = 1; i < hoja.filas.length; i++) {
+    const r = hoja.filas[i] || [];
+    const nombre = String(g(r, 'nombre')).trim();
+    if (!nombre) continue;
+    const sigla = String(g(r, 'sigla')).trim();
+    const formato = String(g(r, 'formato')).trim();
+    const cont = /^S/i.test(String(g(r, 'continuacion')).trim());
+    const anio = aFecha(g(r, 'inicio')) ? aFecha(g(r, 'inicio')).getFullYear() : 2027;
+    const siglaCC = [sigla, formato, anio].filter(Boolean).join(' ') + (cont ? ' CONT' : '');
+    out.push({
+      _completo: true, nombre, sigla, siglaCC,
+      facultad: String(g(r, 'facultad')).trim(), subarea: String(g(r, 'subarea')).trim(),
+      subtipo: String(g(r, 'subtipo')).trim(), tipoPrograma: String(g(r, 'tipoPrograma')).trim(),
+      tipoVenta: String(g(r, 'tipoVenta')).trim(), tipoDocencia: String(g(r, 'tipoDocencia')).trim(),
+      link: String(g(r, 'link')).trim(), nCohorte: g(r, 'nCohorte'),
+      inicio: aFecha(g(r, 'inicio')), termino: aFecha(g(r, 'termino')),
+      coordinador: String(g(r, 'coordinador')).trim(), director: String(g(r, 'director')).trim(),
+      definicionUso: String(g(r, 'definicionUso')).trim(), codigoSence: g(r, 'codigoSence'),
+      horasCron: g(r, 'horasCron'), solicitante: String(g(r, 'solicitante')).trim(),
+      aprobador: String(g(r, 'aprobador')).trim(),
+      monedaPost: String(g(r, 'monedaPost')).trim(), valorPost: g(r, 'valorPost'),
+      monedaMat: String(g(r, 'monedaMat')).trim(), valorMat: g(r, 'valorMat'),
+      monedaAra: String(g(r, 'monedaAra')).trim(), valorAra: g(r, 'valorAra'),
+      nDev: num(g(r, 'nDev')), mesesDev: String(g(r, 'mesesDev')).trim(),
+      nVenc: num(g(r, 'nVenc')), mesesVenc: String(g(r, 'mesesVenc')).trim(),
+    });
+  }
+  return out;
+}
+
 const _escXml = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -1364,24 +1445,87 @@ function _hojaPath(files, pick) {
 function _llenarPlantilla(templateBytes, pick, aplicar) {
   const files = fflate.unzipSync(templateBytes);
   const path = _hojaPath(files, pick);
-  files[path] = fflate.strToU8(aplicar(fflate.strFromU8(files[path])));
+  files[path] = fflate.strToU8(aplicar(fflate.strFromU8(files[path]), files));
   return fflate.zipSync(files, { level: 6 });
 }
 
-/** Ficha Financiera: rellena la plantilla FF con los datos del calculador. */
-function llenarFF(templateBytes, prog) {
-  return _llenarPlantilla(templateBytes, nm => /^FF$/i.test(nm.trim()) || nm.trim() === '', xml => {
-    xml = _setCell(xml, 'D19', { valor: prog.nombre });
-    if (prog.inicio) xml = _setCell(xml, 'D26', { tipo: 'date', valor: _serialFecha(prog.inicio) });
-    if (prog.termino) xml = _setCell(xml, 'G26', { tipo: 'date', valor: _serialFecha(prog.termino) });
-    xml = _setCell(xml, 'D59', { tipo: 'n', valor: prog.nDev });
-    xml = _setCell(xml, 'G59', { tipo: 'n', valor: prog.nVenc });
-    xml = _setCell(xml, 'C61', { valor: prog.mesesDev });
-    xml = _setCell(xml, 'F61', { valor: prog.mesesVenc });
-    // Nombre Sigla CC (G19): se rellena con la sigla si viene; si no, en blanco
-    xml = _setCell(xml, 'G19', prog.sigla ? { valor: prog.sigla } : { blank: true });
-    ['D21', 'D22', 'D24', 'D25', 'G25', 'D27', 'D28', 'G32', 'E47']
-      .forEach(ref => { xml = _setCell(xml, ref, { blank: true }); });
+/* --- localización de campos por su rótulo (robusto a distintas versiones del formato) --- */
+function _sharedStrings(files) {
+  const f = files['xl/sharedStrings.xml']; if (!f) return [];
+  const xml = fflate.strFromU8(f);
+  return (xml.match(/<si>[\s\S]*?<\/si>/g) || []).map(si =>
+    (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'));
+}
+function _mapaEtiquetas(xml, ss) {
+  const map = {};
+  // celdas: autocerradas (<c .../>) o con contenido (<c ...>…</c>), sin desbordar entre ellas
+  (xml.match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) || []).forEach(c => {
+    const ref = (c.match(/r="([A-Z]+\d+)"/) || [])[1]; let txt = '';
+    if (/t="s"/.test(c)) txt = ss[+(c.match(/<v>(\d+)<\/v>/) || [])[1]] || '';
+    else if (/t="inlineStr"/.test(c)) txt = ((c.match(/<t[^>]*>([\s\S]*?)<\/t>/) || [])[1] || '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    if (txt) map[ref] = txt;
+  });
+  return map;
+}
+const _colNum = c => { let n = 0; for (const ch of c) n = n * 26 + (ch.charCodeAt(0) - 64); return n; };
+const _numCol = n => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; };
+const _offRef = (ref, dc, dr) => { const m = ref.match(/([A-Z]+)(\d+)/); return _numCol(_colNum(m[1]) + dc) + (+m[2] + dr); };
+function _refEtiqueta(mapa, re, porDefecto) {
+  for (const ref in mapa) if (re.test(norm(mapa[ref]))) return ref;
+  return porDefecto;
+}
+
+/** Especificación de celda según el valor: fecha, número o texto; vacío → blanco. */
+function _specFF(valor, tipo) {
+  if (valor === null || valor === undefined || String(valor).trim() === '') return { blank: true };
+  if (tipo === 'date') return (valor instanceof Date && !isNaN(valor))
+    ? { tipo: 'date', valor: _serialFecha(valor) } : { blank: true };
+  if (tipo === 'n') { const nn = num(valor); return { tipo: 'n', valor: nn }; }
+  if (tipo === 'auto') { const s = String(valor).trim();
+    return /^-?\d+(\.\d+)?$/.test(s) ? { tipo: 'n', valor: +s } : { valor: valor }; }
+  return { valor: valor };
+}
+
+/** Ficha Financiera: rellena la plantilla FF. Con un registro simple (calculador) llena
+    nombre/fechas/devengos/sigla; con un registro completo (tabla maestra COMPLETAR) llena
+    además facultad, coordinador, tarifas, etc. Los campos ausentes quedan en blanco. */
+function llenarFF(templateBytes, p) {
+  const siglaCC = p.siglaCC || p.sigla || '';
+  // cada campo: [regex del rótulo, celda de rótulo por defecto, [ [dcol,dfila,valor,tipo], … ] ]
+  const CAMPOS = [
+    [/^NOMBRE PROGRAMA/, 'C19', [[1, 0, p.nombre, 's']]],
+    [/NOMBRE SIGLA CC/, 'F19', [[1, 0, siglaCC, 's']]],
+    [/^FACULTAD/, 'C20', [[1, 0, p.facultad, 's']]],
+    [/SUB ?AREA/, 'C21', [[1, 0, p.subarea, 's']]],
+    [/SUBTIPO DE PROGRAMA/, 'C22', [[1, 0, p.subtipo, 's']]],
+    [/^TIPO PROGRAMA/, 'C24', [[1, 0, p.tipoPrograma, 's']]],
+    [/LINK COHORTE/, 'C25', [[1, 0, p.link, 's']]],
+    [/N[UÚ]MERO DE COHORTE/, 'F25', [[1, 0, p.nCohorte, 'auto']]],
+    [/FECHA INICIO PROGRAMA/, 'C26', [[1, 0, p.inicio, 'date']]],
+    [/FECHA T[EÉ]RMINO PROGRAMA/, 'F26', [[1, 0, p.termino, 'date']]],
+    [/^COORDINADOR/, 'C27', [[1, 0, p.coordinador, 's']]],
+    [/DIRECTOR/, 'C28', [[1, 0, p.director, 's']]],
+    [/DEFINICION DE USO/, 'C29', [[1, 0, p.definicionUso, 's']]],
+    [/TIPO DE VENTA/, 'C32', [[1, 0, p.tipoVenta, 's']]],
+    [/TIPO DOCENCIA/, 'F32', [[1, 0, p.tipoDocencia, 's']]],
+    [/C[OÓ]DIGO SENCE/, 'C34', [[1, 0, p.codigoSence, 'auto']]],
+    [/HORAS CRONOL/, 'F34', [[1, 0, p.horasCron, 'auto']]],
+    [/SOLICITANTE/, 'C37', [[1, 0, p.solicitante, 's']]],
+    [/APROBADOR/, 'C38', [[1, 0, p.aprobador, 's']]],
+    [/VALOR POSTULACI/, 'C46', [[1, 0, p.monedaPost, 's'], [2, 0, p.valorPost, 'n']]],
+    [/VALOR MATR[IÍ]CULA/, 'C47', [[1, 0, p.monedaMat, 's'], [2, 0, p.valorMat, 'n']]],
+    [/VALOR ARANCEL/, 'C48', [[1, 0, p.monedaAra, 's'], [2, 0, p.valorAra, 'n']]],
+    [/N[UÚ]MERO DE DEVENGOS/, 'C59', [[1, 0, p.nDev, 'n'], [0, 2, p.mesesDev, 's']]],
+    [/N[UÚ]MERO DE VENCIMIENTOS/, 'F59', [[1, 0, p.nVenc, 'n'], [0, 2, p.mesesVenc, 's']]],
+  ];
+  return _llenarPlantilla(templateBytes, nm => /^FF$/i.test(nm.trim()) || nm.trim() === '', (xml, files) => {
+    const mapa = _mapaEtiquetas(xml, _sharedStrings(files));
+    CAMPOS.forEach(([re, def, puts]) => {
+      const ref = _refEtiqueta(mapa, re, def);
+      puts.forEach(([dc, dr, val, tipo]) => { xml = _setCell(xml, _offRef(ref, dc, dr), _specFF(val, tipo)); });
+    });
     return xml;
   });
 }
@@ -2255,7 +2399,9 @@ function cuadroMando(RE){
   const linea=x=>{
     const m=x.mod?`<b class="dmod">${esc(x.mod)}</b> `:'';
     const r=x.rec?` <span class="rec" style="display:inline">▸ ${esc(x.rec)}</span>`:'';
-    return `<li>${m}${esc(x.txt)}${r}</li>`;
+    const sig=(String(x.txt).match(/(?:•\s*)?([A-Z]{2,6}\d{2,6})\b/)||[])[1];
+    const attr=sig?` class="hpmalla" data-sig="${esc(sig)}"`:'';
+    return `<li${attr}>${m}${esc(x.txt)}${r}</li>`;
   };
   return `<table class="cmd"><thead><tr>
     <th style="width:250px">Indicador / Métrica</th>
@@ -2358,7 +2504,7 @@ function tablaMallaVs(m){
         <td class="mono"><span class="exp" onclick="tog('mv_${m.id}_${i}')">▸ ${esc(d.sigla)}</span></td>
         <td>${esc(d.nombre)}</td><td class="num">${esc(d.periodo)}</td><td>${esc(d.ta||'')}</td>
         <td class="num">${d.creditos}</td><td class="num">${d.ha||''}</td>
-        <td class="num">${d.hp_malla}</td><td class="num">${d.hnp||''}</td>
+        <td class="num hpmalla" data-sig="${esc(d.sigla)}">${d.hp_malla}</td><td class="num">${d.hnp||''}</td>
         <td class="num">${d.horas_programadas}</td>
         <td class="mono">${nz(d.inicio)}</td><td class="mono">${nz(d.fin)}</td>
         <td class="num ${cls}">${dl>0?'+':''}${dl}</td><td class="${cls}">${est}</td>
@@ -2599,13 +2745,15 @@ async function cargarCalculador(file){
   ST.ff.error='';
   try{
     const hojas=await leerArchivoHojas(file);
-    const progs=leerCalculador(hojas);
+    // acepta la tabla maestra completa (formato_FF..._COMPLETAR) o el calculador de devengos
+    let progs=leerCompletarFF(hojas), tipo='completa';
+    if(!progs||!progs.length){ progs=leerCalculador(hojas); tipo='calculador'; }
     if(!progs||!progs.length){
-      ST.ff.error='"'+file.name+'" no parece el calculador de devengos/vencimientos '+
-        '(no encontré la hoja «Programas» con N° Devengos y N° Vencimientos).';
+      ST.ff.error='"'+file.name+'" no reconocido. Se espera el calculador de devengos '+
+        '(hoja «Programas») o la tabla maestra de fichas (hoja «Hoja1» con Sigla/Facultad…).';
       ST.ff.programas=null;
-    } else { ST.ff.calcNombre=file.name; ST.ff.programas=progs; }
-  }catch(e){ ST.ff.error='Error al leer el calculador: '+e.message; }
+    } else { ST.ff.calcNombre=file.name; ST.ff.programas=progs; ST.ff.tipo=tipo; }
+  }catch(e){ ST.ff.error='Error al leer el archivo: '+e.message; }
   render();
 }
 function leerBytes(file){
@@ -2619,23 +2767,25 @@ async function cargarPlantillaFF(file){
   catch(e){ ST.ff.error='Error al leer la plantilla FF: '+e.message; }
   render();
 }
+function siglaDe(p){ return p.sigla || getSigla(p.nombre); }
 function fichaBytes(p){
   const tpl=plantillaFF();
   if(!tpl) throw new Error('No hay plantilla FF disponible. Cargue una plantilla.');
-  return llenarFF(tpl,{...p, sigla:getSigla(p.nombre)});
+  // registro completo: usar su siglaCC ya armada; registro simple: usar la sigla editable
+  return llenarFF(tpl, p._completo ? p : {...p, sigla:getSigla(p.nombre)});
 }
 function descargarFicha(i){
   try{
     const p=ST.ff.programas[i];
     const blob=new Blob([fichaBytes(p)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='FF_'+slugFF(getSigla(p.nombre)||p.nombre)+'.xlsx'; a.click();
+    a.download='FF_'+slugFF(siglaDe(p)||p.nombre)+'.xlsx'; a.click();
   }catch(e){ ST.ff.error=e.message; render(); }
 }
 function descargarTodasFichas(){
   try{
     const files={};
-    ST.ff.programas.forEach((p,i)=>{ files[String(i+1).padStart(2,'0')+'_FF_'+slugFF(getSigla(p.nombre)||p.nombre)+'.xlsx']=fichaBytes(p); });
+    ST.ff.programas.forEach((p,i)=>{ files[String(i+1).padStart(2,'0')+'_FF_'+slugFF(siglaDe(p)||p.nombre)+'.xlsx']=fichaBytes(p); });
     const zip=fflate.zipSync(files,{level:0});
     const blob=new Blob([zip],{type:'application/zip'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -2649,17 +2799,18 @@ function seccionFichas(){
     : (FF_TEMPLATE_B64 && FF_TEMPLATE_B64.length>100 ? 'plantilla oficial incorporada' : 'ninguna — cargue una');
   return `<div class="card">
     <h2>Fichas Financieras</h2>
-    <div class="sub">Toma el <b>calculador de devengos y vencimientos</b> y genera una Ficha
-      Financiera por programa, rellenando la plantilla oficial y conservando su formato. Descarga
-      cada ficha individualmente o todas juntas en un ZIP.</div>
+    <div class="sub">Genera una Ficha Financiera por programa, rellenando la plantilla oficial y
+      conservando su formato. Acepta dos entradas: el <b>calculador de devengos/vencimientos</b>
+      (llena nombre, fechas y devengos) o la <b>tabla maestra «formato_FF…_COMPLETAR»</b> (llena
+      TODOS los campos: sigla, facultad, coordinador, tarifas…). Descarga individual o en ZIP.</div>
     <div class="carga">
       <div>
         <div class="dz ${F.programas?'lleno':''}" id="dzCalc">
           <div class="ic">${F.programas?'✅':'📄'}</div>
-          <div class="t">${F.programas?'Calculador cargado':'Calculador de devengos/vencimientos'}</div>
+          <div class="t">${F.programas?(ST.ff.tipo==='completa'?'Tabla maestra cargada':'Calculador cargado'):'Calculador o tabla maestra'}</div>
           <div class="d">${F.programas
-            ? esc(F.calcNombre)+' · '+F.programas.length+' programas'
-            : 'Arrastre aquí el <b>Calculador_Devengos_y_Vencimientos.xlsx</b> o haga clic.'}</div>
+            ? esc(F.calcNombre)+' · '+F.programas.length+' programas · <b>'+(ST.ff.tipo==='completa'?'ficha completa':'solo devengos')+'</b>'
+            : 'Arrastre el <b>Calculador</b> o la <b>tabla maestra COMPLETAR</b>, o haga clic.'}</div>
         </div>
         <input type="file" id="fCalc" class="hide" accept=".xlsx,.xls,.xlsm">
       </div>
@@ -2688,7 +2839,7 @@ function seccionFichas(){
     <tbody>${F.programas.map((p,i)=>`<tr>
       <td class="mono" style="color:#94a3b8">${i+1}</td>
       <td>${esc(p.nombre)}</td>
-      <td><input class="sigin" data-n="${esc(p.nombre)}" value="${esc(getSigla(p.nombre))}"
+      <td><input class="sigin" data-n="${esc(p.nombre)}" value="${esc(siglaDe(p))}"
         style="width:88px;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;font-size:12px"></td>
       <td class="mono">${nz(iso(p.inicio))}</td><td class="mono">${nz(iso(p.termino))}</td>
       <td class="num">${p.nDev}</td><td class="num">${p.nVenc}</td>
@@ -2727,21 +2878,21 @@ async function cargarPlantillaPeriodo(file){
 function periodoBytes(p){
   const tpl=plantillaPeriodo();
   if(!tpl) throw new Error('No hay plantilla de solicitud disponible. Cargue una.');
-  return llenarPeriodo(tpl,{...p, sigla:getSigla(p.nombre)});
+  return llenarPeriodo(tpl,{...p, sigla:siglaDe(p)});
 }
 function descargarPeriodo(i){
   try{
     const p=ST.ff.programas[i];
     const blob=new Blob([periodoBytes(p)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='Periodo_'+slugFF(getSigla(p.nombre)||p.nombre)+'.xlsx'; a.click();
+    a.download='Periodo_'+slugFF(siglaDe(p)||p.nombre)+'.xlsx'; a.click();
   }catch(e){ ST.per.error=e.message; render(); }
 }
 function descargarConsolidadoPeriodos(){
   // un solo Excel con una hoja por (programa × año académico)
   try{
     const tpl=plantillaPeriodo(); if(!tpl) throw new Error('No hay formato de solicitud disponible.');
-    const items=ST.ff.programas.flatMap(p=>expandirPeriodos({...p, sigla:getSigla(p.nombre)}));
+    const items=ST.ff.programas.flatMap(p=>expandirPeriodos({...p, sigla:siglaDe(p)}));
     const bytes=construirLibroPeriodos(tpl,items);
     const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -2806,7 +2957,7 @@ function seccionPeriodos(){
     <tbody>${progs.map((p,i)=>`<tr>
       <td class="mono" style="color:#94a3b8">${i+1}</td>
       <td>${esc(p.nombre)}</td>
-      <td><input class="sigin" data-n="${esc(p.nombre)}" value="${esc(getSigla(p.nombre))}"
+      <td><input class="sigin" data-n="${esc(p.nombre)}" value="${esc(siglaDe(p))}"
         style="width:88px;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;font-size:12px"></td>
       <td class="mono">${nz(iso(p.inicio))}</td><td class="mono">${nz(iso(p.termino))}</td>
       <td class="num">${p.inicio?p.inicio.getFullYear():'—'}</td>
@@ -2829,6 +2980,56 @@ function wirePeriodos(){
   const z=$('btnPerZip'); if(z) z.onclick=descargarZipPeriodos;
   document.querySelectorAll('.perdl').forEach(b=>b.onclick=()=>descargarPeriodo(+b.dataset.i));
   wireSiglas();
+}
+
+/* ===================== malla visual flotante ===================== */
+let _mallaPopEl=null;
+function mallaPop(){ if(!_mallaPopEl){ _mallaPopEl=document.createElement('div'); _mallaPopEl.id='mallaPop'; document.body.appendChild(_mallaPopEl); } return _mallaPopEl; }
+function mallaPopHTML(sig){
+  const D=ST.datos; if(!D||!D.malla||!D.malla.length) return '';
+  const malla=D.malla, maxHP=Math.max(1,...malla.map(a=>a.hp||0));
+  const key=norm(sig||'');
+  const pers={}; malla.forEach(a=>{ (pers[a.periodo]=pers[a.periodo]||[]).push(a); });
+  const totHP=malla.reduce((t,a)=>t+(a.hp||0),0);
+  let html=`<h4>Malla ${esc(D.programa)}</h4>
+    <div class="mp-sub">${malla.length} asignaturas · ${totHP} HP totales · pase el cursor por las HP de la malla</div>`;
+  Object.keys(pers).sort().forEach(p=>{
+    html+=`<div class="mp-per">Período ${esc(p)}</div>`;
+    pers[p].forEach(a=>{
+      const on=norm(a.sigla)===key;
+      const w=Math.round(100*(a.hp||0)/maxHP);
+      html+=`<div class="mp-row ${on?'mp-on':''}" style="${on?'padding:3px 4px':''}">
+        <span class="mp-sig">${esc(a.sigla)}</span>
+        <span class="mp-nom" title="${esc(a.nombre)}">${esc(a.nombre)}</span>
+        <span style="display:flex;align-items:center;gap:6px"><span class="mp-bar" style="flex:1"><span style="width:${w}%"></span></span>
+        <span class="mp-hp">${a.hp||0} h</span></span></div>`;
+    });
+  });
+  html+=`<div class="mp-tot">Total HP malla: ${totHP} h</div>`;
+  return html;
+}
+function mostrarMallaPop(e,sig){
+  const el=mallaPop(); const h=mallaPopHTML(sig); if(!h) return;
+  el.innerHTML=h; el.style.display='block';
+  // resaltar y auto-scroll a la asignatura
+  const on=el.querySelector('.mp-on'); if(on) on.scrollIntoView({block:'center'});
+  posicionarPop(e);
+}
+function posicionarPop(e){
+  const el=mallaPop(); if(el.style.display!=='block') return;
+  const w=el.offsetWidth||420, hh=el.offsetHeight||300, pad=12;
+  let x=e.clientX+16, y=e.clientY+12;
+  if(x+w+pad>innerWidth) x=e.clientX-w-16;
+  if(y+hh+pad>innerHeight) y=Math.max(pad,innerHeight-hh-pad);
+  el.style.left=Math.max(pad,x)+'px'; el.style.top=Math.max(pad,y)+'px';
+}
+function ocultarMallaPop(){ if(_mallaPopEl) _mallaPopEl.style.display='none'; }
+function wireMallaPop(){
+  document.querySelectorAll('.hpmalla').forEach(t=>{
+    t.addEventListener('mouseenter',e=>mostrarMallaPop(e,t.dataset.sig));
+    t.addEventListener('mousemove',posicionarPop);
+    t.addEventListener('mouseleave',ocultarMallaPop);
+  });
 }
 
 /* ===================== render ===================== */
@@ -2948,6 +3149,7 @@ function render(forzarTab){
     b.className='tab'; b.textContent='Detalle por calendario'; b.disabled=true; tabs.appendChild(b);
   }
   secciones[TAB_ACTIVA].after();
+  ocultarMallaPop(); wireMallaPop();
   $('hsub').textContent = D
     ? `Programa ${D.programa} · ${D.modalidades.length} calendario(s) analizado(s) · ${new Date().toLocaleDateString('es-CL')}`
     : 'Cargue la malla y los calendarios académicos para ejecutar la validación';
@@ -2955,4 +3157,5 @@ function render(forzarTab){
 
 render();
 </script></body></html>
+
 
