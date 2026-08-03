@@ -1530,6 +1530,14 @@ function llenarFF(templateBytes, p) {
   });
 }
 
+/** Suma n meses a una fecha, ajustando el día al último día del mes si se pasa. */
+function _sumaMeses(d, n) {
+  const t = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const ult = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  t.setDate(Math.min(d.getDate(), ult));
+  return t;
+}
+
 /** Rellena el XML del formato de solicitud con un ítem (programa + año). */
 function _fillPeriodoXml(baseXml, it) {
   let xml = baseXml;
@@ -1538,10 +1546,21 @@ function _fillPeriodoXml(baseXml, it) {
   if (it.termino) xml = _setCell(xml, 'L9', { tipo: 'date', valor: _serialFecha(it.termino) }); // término clases
   if (it.anio) { xml = _setCell(xml, 'E9', { tipo: 'n', valor: it.anio }); // Año Período
     xml = _setCell(xml, 'M14', { tipo: 'n', valor: it.anio }); }           // Año Cohorte
-  // Sigla del Programa (L14): se rellena con la sigla si viene; si no, en blanco
+  // Sigla del Programa (L14)
   xml = _setCell(xml, 'L14', it.sigla ? { valor: it.sigla } : { blank: true });
-  ['A9', 'B9', 'C9', 'D9', 'F9', 'G9', 'H9', 'I9', 'J9', 'M9', 'R9',
-   'N14', 'O14', 'P14', 'Q14', 'R14', 'S14']
+  // Fecha cierre del período (M9) = fecha de término + 2 meses
+  xml = _setCell(xml, 'M9', it.termino
+    ? { tipo: 'date', valor: _serialFecha(_sumaMeses(it.termino, 2)) } : { blank: true });
+  // Nombre asignado al período (R9) = sigla + año + '-' + ordinal  (ej. DNIA2027-1)
+  const nomAsig = (it.sigla ? String(it.sigla).replace(/\s+/g, '') : '') +
+    (it.anio || '') + '-' + (it.ordinal || 1);
+  xml = _setCell(xml, 'R9', (it.sigla || it.anio) ? { valor: nomAsig } : { blank: true });
+  // ID Cohorte Postula (R14) = Número de Cohorte
+  const nc = it.nCohorte;
+  xml = _setCell(xml, 'R14', (nc !== undefined && nc !== null && String(nc).trim() !== '')
+    ? _specFF(nc, 'auto') : { blank: true });
+  ['A9', 'B9', 'C9', 'D9', 'F9', 'G9', 'H9', 'I9', 'J9',
+   'N14', 'O14', 'P14', 'Q14', 'S14']
     .forEach(ref => { xml = _setCell(xml, ref, { blank: true }); });
   return xml;
 }
@@ -1550,12 +1569,13 @@ function _fillPeriodoXml(baseXml, it) {
     Año 1 empieza en el inicio real; los siguientes se aproximan al 1-ene, y el último
     termina en el término real (el calculador no trae las fechas separadas por año). */
 function expandirPeriodos(p) {
-  if (!p.inicio) return [{ nombre: p.nombre, inicio: p.inicio, termino: p.termino, anio: '', ordinal: 1, total: 1 }];
+  if (!p.inicio) return [{ nombre: p.nombre, sigla: p.sigla || '', nCohorte: p.nCohorte,
+    inicio: p.inicio, termino: p.termino, anio: '', ordinal: 1, total: 1 }];
   const y0 = p.inicio.getFullYear(), y1 = p.termino ? p.termino.getFullYear() : y0;
   const items = [];
   for (let y = y0; y <= y1; y++) {
     items.push({
-      nombre: p.nombre, sigla: p.sigla || '',
+      nombre: p.nombre, sigla: p.sigla || '', nCohorte: p.nCohorte,
       inicio: y === y0 ? p.inicio : new Date(y, 0, 1),
       termino: (p.termino && y === y1) ? p.termino : new Date(y, 11, 31),
       anio: y, ordinal: y - y0 + 1, total: y1 - y0 + 1,
