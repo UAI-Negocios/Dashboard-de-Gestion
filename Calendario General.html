@@ -2948,7 +2948,8 @@ function _authShowLogin(){
 }
 /* ===== Selector de Unidad Academica (post-login, pre-dashboard) ===== */
 var ACAD_UNITS = [
-  {id:'magdip', icon:'🎓', label:'Magíster y Diplomados', desc:'Magíster, Full-Time y Diplomados (misma pestaña)', sheets:['Data General Postgrados','Postgrados','Magister y Diplomados','Data General Magister','Magister','Magíster','Diplomados','Data General Cursos','Cursos']},
+  {id:'magdip', icon:'🎓', label:'Magíster y Diplomados', desc:'Magíster, Full-Time y Diplomados (misma pestaña)', sheets:['Data General Postgrados','Postgrados','Magister y Diplomados','Data General Magister','Magister','Magíster','Diplomados']},
+  {id:'cursos', icon:'📚', label:'Cursos', desc:'Cursos (pestaña Data General Cursos)', sheets:['Data General Cursos','Cursos','Data Cursos','General Cursos']},
   {id:'mba', icon:'💼', label:'MBA', desc:'Programas MBA / EMBA (pestaña aparte)', sheets:['MBA-EMBA','Data General MBA','MBA','EMBA','Data MBA','MBA General']}
 ];
 function _unitGet(){ try{ var id=sessionStorage.getItem('dash_unit'); if(id){ for(var i=0;i<ACAD_UNITS.length;i++){ if(ACAD_UNITS[i].id===id) return ACAD_UNITS[i]; } } }catch(e){} return ACAD_UNITS[0]||null; }
