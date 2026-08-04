@@ -456,7 +456,7 @@ const COLPAT = {
   fecha:      [/^FECHAS?$/, /^(NUEVA|NVA|ULTIMA) FECHA$/, /^DIAS? ?\/? ?FECHAS?$/, /FECHA/],
   dia:        [/^DIAS?$/, /^DIA DE LA SEMANA$/, /^DIA ?\/? ?SEM/, /^DIA /],
   horario:    [/^HORARIOS?$/, /^HORA$/, /HORARIO/],
-  horas:      [/^HORAS?$/, /^HRS$/, /^HORAS ACADEMICAS$/, /^(N|NRO|CANT) ?HORAS$/],
+  horas:      [/^HORAS?$/, /^HRS\.?$/, /^HORAS ACADEMICAS$/, /^(N|NRO|CANT) ?HORAS$/],
   asignatura: [/^ASIGNATURAS?$/, /^CURSOS?$/, /^RAMOS?$/, /^MATERIAS?$/, /^MODULOS?$/],
   tema:       [/^TEMAS?$/, /^CONTENIDOS?$/, /^ACTIVIDAD(ES)?$/, /^DETALLE$/],
   profesor:   [/^PROFESOR(A|ES|AS)?$/, /^DOCENTES?$/, /^RELATOR(A|ES)?$/, /PROFESOR/],
@@ -479,32 +479,51 @@ function tituloBase(s) {
     el nombre de la asignatura (ej. "Clase 1", "Examen"). */
 const TEMA_GENERICO = /^(CLASE|SESION|EXAMEN|AYUDANTIA|PRUEBA|CONTROL|CATEDRA|TALLER|MODULO|EX)\s*\d*[AB]?$/;
 
+/** Mapea las columnas de UNA fila (rótulo -> índice). ok=true si parece un encabezado. */
+function _mapaFila(r) {
+  const map = {}, rank = {};
+  (r || []).forEach((c, j) => {
+    const t = norm(c);
+    if (!t) return;
+    for (const k in COLPAT) {
+      const p = COLPAT[k].findIndex(re => re.test(t));
+      if (p < 0) continue;
+      if (map[k] === undefined || p < rank[k]) { map[k] = j; rank[k] = p; }
+      return;
+    }
+  });
+  const apoyo = ['horario', 'horas', 'asignatura', 'profesor', 'tema']
+    .filter(k => map[k] !== undefined).length;
+  return { map, apoyo, ok: map.fecha !== undefined && apoyo >= 2 };
+}
+
 /** Busca la fila de encabezado y mapea columna -> índice. Null si no es tabular. */
 function detectarEncabezado(filas) {
   for (let i = 0; i < Math.min(25, filas.length); i++) {
-    const r = filas[i] || [];
-    const map = {}, rank = {};
-    r.forEach((c, j) => {
-      const t = norm(c);
-      if (!t) return;
-      for (const k in COLPAT) {
-        const p = COLPAT[k].findIndex(re => re.test(t));
-        if (p < 0) continue;
-        if (map[k] === undefined || p < rank[k]) { map[k] = j; rank[k] = p; }
-        return;
-      }
-    });
-    const apoyo = ['horario', 'horas', 'asignatura', 'profesor', 'tema']
-      .filter(k => map[k] !== undefined).length;
-    if (map.fecha !== undefined && apoyo >= 2) return { fila: i, map };
+    const m = _mapaFila(filas[i]);
+    if (m.ok) return { fila: i, map: m.map };
   }
   return null;
+}
+
+/** Todas las filas-encabezado del libro. Un mismo archivo puede traer varias sub-tablas
+    con encabezados distintos (ej. un consolidado Diplomado Año 1 + Magíster Año 2, con
+    las columnas corridas), cada una con su propio mapeo de columnas. */
+function detectarEncabezados(filas) {
+  const hs = [];
+  for (let i = 0; i < filas.length; i++) {
+    const m = _mapaFila(filas[i]);
+    if (m.ok) hs.push({ fila: i, map: m.map });
+  }
+  return hs;
 }
 
 function leerCalendarioTabular(filas, hdr) {
   const map = hdr.map, bloques = [], notas = [], porNombre = new Map(), totales = [];
   const cel = (r, k) => (map[k] !== undefined && r[map[k]] != null) ? r[map[k]] : '';
   let tituloModulo = '', colHoras = map.horas;
+  // rótulo de la última fila de texto suelto (candidato a título de una nueva sección)
+  let seccionPend = '';
   // acumulador del tramo actual: horas leídas desde el último total declarado
   let segAcc = 0, segN = 0, segIni = 0, segClaves = new Set();
 
@@ -566,8 +585,28 @@ function leerCalendarioTabular(filas, hdr) {
                       .sort((a, b) => b.length - a.length)[0] || '';
         }
         if (nom) tituloModulo = nom;
+        seccionPend = '';
         continue;
       }
+      // fila que RE-DECLARA los encabezados (DIA/FECHA/HORARIO/PROFESOR…): marca el
+      // comienzo de una nueva sub-tabla (ej. "SEGUNDA SEMANA PRESENCIAL", que no trae un
+      // rótulo "Módulo N"). Se reinicia el módulo vigente para que sus sesiones no se
+      // sumen al módulo anterior, tomando como título la última fila de texto suelto.
+      const KW = /^(DIA|FECHA|HORARIO|HORAS?|HRS\.?|TEMA|PROFESOR|DOCENTE|ASIGNATURA|SESION|MODULO|SALA|SEDE|MODALIDAD)$/;
+      if (celdas.filter(t => KW.test(norm(t))).length >= 2) {
+        // Si el calendario agrupa por la columna TEMA (cada tema es su propia asignatura,
+        // ej. MiMM), el rótulo de sección es solo un divisor de año y NO debe volverse el
+        // módulo vigente: se reinicia a vacío para que cada tema siga siendo su bloque.
+        tituloModulo = temaEsAsignatura ? '' : seccionPend;
+        seccionPend = ''; continue;
+      }
+      // candidato a rótulo de sección: se recuerda por si a continuación viene una
+      // cabecera repetida; si no, no tiene efecto sobre la agrupación.
+      const candTit = celdas.filter(t => t.length > 4 && !/^\d/.test(t)
+        && !/^M[ÓO]DULO\b/i.test(t) && !norm(t).includes('TOTAL')
+        && !norm(t).includes('MASTER EN DIRECCION') && !norm(t).includes('DIPLOMA'))
+        .sort((a, b) => b.length - a.length)[0];
+      if (candTit) seccionPend = candTit;
       // fila de TOTAL declarado: un número suelto (en la columna de horas, o el único
       // valor numérico de la fila) sin día/asignatura/tema. Cierra el tramo y se compara
       // con la suma de horas realmente leídas desde el total anterior.
@@ -654,8 +693,29 @@ function leerCalendarioTabular(filas, hdr) {
 }
 
 function leerCalendario(filas) {
-  const hdr = detectarEncabezado(filas);
-  return hdr ? leerCalendarioTabular(filas, hdr) : leerCalendarioBloques(filas);
+  const hs = detectarEncabezados(filas);
+  if (hs.length <= 1) return hs.length ? leerCalendarioTabular(filas, hs[0]) : leerCalendarioBloques(filas);
+  // Varias sub-tablas (posiblemente con columnas distintas): se lee cada tramo con SU
+  // propio encabezado y se combinan los bloques por nombre de asignatura. Así un
+  // consolidado que junta el Diplomado (Año 1) y el Magíster (Año 2) en una sola hoja
+  // se lee completo, sin dejar asignaturas fuera por el corrimiento de columnas.
+  const porNombre = new Map(), bloques = [], notas = [], totales = [];
+  for (let s = 0; s < hs.length; s++) {
+    const ini = hs[s].fila, fin = (s + 1 < hs.length) ? hs[s + 1].fila : filas.length;
+    const sub = filas.slice(ini, fin);
+    const r = leerCalendarioTabular(sub, { fila: 0, map: hs[s].map });
+    // los números de fila son relativos al tramo: se reajustan al libro completo
+    r.bloques.forEach(b => b.sesiones.forEach(x => { x.fila += ini; }));
+    (r.totales || []).forEach(t => { t.fila += ini; if (t.desde) t.desde += ini; });
+    (r.notas || []).forEach(t => { t.fila += ini; notas.push(t); });
+    (r.totales || []).forEach(t => totales.push(t));
+    r.bloques.forEach(b => {
+      const clave = norm(b.titulo);
+      if (porNombre.has(clave)) porNombre.get(clave).sesiones.push(...b.sesiones);
+      else { porNombre.set(clave, b); bloques.push(b); }
+    });
+  }
+  return { bloques: bloques.filter(b => b.sesiones.length), notas, totales, formato: 'tabular' };
 }
 
 function leerCalendarioBloques(filas) {
@@ -3177,5 +3237,6 @@ function render(forzarTab){
 
 render();
 </script></body></html>
+
 
 
