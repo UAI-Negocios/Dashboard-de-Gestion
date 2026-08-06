@@ -26,6 +26,8 @@ header p{margin:6px 0 0;opacity:.75;font-size:13px}
 .card h2{margin:0 0 4px;font-size:15px;font-weight:650}
 .card .sub{color:#64748b;font-size:12px;margin-bottom:14px}
 table{width:100%;border-collapse:collapse;font-size:13px}
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.tblwrap .mvtab{min-width:1080px}
 th{text-align:left;padding:9px 10px;background:#f8fafc;border-bottom:2px solid #e2e8f0;
    font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#475569;white-space:nowrap}
 td{padding:9px 10px;border-bottom:1px solid #eef2f7;vertical-align:top}
@@ -332,6 +334,14 @@ function aHora(v) {
 }
 
 const iso = d => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null;
+// Formato de PRESENTACIÓN: DD-MM-AAAA (iso sigue siendo el formato interno para Excel y claves).
+// Acepta una fecha (Date) o una cadena ISO "AAAA-MM-DD"; cualquier otra cosa se devuelve igual.
+const dmy = v => {
+  if (v == null || v === '') return v;
+  if (v instanceof Date) return `${String(v.getDate()).padStart(2, '0')}-${String(v.getMonth() + 1).padStart(2, '0')}-${v.getFullYear()}`;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : v;
+};
 const dias = (a, b) => Math.round((b - a) / 86400000);
 const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; };
 
@@ -340,7 +350,7 @@ function diaCercano(fecha, diaNorm) {
   if (obj < 0) return '-';
   for (let d = 0; d < 8; d++) for (const sg of [1, -1]) {
     const c = new Date(fecha.getTime() + d * sg * 86400000);
-    if ((c.getDay() + 6) % 7 === obj) return iso(c);
+    if ((c.getDay() + 6) % 7 === obj) return dmy(c);
   }
   return '-';
 }
@@ -518,8 +528,12 @@ function detectarEncabezados(filas) {
   return hs;
 }
 
-function leerCalendarioTabular(filas, hdr) {
+function leerCalendarioTabular(filas, hdr, desde) {
   const map = hdr.map, bloques = [], notas = [], porNombre = new Map(), totales = [];
+  // fila desde donde se recorren las sesiones. Por defecto, justo tras el encabezado; con
+  // `desde` se puede empezar antes (para captar títulos de módulo que van sobre el 1er
+  // encabezado cuando el encabezado se repite en cada módulo con la misma estructura).
+  const inicioLoop = (desde !== undefined) ? desde : hdr.fila + 1;
   const cel = (r, k) => (map[k] !== undefined && r[map[k]] != null) ? r[map[k]] : '';
   let tituloModulo = '', colHoras = map.horas;
   // rótulo de la última fila de texto suelto (candidato a título de una nueva sección)
@@ -564,7 +578,7 @@ function leerCalendarioTabular(filas, hdr) {
   // si aún no hay columna de horas, se derivan del rango horario (fin − inicio).
   const derivarHoras = colHoras === undefined && map.horario !== undefined;
 
-  for (let i = hdr.fila + 1; i < filas.length; i++) {
+  for (let i = inicioLoop; i < filas.length; i++) {
     const r = filas[i] || [];
     const n = i + 1;
     const fecha = aFecha(cel(r, 'fecha'));
@@ -574,15 +588,21 @@ function leerCalendarioTabular(filas, hdr) {
 
     // fila de módulo/bloque sin fecha: el rótulo "Módulo N" puede estar en cualquier
     // columna (a veces sin encabezado), y el nombre real va tras ':' o en la celda
-    // de texto más larga de esa misma fila.
+    // de texto de esa misma fila. Cuando el nombre va en una celda aparte, se toma la
+    // PRIMERA celda de texto a la derecha del rótulo (no la más larga), para no confundirlo
+    // con rótulos de columnas contiguas ("ACTIVIDAD ACADÉMICA", "EVALUACIONES").
     if (!fecha) {
       const celdas = r.map(c => String(c == null ? '' : c).trim());
-      const mod = celdas.find(t => /^M[ÓO]DULO\b/i.test(t));
+      const modIdx = celdas.findIndex(t => /^M[ÓO]DULO\b/i.test(t));
+      const mod = modIdx >= 0 ? celdas[modIdx] : undefined;
       if (mod) {
         let nom = mod.includes(':') ? mod.slice(mod.indexOf(':') + 1).trim() : '';
         if (!nom) {
-          nom = celdas.filter(t => t && t !== mod && t.length > 4 && !/^\d/.test(t))
-                      .sort((a, b) => b.length - a.length)[0] || '';
+          const noRotulo = t => !/^(ACTIVIDAD ACAD[EÉ]MICA|EVALUACION(ES)?)$/i.test(t);
+          const cand = celdas.map((t, idx) => ({ t, idx }))
+            .filter(o => o.t && o.idx !== modIdx && o.t.length > 4 && !/^\d/.test(o.t) && noRotulo(o.t));
+          const der = cand.filter(o => o.idx > modIdx).sort((a, b) => a.idx - b.idx);
+          nom = (der[0] || cand.sort((a, b) => b.t.length - a.t.length)[0] || {}).t || '';
         }
         if (nom) tituloModulo = nom;
         seccionPend = '';
@@ -592,12 +612,14 @@ function leerCalendarioTabular(filas, hdr) {
       // comienzo de una nueva sub-tabla (ej. "SEGUNDA SEMANA PRESENCIAL", que no trae un
       // rótulo "Módulo N"). Se reinicia el módulo vigente para que sus sesiones no se
       // sumen al módulo anterior, tomando como título la última fila de texto suelto.
-      const KW = /^(DIA|FECHA|HORARIO|HORAS?|HRS\.?|TEMA|PROFESOR|DOCENTE|ASIGNATURA|SESION|MODULO|SALA|SEDE|MODALIDAD)$/;
+      const KW = /^(DIA|FECHA|HORARIO|HORAS?|HRS\.?|TEMA|PROFESOR|DOCENTE|ASIGNATURA|SESION|MODULO|SALA|SEDE|MODALIDAD|CLASE)$/;
       if (celdas.filter(t => KW.test(norm(t))).length >= 2) {
-        // Si el calendario agrupa por la columna TEMA (cada tema es su propia asignatura,
-        // ej. MiMM), el rótulo de sección es solo un divisor de año y NO debe volverse el
-        // módulo vigente: se reinicia a vacío para que cada tema siga siendo su bloque.
-        tituloModulo = temaEsAsignatura ? '' : seccionPend;
+        // Encabezado repetido (nueva sub-tabla). Si viene un rótulo de sección pendiente
+        // (ej. "SEGUNDA SEMANA PRESENCIAL"), pasa a ser el módulo vigente —salvo que el
+        // calendario agrupe por la columna TEMA (ej. MiMM), donde el rótulo es solo un
+        // divisor. Si NO hay rótulo pendiente, se conserva el módulo vigente (que suele
+        // venir declarado en la fila inmediatamente anterior al encabezado).
+        if (seccionPend) tituloModulo = temaEsAsignatura ? '' : seccionPend;
         seccionPend = ''; continue;
       }
       // candidato a rótulo de sección: se recuerda por si a continuación viene una
@@ -692,10 +714,25 @@ function leerCalendarioTabular(filas, hdr) {
   return { bloques: bloques.filter(b => b.sesiones.length), notas, totales, formato: 'tabular' };
 }
 
+/** Dos encabezados tienen la MISMA estructura si toda columna compartida cae en el mismo
+    índice (misma disposición; encabezado simplemente repetido en cada módulo). */
+function _mismaEstructura(a, b) {
+  for (const k in a) if (b[k] !== undefined && b[k] !== a[k]) return false;
+  for (const k in b) if (a[k] !== undefined && a[k] !== b[k]) return false;
+  return true;
+}
+
 function leerCalendario(filas) {
   const hs = detectarEncabezados(filas);
-  if (hs.length <= 1) return hs.length ? leerCalendarioTabular(filas, hs[0]) : leerCalendarioBloques(filas);
-  // Varias sub-tablas (posiblemente con columnas distintas): se lee cada tramo con SU
+  if (hs.length === 0) return leerCalendarioBloques(filas);
+  if (hs.length === 1) return leerCalendarioTabular(filas, hs[0]);
+  // Varios encabezados con la MISMA estructura = una sola tabla lógica con el encabezado
+  // repetido en cada módulo (ej. DEC). Se lee la hoja completa desde el inicio para captar
+  // el título de módulo que va sobre el primer encabezado; los encabezados repetidos y los
+  // títulos de módulo se manejan dentro del lector.
+  if (hs.every(h => _mismaEstructura(hs[0].map, h.map)))
+    return leerCalendarioTabular(filas, hs[0], 0);
+  // Varias sub-tablas con COLUMNAS DISTINTAS: se lee cada tramo con SU
   // propio encabezado y se combinan los bloques por nombre de asignatura. Así un
   // consolidado que junta el Diplomado (Año 1) y el Magíster (Año 2) en una sola hoja
   // se lee completo, sin dejar asignaturas fuera por el corrimiento de columnas.
@@ -935,8 +972,8 @@ function analizar(malla, bloques, notas, modalidad, totales) {
       exams.forEach(e => {
         if (e.fecha < ult) {
           add('CRITICO', 'Secuencia', `${a.sigla} ${a.nombre}`,
-            `Examen el ${iso(e.fecha)} ocurre ANTES de la última clase (${iso(ult)}).`,
-            `Reprogramar el examen a una fecha posterior al ${iso(ult)}.`);
+            `Examen el ${dmy(e.fecha)} ocurre ANTES de la última clase (${dmy(ult)}).`,
+            `Reprogramar el examen a una fecha posterior al ${dmy(ult)}.`);
           fila.hallazgos.push('Examen antes de la última clase');
         }
       });
@@ -947,7 +984,7 @@ function analizar(malla, bloques, notas, modalidad, totales) {
         const real = DIAS_ORDEN[(s.fecha.getDay() + 6) % 7];
         if (real !== norm(s.dia)) {
           add('CRITICO', 'Fecha', `${a.sigla} ${a.nombre}`,
-            `Fila ${s.fila}: se declara '${s.dia}' pero ${iso(s.fecha)} es ${real[0] + real.slice(1).toLowerCase()}.`,
+            `Fila ${s.fila}: se declara '${s.dia}' pero ${dmy(s.fecha)} es ${real[0] + real.slice(1).toLowerCase()}.`,
             `Corregir la fecha o el día. El ${real.toLowerCase()} más cercano es ${diaCercano(s.fecha, norm(s.dia))}.`);
           fila.hallazgos.push('Día/fecha inconsistente');
         }
@@ -958,7 +995,7 @@ function analizar(malla, bloques, notas, modalidad, totales) {
       const [i0, f0] = parseRangoHorario(s.horario);
       if (i0 !== null && f0 !== null && f0 <= i0) {
         add('CRITICO', 'Horario', `${a.sigla} ${a.nombre}`,
-          `Rango horario inválido '${s.horario}' (fila ${s.fila}, ${iso(s.fecha)}).`,
+          `Rango horario inválido '${s.horario}' (fila ${s.fila}, ${dmy(s.fecha)}).`,
           'Corregir hora de inicio/término.');
         fila.hallazgos.push('Rango horario inválido');
       }
@@ -1067,25 +1104,25 @@ function analizar(malla, bloques, notas, modalidad, totales) {
       const d = dias(fechas[i - 1], fechas[i]);
       if (d >= REGLAS.gap_critico_dias)
         add('ADVERTENCIA', 'Vacio academico', 'Calendario',
-          `${d} días sin actividad entre ${iso(fechas[i - 1])} y ${iso(fechas[i])}.`,
+          `${d} días sin actividad entre ${dmy(fechas[i - 1])} y ${dmy(fechas[i])}.`,
           'Verificar si corresponde a receso oficial; documentarlo en el calendario.');
       else if (d >= REGLAS.gap_alerta_dias)
         add('ADVERTENCIA', 'Vacio academico', 'Calendario',
-          `${d} días sin actividad entre ${iso(fechas[i - 1])} y ${iso(fechas[i])}.`,
+          `${d} días sin actividad entre ${dmy(fechas[i - 1])} y ${dmy(fechas[i])}.`,
           'Revisar continuidad académica.');
     }
     const f0 = fechas[0], f1 = fechas[fechas.length - 1];
     const meses = (f1.getFullYear() - f0.getFullYear()) * 12 + f1.getMonth() - f0.getMonth();
     if (meses > REGLAS.duracion_max_meses)
       add('CRITICO', 'Duracion', 'Programa',
-        `Duración de ${meses} meses (${iso(f0)} a ${iso(f1)}), sobre el máximo de ${REGLAS.duracion_max_meses} meses.`,
+        `Duración de ${meses} meses (${dmy(f0)} a ${dmy(f1)}), sobre el máximo de ${REGLAS.duracion_max_meses} meses.`,
         'Compactar el calendario o solicitar autorización de extensión.');
     else if (meses < REGLAS.duracion_min_meses)
       add('ADVERTENCIA', 'Duracion', 'Programa',
         `Duración de ${meses} meses, bajo el mínimo referencial de ${REGLAS.duracion_min_meses} meses.`,
         'Verificar normativa de posgrado.');
     else
-      add('OK', 'Duracion', 'Programa', `Duración de ${meses} meses (${iso(f0)} a ${iso(f1)}), dentro de norma.`);
+      add('OK', 'Duracion', 'Programa', `Duración de ${meses} meses (${dmy(f0)} a ${dmy(f1)}), dentro de norma.`);
 
     todos.forEach(([, s]) => {
       const k = `${s.fecha.getFullYear()}-S${s.fecha.getMonth() <= 5 ? 1 : 2}`;
@@ -1260,10 +1297,10 @@ function resumenEjecutivo(malla, modalidades) {
   const vent = {}, dur = {};
   const detVent = [], detDur = [];
   modalidades.forEach(m => {
-    vent[m.modalidad] = `${m.resumen.inicio} → ${m.resumen.fin}`;
+    vent[m.modalidad] = `${dmy(m.resumen.inicio)} → ${dmy(m.resumen.fin)}`;
     const d = m.hallazgos.filter(h => h.categoria === 'Duracion');
     dur[m.modalidad] = d.length ? (d[0].mensaje.split(' de ')[1] || '').split(' (')[0] : '—';
-    detVent.push({ mod: m.modalidad, txt: `del ${m.resumen.inicio} al ${m.resumen.fin}` });
+    detVent.push({ mod: m.modalidad, txt: `del ${dmy(m.resumen.inicio)} al ${dmy(m.resumen.fin)}` });
     Object.entries(m.resumen.carga_por_semestre).sort().forEach(([k, v]) =>
       detVent.push({ txt: `   • ${k}: ${v} h presenciales` }));
     if (d.length) detDur.push({ mod: m.modalidad, txt: d[0].mensaje });
@@ -2138,11 +2175,11 @@ function anchos(aoa,ignorar,max=48){
 const fx=s=>{
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));
   if(!m) return s||'';
-  return {t:'n', v:Date.UTC(+m[1],+m[2]-1,+m[3])/86400000+25569, z:'yyyy-mm-dd'};
+  return {t:'n', v:Date.UTC(+m[1],+m[2]-1,+m[3])/86400000+25569, z:'dd-mm-yyyy'};
 };
 
 function agregarHoja(wb,titulo,aoa,merges,filasTitulo){
-  const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'yyyy-mm-dd'});
+  const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'dd-mm-yyyy'});
   ws['!cols']=anchos(aoa,filasTitulo);
   if(merges&&merges.length) ws['!merges']=merges;
   XLSX.utils.book_append_sheet(wb,ws,hojaNombre(titulo));
@@ -2564,7 +2601,7 @@ function tog(id){
 function tablaMallaVs(m){
   const D=m.detalle.slice().sort((a,b)=>(a.periodo+a.sigla).localeCompare(b.periodo+b.sigla));
   const s=k=>D.reduce((t,x)=>t+(x[k]||0),0);
-  return `<table><thead>
+  return `<div class="tblwrap"><table class="mvtab"><thead>
     <tr class="grupo"><th colspan="8">INFORMACIÓN MALLA BASE CURRICULAR</th>
       <th colspan="3" class="g2">PROGRAMACIÓN CALENDARIO ${esc(m.modalidad.toUpperCase())}</th>
       <th colspan="3" class="g3">VALIDACIÓN Y CUMPLIMIENTO</th></tr>
@@ -2586,14 +2623,14 @@ function tablaMallaVs(m){
         <td class="num">${d.creditos}</td><td class="num">${d.ha||''}</td>
         <td class="num hpmalla" data-sig="${esc(d.sigla)}">${d.hp_malla}</td><td class="num">${d.hnp||''}</td>
         <td class="num">${d.horas_programadas}</td>
-        <td class="mono">${nz(d.inicio)}</td><td class="mono">${nz(d.fin)}</td>
+        <td class="mono">${nz(dmy(d.inicio))}</td><td class="mono">${nz(dmy(d.fin))}</td>
         <td class="num ${cls}">${dl>0?'+':''}${dl}</td><td class="${cls}">${est}</td>
         <td>${ev}${d.hallazgos.length?`<span class="rec">${esc(d.hallazgos.join(' · '))}</span>`:''}</td></tr>
       <tr id="mv_${m.id}_${i}" class="sess hide"><td colspan="14">
         <table><thead><tr><th>Fila</th><th>Día</th><th>Fecha</th><th>Horario</th><th>Tipo</th>
         <th class="num">Horas</th><th>Docente</th></tr></thead><tbody>
         ${(d.detalle_sesiones||[]).map(x=>`<tr><td class="mono">${x.fila}</td><td>${esc(x.dia)}</td>
-          <td class="mono">${nz(x.fecha)}</td><td class="mono">${esc(x.horario)}</td><td>${esc(x.tipo)}</td>
+          <td class="mono">${nz(dmy(x.fecha))}</td><td class="mono">${esc(x.horario)}</td><td>${esc(x.tipo)}</td>
           <td class="num">${x.horas}</td><td>${esc(x.docente)||'<span style="color:#b91c1c">—</span>'}</td></tr>`).join('')
           ||'<tr><td colspan="7">Sin sesiones calendarizadas.</td></tr>'}
         </tbody></table></td></tr>`;}).join('')}
@@ -2602,7 +2639,7 @@ function tablaMallaVs(m){
       <td class="num">${s('hp_malla')}</td><td class="num">${s('hnp')}</td>
       <td class="num">${s('horas_programadas')}</td><td></td><td></td>
       <td class="num">${s('delta')>0?'+':''}${s('delta')}</td><td></td><td></td></tr>
-    </tbody></table>`;
+    </tbody></table></div>`;
 }
 
 function tablaComparacion(C,na,nb){
@@ -2621,8 +2658,9 @@ function tablaComparacion(C,na,nb){
 function tablaReporte(rows){
   return `<table><thead><tr>${REPORTE_COLS.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r=>`<tr>${REPORTE_COLS.map(c=>{
-      const v=r[c], cls=(c==='Nº ALUMNOS'||c==='AÑO IMPARTE'||c==='HORAS')?' class="num"':
+      let v=r[c]; const cls=(c==='Nº ALUMNOS'||c==='AÑO IMPARTE'||c==='HORAS')?' class="num"':
                         (c==='FECHAS'||c==='HORARIO')?' class="mono"':'';
+      if(c==='FECHAS') v=dmy(v);
       return `<td${cls}>${(v===''||v==null)?'<span style="color:#cbd5e1">—</span>':esc(v)}</td>`;
     }).join('')}</tr>`).join('')}</tbody></table>`;
 }
@@ -2921,7 +2959,7 @@ function seccionFichas(){
       <td>${esc(p.nombre)}</td>
       <td><input class="sigin" data-n="${esc(p.nombre)}" value="${esc(siglaDe(p))}"
         style="width:88px;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;font-size:12px"></td>
-      <td class="mono">${nz(iso(p.inicio))}</td><td class="mono">${nz(iso(p.termino))}</td>
+      <td class="mono">${nz(dmy(p.inicio))}</td><td class="mono">${nz(dmy(p.termino))}</td>
       <td class="num">${p.nDev}</td><td class="num">${p.nVenc}</td>
       <td><button class="btn sec ffdl" data-i="${i}" ${hayTpl?'':'disabled'} style="padding:5px 12px;font-size:12px">⬇ Ficha</button></td>
     </tr>`).join('')}</tbody></table>
@@ -3039,7 +3077,7 @@ function seccionPeriodos(){
       <td>${esc(p.nombre)}</td>
       <td><input class="sigin" data-n="${esc(p.nombre)}" value="${esc(siglaDe(p))}"
         style="width:88px;border:1px solid #cbd5e1;border-radius:6px;padding:3px 6px;font-size:12px"></td>
-      <td class="mono">${nz(iso(p.inicio))}</td><td class="mono">${nz(iso(p.termino))}</td>
+      <td class="mono">${nz(dmy(p.inicio))}</td><td class="mono">${nz(dmy(p.termino))}</td>
       <td class="num">${p.inicio?p.inicio.getFullYear():'—'}</td>
       <td><button class="btn sec perdl" data-i="${i}" ${hayTpl?'':'disabled'} style="padding:5px 12px;font-size:12px">⬇ Solicitud</button></td>
     </tr>`).join('')}</tbody></table>
@@ -3170,7 +3208,7 @@ function render(forzarTab){
         ${kpi(R.horas_programadas+' h','Horas programadas')}
         ${kpi(R.sin_calendario,'Sin calendarizar',R.sin_calendario?'crit':'ok')}</div>
       <div class="card"><h2>Ventana académica</h2>
-        <div class="sub">Archivo <b>${esc(m.archivo||'')}</b> · del <b>${nz(R.inicio)}</b> al <b>${nz(R.fin)}</b> ·
+        <div class="sub">Archivo <b>${esc(m.archivo||'')}</b> · del <b>${nz(dmy(R.inicio))}</b> al <b>${nz(dmy(R.fin))}</b> ·
         ${R.bloques_calendario} bloques · ${R.emparejadas} asignaturas emparejadas ·
         ${R.fuera_de_malla} bloques fuera de malla</div>
         <table><thead><tr><th>Semestre calendario</th><th class="num">Horas presenciales programadas</th></tr></thead>
@@ -3237,6 +3275,5 @@ function render(forzarTab){
 
 render();
 </script></body></html>
-
 
 
