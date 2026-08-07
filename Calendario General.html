@@ -1714,7 +1714,7 @@ const CATS = {
   calendarios:  ['calendario','reservas','actterm'],
   planificador: ['plancursos','plancoord','malla','planreporte','propuestas','horario','asistencia'],
   admin:        ['gestion','cargaprog','cargapuntaje','turnos','cargalaboral','coordcarga'],
-  control:      ['declaracion','infodecl','declarado','anualdecl','presupuesto','informe','cruce','crucedecl','controlhoras','valoreshora','areacg'],
+  control:      ['declaracion','infodecl','horasdecl','declarado','anualdecl','presupuesto','informe','cruce','crucedecl','controlhoras','valoreshora','areacg'],
   ayuda:        ['manual','faqs'],
   adn:          ['adnacademico','finalizados'],
 };
@@ -1735,6 +1735,7 @@ const TAB_LABELS = {
   correos:      '📧 Correos de Bienvenida',
   declaracion:  'Declaración de Horas',
   infodecl:     '📋 Informe Declaración Mes',
+  horasdecl:    '⏱️ Horas por Mes',
   crucedecl:    '🔀 Cruce Declaraciones',
   anualdecl:    '📅 Declarado por Año',
   presupuesto:  '💰 Presupuesto vs Real',
@@ -3364,7 +3365,7 @@ function refreshView() {
   if (!$('page')) return; // DOM not ready yet
   destroyCharts();
   // Tabs que tienen su propia fuente de datos o no requieren el calendario
-  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','infodecl','crucedecl','finalizados','correos','asistencia','areacg'];
+  const TABS_SIN_DF = ['manual','faqs','agente','declarado','plancursos','plancoord','malla','planreporte','propuestas','horario','contratos','anualdecl','presupuesto','informe','cruce','adnacademico','controlhoras','valoreshora','infodecl','horasdecl','crucedecl','finalizados','correos','asistencia','areacg'];
   if (!APP.df.length && !TABS_SIN_DF.includes(APP.tab)) {
     renderEmpty(); return;
   }
@@ -3387,6 +3388,7 @@ function refreshView() {
     cruce:        renderCruceInfo,
     controlhoras: renderControlHoras,
     infodecl:     renderInfoDeclMes,
+    horasdecl:    renderHorasDeclMes,
     crucedecl:    renderCruceDecl,
     horasdoc:     renderHorasDoc,
     valoreshora:  renderValoresHora,
@@ -12968,7 +12970,8 @@ function gctCargarDecl(file) {
       // También alimentar el módulo _dvo (declaraciones vs obligación)
       _dvo = rows;
       if(typeof _dvCons === 'function') _dvCons();
-      showToast(rows.length+' declaraciones cargadas','ok');
+      var _hdcAdded=(typeof _hdcHistMerge==='function')?_hdcHistMerge(rows):0;
+      showToast(rows.length+' declaraciones cargadas'+(_hdcAdded?' \u00b7 '+_hdcAdded+' nuevas al hist\u00f3rico':''),'ok');
       if(_ctRawCont.length) _ctCruzar();
       renderDeclarado();
     }catch(err){ showToast('Error declaraciones: '+err.message,'err'); }
@@ -13003,6 +13006,7 @@ function ctCargarDecl(file) {
       var shN=wb.SheetNames[0];
       _ctRawDecl=XLSX.utils.sheet_to_json(wb.Sheets[shN],{defval:''});
       if(st) st.textContent='✅ '+_ctRawDecl.length.toLocaleString('es-CL')+' declaraciones';
+      if(typeof _hdcHistMerge==='function') _hdcHistMerge(_ctRawDecl);
       _ctCruzar();
     }catch(err){ if(st) st.textContent='❌ '+err.message; }
   };
@@ -31964,6 +31968,188 @@ function _hdTgl(i){
    Cruza: Declarado (actividad, hrs oblig/declaradas, RUT, CC, mes)
         + Contratos (monto, emisión) · granularidad por actividad
 ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   CONTROL → HORAS POR MES (DECLARADO)
+   Misma estructura visual que Programas → Horas por Mes,
+   pero calculado desde el Reporte de Declaraciones cargado
+   en Gestión C./Declaración (_ctRawDecl), no del Calendario.
+══════════════════════════════════════════════════════ */
+var _HDC={q:'',doc:'',year:'',tipo:''};
+var _HDC_HISTKEY='hdc_hist_v1';
+/* Acumula TODO el histórico de declaraciones cargadas (dedup por movimiento_id), persistente en localStorage */
+function _hdcHistLoad(){
+  if(window._hdcHistCache) return window._hdcHistCache;
+  try{ window._hdcHistCache=JSON.parse(localStorage.getItem(_HDC_HISTKEY)||'[]'); }catch(e){ window._hdcHistCache=[]; }
+  return window._hdcHistCache;
+}
+function _hdcHistSave(rows){
+  window._hdcHistCache=rows;
+  try{ localStorage.setItem(_HDC_HISTKEY,JSON.stringify(rows)); }catch(e){ showToast('Historial muy grande para guardar localmente','warn'); }
+}
+/* Llamar cada vez que se carga un archivo de declaraciones (gctCargarDecl / ctCargarDecl) */
+function _hdcHistMerge(newRows){
+  if(!newRows||!newRows.length) return;
+  var hist=_hdcHistLoad();
+  var seen={};
+  hist.forEach(function(r){ var k=r['movimiento_id']!=null&&r['movimiento_id']!==''?('id:'+r['movimiento_id']):('c:'+r['NumeroDocumento']+'|'+r['programa_centrocosto']+'|'+r['ActividadCodigo']+'|'+r['Mes']+'|'+r['movimiento_horas_lv']+'|'+r['movimiento_horas_sd']); seen[k]=1; });
+  var added=0;
+  newRows.forEach(function(r){
+    var k=r['movimiento_id']!=null&&r['movimiento_id']!==''?('id:'+r['movimiento_id']):('c:'+r['NumeroDocumento']+'|'+r['programa_centrocosto']+'|'+r['ActividadCodigo']+'|'+r['Mes']+'|'+r['movimiento_horas_lv']+'|'+r['movimiento_horas_sd']);
+    if(!seen[k]){ seen[k]=1; hist.push(r); added++; }
+  });
+  _hdcHistSave(hist);
+  return added;
+}
+function _hdcHistClear(){ _hdcHistSave([]); showToast('Historial de Horas por Mes borrado','ok'); if(document.getElementById('page')&&document.getElementById('page').innerHTML.indexOf('hdcWrap')>=0) renderHorasDeclMes(); }
+var _HDC_MESIDX={ENERO:0,FEBRERO:1,MARZO:2,ABRIL:3,MAYO:4,JUNIO:5,JULIO:6,AGOSTO:7,SEPTIEMBRE:8,SETIEMBRE:8,OCTUBRE:9,NOVIEMBRE:10,DICIEMBRE:11};
+var _HDC_MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function _hdcFmt(n){ if(!n) return ''; var r=Math.round(n*10)/10; return (r%1===0? String(r) : r.toFixed(1)).replace('.',','); }
+/* Reconocimiento robusto del mes: texto 'Mes' -> numérico 'movimiento_mes' -> texto 'MesInicio' */
+function _hdcMesIdx(r){
+  var t=String(r['Mes']||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(_HDC_MESIDX[t]!=null) return _HDC_MESIDX[t];
+  var n=parseInt(r['movimiento_mes'],10);
+  if(!isNaN(n)&&n>=1&&n<=12) return n-1;
+  var t2=String(r['MesInicio']||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(_HDC_MESIDX[t2]!=null) return _HDC_MESIDX[t2];
+  return null;
+}
+function _hdcYear(r){
+  function pull(v){
+    if(v instanceof Date && !isNaN(v)) return v.getFullYear();
+    var s=String(v||''); var m=s.match(/(20\d\d)/); return m?+m[1]:null;
+  }
+  return pull(r['movimiento_fecha']) || pull(r['FechaInicio']) || pull(r['FechaTermino']) || null;
+}
+function _hdcTipoList(){
+  var hist=_hdcHistLoad(); var raw=hist.length?hist:(_ctRawDecl||[]);
+  var s={}; raw.forEach(function(r){ var t=String(r['TipoProfesor']||'').trim(); if(t) s[t]=1; });
+  return Object.keys(s).sort();
+}
+/* Filas PLANAS: Docente · Tipo · Año · Programa · Actividad · Valor Hora · meses */
+function _hdcBuild(){
+  var hist=_hdcHistLoad();
+  var raw=hist.length?hist:(_ctRawDecl||[]);
+  var map={}, years={}, sinMes=0;
+  raw.forEach(function(r){
+    var prof=String(r['Profesor']||'').trim();
+    if(!prof||IGNORE_NO_ASIG.has(prof.toLowerCase())) return;
+    var mi=_hdcMesIdx(r);
+    if(mi==null){ sinMes++; return; }
+    var yr=_hdcYear(r);
+    if(yr) years[yr]=1;
+    if(_HDC.year && String(yr)!==_HDC.year) return;
+    var tipo=String(r['TipoProfesor']||'').trim()||'\u2014';
+    if(_HDC.tipo && tipo!==_HDC.tipo) return;
+    var progFull=String(r['Programa']||'').trim()||'\u2014';
+    var act=String(r['ActividadNombre']||'').trim()||String(r['ActividadCodigo']||'').trim()||'\u2014';
+    var vh=Math.round(parseFloat(r['movimiento_precio_hora'])||0);
+    var k=prof+'\u241F'+progFull+'\u241F'+act+'\u241F'+(yr||'')+'\u241F'+vh;
+    if(!map[k]) map[k]={doc:prof,tipo:tipo,anio:yr||'\u2014',prog:progFull,act:act,vh:vh,
+      m:[0,0,0,0,0,0,0,0,0,0,0,0],total:0};
+    var e=map[k];
+    var hrs=(parseFloat(r['movimiento_horas_lv'])||0)+(parseFloat(r['movimiento_horas_sd'])||0);
+    e.m[mi]+=hrs; e.total+=hrs;
+  });
+  _HDC._years=Object.keys(years).sort();
+  _HDC._sinMes=sinMes;
+  var out=Object.keys(map).map(function(k){return map[k];}).filter(function(r){return r.total>0.001;});
+  out.sort(function(a,b){ return a.prog.localeCompare(b.prog,'es') || a.doc.localeCompare(b.doc,'es') || (a.anio+'').localeCompare(b.anio+''); });
+  return out;
+}
+function renderHorasDeclMes(){
+  var hist=_hdcHistLoad();
+  var src=hist.length?hist:(_ctRawDecl||[]);
+  if(!src.length){
+    $('page').innerHTML='<div class="pg-title">\u23F1\uFE0F Horas por Mes <span style="font-size:10px;color:var(--t4);font-weight:400;margin-left:8px">calculado desde el reporte de Declaraciones</span></div>'+
+      '<div style="background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:30px;text-align:center;color:var(--t3);font-size:12px">A\u00fan no hay un reporte de Declaraciones cargado.<br><span style="font-size:10px;color:var(--t4)">Ve a <b style="color:var(--t2)">Gesti\u00f3n C./Declaraci\u00f3n</b> y carga el archivo de Declaraciones \u2014 esta vista se completa autom\u00e1ticamente. Cada archivo que cargues se suma al hist\u00f3rico (no se pierde lo anterior).</span></div>';
+    return;
+  }
+  var all=_hdcBuild();
+  _HDC._rows=all;
+  var docs=[...new Set(all.map(function(r){return r.doc;}))].sort(function(a,b){return a.localeCompare(b,'es');});
+  var progsN=[...new Set(all.map(function(r){return r.prog;}))].length;
+  var tipoOpts=_hdcTipoList();
+  var totV=all.reduce(function(a,r){return a+r.total;},0);
+  var mesT=[0,0,0,0,0,0,0,0,0,0,0,0]; all.forEach(function(r){ r.m.forEach(function(v,i){mesT[i]+=v;}); });
+  var pk=Math.max.apply(null,mesT), pi=mesT.indexOf(pk);
+  var mesesConDatos=mesT.filter(function(v){return v>0;}).length;
+  var kpi=function(ico,val,lbl,clr){ return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:130px"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">'+ico+' '+lbl+'</div><div style="font-size:20px;font-weight:800;color:'+clr+';margin-top:4px">'+val+'</div></div>'; };
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  $('page').innerHTML='<div class="pg-title">\u23F1\uFE0F Horas por Mes <span style="font-size:10px;color:var(--t4);font-weight:400;margin-left:8px">calculado desde el hist\u00f3rico de Declaraciones (Gesti\u00f3n C./Declaraci\u00f3n)</span></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;margin-bottom:12px;background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.25);border-radius:8px;font-size:10.5px;color:var(--t2)">'+
+      '<span>\uD83D\uDCDA</span><span><b style="color:#3fb950">'+src.length.toLocaleString('es-CL')+' movimientos</b> en el hist\u00f3rico acumulado \u00b7 '+mesesConDatos+' mes(es) con datos'+(hist.length?'':' (a\u00fan no acumulado \u2014 se guardar\u00e1 desde la pr\u00f3xima carga)')+(_HDC._sinMes?' \u00b7 <span style="color:#f0b429">'+_HDC._sinMes+' fila(s) sin mes reconocible</span>':'')+'</span>'+
+      (hist.length?'<button onclick="if(confirm(\'\u00bfBorrar todo el hist\u00f3rico acumulado de Horas por Mes?\'))_hdcHistClear()" style="margin-left:auto;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--t3);font-size:10px;cursor:pointer">\uD83D\uDDD1 Borrar hist\u00f3rico</button>':'')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      kpi('\uD83D\uDC68\u200D\uD83C\uDFEB',docs.length,'Docentes','var(--t1)')+
+      kpi('\uD83C\uDF93',progsN,'Programas','#34d6ff')+
+      kpi('\uD83D\uDCCB',all.length,'Filas (act.\u00d7a\u00f1o)','#a78bfa')+
+      kpi('\u23F1\uFE0F',_hdcFmt(totV)||'0','Horas totales','#f0b429')+
+      kpi('\uD83D\uDCC8',pk?(_HD_MLBL[pi]+' \u00b7 '+_hdcFmt(pk)+'h'):'\u2014','Mes pico','#3fb950')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+      '<select onchange="_HDC.year=this.value;renderHorasDeclMes()" style="'+selS+'"><option value="">Todos los a\u00f1os</option>'+(_HDC._years||[]).map(function(y){return '<option value="'+y+'"'+(_HDC.year===y?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+      '<select onchange="_HDC.tipo=this.value;renderHorasDeclMes()" style="'+selS+'"><option value="">Todo tipo docente</option>'+tipoOpts.map(function(t){return '<option value="'+escA(t)+'"'+(_HDC.tipo===t?' selected':'')+'>'+esc(t)+'</option>';}).join('')+'</select>'+
+      '<input type="text" id="hdcSearch" placeholder="\uD83D\uDD0D Buscar docente, programa o actividad..." value="'+esc(_HDC.q||'')+'" style="flex:1;min-width:220px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<select onchange="_HDC.doc=this.value;_hdcFill()" style="'+selS+'"><option value="">Todos los docentes</option>'+docs.map(function(d){return '<option value="'+escA(d)+'"'+(_HDC.doc===d?' selected':'')+'>'+esc(abbr(d,34))+'</option>';}).join('')+'</select>'+
+      '<span id="hdcCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+      '<button onclick="_hdcExcel()" style="padding:7px 14px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Exportar</button>'+
+    '</div>'+
+    '<div style="font-size:10px;color:var(--t4);margin-bottom:10px">\u2139\uFE0F Horas seg\u00fan movimiento_horas_lv + movimiento_horas_sd, por Docente \u00b7 Tipo \u00b7 A\u00f1o \u00b7 Programa \u00b7 Actividad \u00b7 Valor Hora. Cada archivo cargado se suma al hist\u00f3rico (deduplicado por movimiento).</div>'+
+    '<div id="hdcWrap"></div>';
+  var inp=$('hdcSearch'); if(inp) inp.oninput=function(){ _HDC.q=this.value; clearTimeout(window._hdcT); window._hdcT=setTimeout(_hdcFill,150); };
+  _hdcFill();
+}
+function _hdcRowsF(){
+  var q=(_HDC.q||'').toLowerCase();
+  return (_HDC._rows||[]).filter(function(r){
+    if(_HDC.doc && r.doc!==_HDC.doc) return false;
+    if(q && r.doc.toLowerCase().indexOf(q)<0 && r.prog.toLowerCase().indexOf(q)<0 && r.act.toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+function _hdcFill(){
+  var wrap=$('hdcWrap'); if(!wrap) return;
+  var rows=_hdcRowsF();
+  var cnt=$('hdcCount'); if(cnt) cnt.textContent=rows.length+' fila(s)';
+  var thS='padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase';
+  var thN='padding:7px 8px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase';
+  var thM=_HD_MLBL.map(function(l){return '<th style="'+thN+'">'+l+'</th>';}).join('');
+  wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:68vh"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1700px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+    '<th style="'+thS+'">Docente</th><th style="'+thS+'">Tipo Docente</th><th style="'+thN+'">A\u00f1o</th>'+
+    '<th style="'+thS+'">Programa</th><th style="'+thS+'">Actividad</th><th style="'+thN+'">Valor Hora</th>'+thM+
+    '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Total</th></tr></thead><tbody>'+
+    (rows.length? rows.map(function(r){
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:6px 10px;color:var(--t1);font-weight:700;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.doc)+'">'+esc(abbr(r.doc,30))+'</td>'+
+        '<td style="padding:6px 10px;white-space:nowrap"><span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.35)">'+esc(r.tipo)+'</span></td>'+
+        '<td style="padding:6px 8px;text-align:right;color:var(--t2);font-variant-numeric:tabular-nums">'+esc(r.anio)+'</td>'+
+        '<td style="padding:6px 10px;color:#34d6ff;font-weight:700;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.prog)+'">'+esc(r.prog)+'</td>'+
+        '<td style="padding:6px 10px;color:var(--t2);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.act)+'">'+esc(r.act)+'</td>'+
+        '<td style="padding:6px 8px;text-align:right;color:var(--t1);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap">'+(r.vh?'$'+fmt(r.vh):'\u2014')+'</td>'+
+        r.m.map(function(v){ return v?'<td style="padding:6px 7px;text-align:right;color:var(--t1);font-weight:600;font-variant-numeric:tabular-nums">'+_hdcFmt(v)+'</td>':'<td style="padding:6px 7px;text-align:right;color:var(--t4)">-</td>'; }).join('')+
+        '<td style="padding:6px 10px;text-align:right;color:#f0b429;font-weight:800;font-variant-numeric:tabular-nums">'+_hdcFmt(r.total)+'</td>'+
+      '</tr>';
+    }).join('') : '<tr><td colspan="18" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
+    '</tbody></table></div>';
+}
+function _hdcExcel(){
+  var rows=_hdcRowsF();
+  if(!rows.length){ showToast('No hay datos para exportar','err'); return; }
+  var data=rows.map(function(r){
+    var o={'Docente':r.doc,'Tipo Docente':r.tipo,'A\u00f1o':r.anio,'Programa':r.prog,'Actividad':r.act,'Valor_Hora':r.vh};
+    _HDC_MFULL.forEach(function(m,i){ o[m]=r.m[i]?Math.round(r.m[i]*100)/100:'-'; });
+    o['Total']=Math.round(r.total*100)/100;
+    return o;
+  });
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:32},{wch:12},{wch:7},{wch:16},{wch:50},{wch:11}].concat(_HDC_MFULL.map(function(){return {wch:9};})).concat([{wch:9}]);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Horas por Mes');
+  XLSX.writeFile(wb,'Horas_por_Mes_Declarado_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Tabla descargada','ok');
+}
 var _IDM={mes:'',q:'',est:''};
 var _IDM_MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function _idmBuild(){
