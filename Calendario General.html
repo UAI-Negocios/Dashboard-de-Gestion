@@ -6338,6 +6338,12 @@ function _cbRenderFormulario(info, nombreAbrev){
         '<button onclick="_cbCopiarHTML()" style="padding:12px 20px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">'+
           '📋 Copiar HTML'+
         '</button>'+
+        '<button onclick="_cbDescargarWord()" title="Descargar como documento Word (.doc)" style="padding:12px 16px;background:#1a56db;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px">'+
+          '📄 Word'+
+        '</button>'+
+        '<button onclick="_cbDescargarPDF()" title="Descargar/imprimir como PDF" style="padding:12px 16px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px">'+
+          '📕 PDF'+
+        '</button>'+
       '</div>'+
     '</div>'+
 
@@ -6549,6 +6555,41 @@ function _cbCopiarHTML(){
     catch(e){ showToast('No se pudo copiar — descarga manual','err'); }
     document.body.removeChild(ta);
   });
+}
+/* ── Descargar correo como Word (.doc) ── */
+function _cbDescargarWord(){
+  if (!window._cbHTML) _cbGenerar();
+  var html = window._cbHTML;
+  if (!html) { showToast('Genera primero la vista previa','err'); return; }
+  var wrapped = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
+    'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+    '<head><meta charset="utf-8"><title>Correo de Bienvenida</title>'+
+    '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View>'+
+    '<w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+    '<style>body{font-family:Calibri,Arial,sans-serif;} table{border-collapse:collapse;}</style>'+
+    '</head><body>'+html+'</body></html>';
+  var blob = new Blob(['\ufeff', wrapped], {type: 'application/msword'});
+  var nombre = 'Correo_Bienvenida_'+(_CB.programa?_CB.programa.replace(/[^\w\-]+/g,'_').substring(0,40):'programa')+'.doc';
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = nombre;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  showToast('📄 Documento Word descargado','ok');
+}
+/* ── Descargar/imprimir correo como PDF (usa el diálogo de impresión del navegador) ── */
+function _cbDescargarPDF(){
+  if (!window._cbHTML) _cbGenerar();
+  var html = window._cbHTML;
+  if (!html) { showToast('Genera primero la vista previa','err'); return; }
+  var w = window.open('', '_blank');
+  if (!w) { showToast('El navegador bloqueó la ventana emergente — habilita pop-ups','err'); return; }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Correo de Bienvenida</title>'+
+    '<style>body{margin:0;padding:24px;background:#fff;font-family:Arial,sans-serif;} @media print{body{padding:0}}</style>'+
+    '</head><body>'+html+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>'+
+    '</body></html>');
+  w.document.close();
+  showToast('📕 Usa "Guardar como PDF" en el diálogo de impresión','ok');
 }
 
 
