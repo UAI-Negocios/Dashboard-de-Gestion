@@ -16086,7 +16086,8 @@ var _ch = {
   vista: 'resumen',  // resumen | programas | tabla | docentes
   filtEstado: '', filtEstados: [], filtTipo: '', filtProg: '', buscar: '',
   topN: 20, progSel: [],
-  docBuscar: '', docTipo: '', docOrder: '', docLimit: 30
+  docBuscar: '', docTipo: '', docOrder: '', docLimit: 30,
+  agrFiltTipo: '', agrFiltProg: '', agrBuscar: '', agrSoloNoReal: false
 };
 
 var _chValoresHora = {
@@ -17416,6 +17417,112 @@ function _chVistaModif(el){
   var inp=document.getElementById('chModSearch'); if(inp) inp.oninput=function(){ _ch.modBuscar=this.value; clearTimeout(window._chModT); window._chModT=setTimeout(_chFillModif,150); };
   _chFillModif();
 }
+
+/* ── Vista: Cursos Agregados (no estaban en PPT), por 1er/2do semestre ── */
+function _chVistaAgregados(el){
+  var realKeys=_ch.realKeys;
+  var dAll=_chCursosAgregados();
+  var totalAll=dAll.s1.length+dAll.s2.length;
+  if(!totalAll){
+    el.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:11px 16px;background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.3);border-radius:10px;font-size:12px;color:var(--t2)"><span>\u2705</span> No hay cursos que se hayan agregado despu\u00e9s del Presupuesto (todos los \u00edtems del Real ya estaban en el PPT).</div>';
+    return;
+  }
+  var noReal = dAll.s1.concat(dAll.s2).filter(function(r){ return r._noRealizado; });
+  var tipos=[...new Set(dAll.s1.concat(dAll.s2).map(function(r){ return r.tipo; }).filter(Boolean))].sort();
+  var progs=[...new Set(dAll.s1.concat(dAll.s2).map(function(r){ return r.programa; }).filter(Boolean))].sort();
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<span style="font-size:11px;color:var(--t3)">Cursos presentes en alg\u00fan corte REAL que <b style="color:var(--t2)">no exist\u00edan en el PPT</b> \u2014 agregados despu\u00e9s del presupuesto.</span>'+
+    '</div>'+
+    (noReal.length ?
+      '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;margin-bottom:12px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:9px">'+
+        '<span style="font-size:15px">\uD83D\uDEAB</span>'+
+        '<span style="font-size:11.5px;color:var(--t1)"><b style="color:#f85149">'+noReal.length+'</b> de los '+totalAll+' curso(s) agregados <b>no llegaron a realizarse</b> (no tienen horas en el \u00faltimo corte, '+esc(realKeys[realKeys.length-1]||'')+')</span>'+
+        '<button onclick="_ch.agrSoloNoReal=!_ch.agrSoloNoReal;_chFillAgregados()" id="chAgrToggleBtn" style="margin-left:auto;padding:5px 12px;border-radius:7px;border:1px solid #f85149;background:'+(_ch.agrSoloNoReal?'#f85149':'rgba(248,81,73,.12)')+';color:'+(_ch.agrSoloNoReal?'#fff':'#f85149')+';font-size:11px;font-weight:800;cursor:pointer">'+(_ch.agrSoloNoReal?'\u2713 Mostrando solo no realizados':'\uD83D\uDD0D Ver solo no realizados')+'</button>'+
+      '</div>'
+    : '')+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+
+      '<select onchange="_ch.agrFiltTipo=this.value;_chFillAgregados()" style="'+selS+'"><option value="">Todos los tipos</option>'+
+        tipos.map(function(t){ return '<option value="'+esc(t)+'"'+(t===_ch.agrFiltTipo?' selected':'')+'>'+esc(t.replace('Actividad de ','').replace(' de Programa',''))+'</option>'; }).join('')+
+      '</select>'+
+      '<select onchange="_ch.agrFiltProg=this.value;_chFillAgregados()" style="'+selS+';flex:1;min-width:160px"><option value="">Todos los programas</option>'+
+        progs.map(function(p){ return '<option value="'+esc(p)+'"'+(p===_ch.agrFiltProg?' selected':'')+'>'+esc(p)+'</option>'; }).join('')+
+      '</select>'+
+      '<input type="text" id="chAgrSearchIn" placeholder="\uD83D\uDD0D Buscar actividad..." value="'+esc(_ch.agrBuscar)+'" style="flex:1;min-width:160px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<button onclick="_ch.agrFiltTipo=\'\';_ch.agrFiltProg=\'\';_ch.agrBuscar=\'\';_ch.agrSoloNoReal=false;_chVistaAgregados(document.getElementById(\'chBody\'))" style="'+selS+';color:var(--t3)">\u2715 Limpiar</button>'+
+      '<span id="chAgrCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+      '<button onclick="_chAgregadosExcel()" style="padding:7px 14px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">\uD83D\uDCCA Descargar</button>'+
+    '</div>'+
+    '<div id="chAgrWrap"></div>';
+  var inp=document.getElementById('chAgrSearchIn'); if(inp) inp.oninput=function(){ _ch.agrBuscar=this.value; clearTimeout(window._chAgrT); window._chAgrT=setTimeout(_chFillAgregados,150); };
+  _chFillAgregados();
+}
+function _chFillAgregados(){
+  var wrap=document.getElementById('chAgrWrap'); if(!wrap) return;
+  var realKeys=_ch.realKeys;
+  var d=_chAgregadosFRows();
+  var cnt=document.getElementById('chAgrCount'); if(cnt) cnt.textContent=(d.s1.length+d.s2.length)+' de '+(d.all1.length+d.all2.length)+' \u00edtems';
+  function tabla(items,color){
+    if(!items.length) return '<div style="padding:18px;text-align:center;color:var(--t3);font-size:11px">Ninguno</div>';
+    return '<div style="overflow:auto;max-height:400px"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead style="position:sticky;top:0"><tr style="background:var(--surface2)">'+
+        '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Actividad</th>'+
+        '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Programa</th>'+
+        '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Inicio</th>'+
+        '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase" title="Horas del corte m\u00e1s reciente en que la actividad tiene registro (no es una suma de cortes)">Horas vigentes</th>'+
+        '<th style="padding:7px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Estado</th>'+
+      '</tr></thead><tbody>'+
+      items.slice().sort(function(a,b){ return _chUltimoValor(b,realKeys)-_chUltimoValor(a,realKeys); }).map(function(r){
+        var tot=_chUltimoValor(r,realKeys);
+        return '<tr style="border-top:1px solid var(--border)'+(r._noRealizado?';background:rgba(248,81,73,.05)':'')+'">'+
+          '<td style="padding:6px 10px;color:var(--t1);font-weight:700;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.nombre)+'">'+esc(r.nombre)+'</td>'+
+          '<td style="padding:6px 10px;color:var(--t3);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.programa)+'">'+esc(r.programa)+'</td>'+
+          '<td style="padding:6px 10px;color:var(--t2);white-space:nowrap">'+(_dvFechaDisp(_dvFechaNorm(r.fechaIni))||'\u2014')+'</td>'+
+          '<td style="padding:6px 10px;text-align:right;color:'+color+';font-weight:800;font-variant-numeric:tabular-nums">'+_chFmt(tot)+'</td>'+
+          '<td style="padding:6px 10px;text-align:center">'+(r._noRealizado?'<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.4)">\uD83D\uDEAB No realizado</span>':'<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.4)">\u2705 Realizado</span>')+'</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table></div>';
+  }
+  wrap.innerHTML=
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+        '<div style="padding:9px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:800;color:#388bfd">\uD83D\uDCC5 1er Semestre ('+esc(realKeys[0]||'')+') \u00b7 '+d.s1.length+'</div>'+
+        tabla(d.s1,'#388bfd')+
+      '</div>'+
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+        '<div style="padding:9px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:800;color:#a78bfa">\uD83D\uDCC5 2do Semestre en adelante \u00b7 '+d.s2.length+'</div>'+
+        tabla(d.s2,'#a78bfa')+
+      '</div>'+
+    '</div>';
+}
+function _chAgregadosExcel(){
+  var d=_chAgregadosFRows();
+  var total=d.s1.length+d.s2.length;
+  if(!total){ showToast('No hay cursos agregados para exportar con los filtros actuales','ok'); return; }
+  var realKeys=_ch.realKeys;
+  function rows(items,sem){
+    return items.map(function(r){
+      var tot=_chUltimoValor(r,realKeys);
+      var o={'Semestre':sem,'Actividad':r.nombre,'Tipo':r.tipo,'Programa':r.programa,'CC':r.cc};
+      realKeys.forEach(function(rk){ o[_chPLabel(rk)]=r.periods[rk]; });
+      o['Horas Vigentes']=Math.round(tot*10)/10;
+      o['Fecha Inicio']=_dvFechaDisp(_dvFechaNorm(r.fechaIni))||'\u2014';
+      o['Fecha T\u00e9rmino']=_dvFechaDisp(_dvFechaNorm(r.fechaTer))||'\u2014';
+      o['Estado']=r._noRealizado?'No realizado':'Realizado';
+      return o;
+    });
+  }
+  var data=rows(d.s1,'1er Semestre').concat(rows(d.s2,'2do Semestre en adelante'));
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:22},{wch:46},{wch:26},{wch:30},{wch:10}].concat(realKeys.map(function(){return {wch:10};})).concat([{wch:9},{wch:12},{wch:12},{wch:14}]);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Cursos Agregados');
+  var suf=(_ch.agrSoloNoReal||_ch.agrFiltTipo||_ch.agrFiltProg||_ch.agrBuscar)?'_filtrado':'';
+  XLSX.writeFile(wb,'ControlHoras_CursosAgregados'+suf+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast(total+' curso(s) exportados','ok');
+}
 function _chFillModif(){
   var wrap=document.getElementById('chModWrap'); if(!wrap) return;
   var list=_chModifList(); var q=(_ch.modBuscar||'').toLowerCase(); var pf=_ch.modPersona||'';
@@ -17661,7 +17768,8 @@ function _chRender(){
         {k:'programas',l:'🏛 Top Programas'},
         {k:'tabla',    l:'🔄 Cambios ('+_ch.changed.length+')'},
         {k:'docentes', l:'👨‍🏫 Carga Docentes ('+_ch.docentes.length+')'},
-        {k:'modif', l:'🕓 Modificaciones'}
+        {k:'modif', l:'🕓 Modificaciones'},
+        {k:'agregados', l:'🆕 Cursos Agregados'}
       ].map(function(t){
         var on = _ch.vista === t.k;
         return '<button onclick="_ch.vista=\''+t.k+'\';_chRender()" '+
@@ -17690,6 +17798,7 @@ function _chRenderVista(){
   if (_ch.vista === 'tabla')     return _chVistaTabla(el);
   if (_ch.vista === 'docentes')  return _chVistaDocentes(el);
   if (_ch.vista === 'modif')     return _chVistaModif(el);
+  if (_ch.vista === 'agregados') return _chVistaAgregados(el);
 }
 
 /* ── Vista Resumen: charts ─────────────────────────────────── */
@@ -17905,7 +18014,14 @@ function _chVistaTabla(el){
   var selS = 'padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
 
   _ch._estadosList = estados;
-  el.innerHTML =
+  var bajasSem = _chBajasSemestre();
+  var soloPPT = _chSoloPPT();
+  var bannerEsp = (bajasSem.length || soloPPT.length) ?
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
+      (bajasSem.length ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 13px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:8px;font-size:11px;color:var(--t1)"><span style="font-size:14px">📉</span><span><b style="color:#f85149">'+bajasSem.length+'</b> curso(s) estuvieron en el <b>1er semestre</b> ('+esc(_ch.realKeys[0])+') y ya no están en el <b>2do semestre</b> ('+esc(_ch.realKeys[_ch.realKeys.length-1])+')</span></div>' : '')+
+      (soloPPT.length ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 13px;background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.3);border-radius:8px;font-size:11px;color:var(--t1)"><span style="font-size:14px">📋</span><span><b style="color:#f0b429">'+soloPPT.length+'</b> curso(s) estuvieron en el <b>PPT</b> y no aparecen en ningún semestre (REAL)</span></div>' : '')+
+    '</div>' : '';
+  el.innerHTML = bannerEsp+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
       '<span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-right:2px">Estados:</span>'+
       '<div id="chEstadoChips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+_chEstadoChipsHTML()+'</div>'+
@@ -17934,6 +18050,53 @@ function _chVistaTabla(el){
   _chFillTabla();
 }
 
+/* ── Bajas entre semestres: presente en el primer corte (1er semestre) y ausente en el último (2do semestre) ── */
+function _chBajasSemestre(){
+  var realKeys=_ch.realKeys;
+  if(!realKeys||realKeys.length<2) return [];
+  var first=realKeys[0], last=realKeys[realKeys.length-1];
+  return _ch.changed.filter(function(r){
+    var v1=r.periods[first], v2=r.periods[last];
+    return v1!=null && v1>0 && v2==null;
+  });
+}
+/* ── Cursos que solo estuvieron en PPT: nunca aparecieron en ningún corte REAL ── */
+function _chSoloPPT(){
+  return _ch.changed.filter(function(r){ return r.estado==='Solo en PPT'; });
+}
+/* ── Cursos AGREGADOS después del PPT (no estaban en el Presupuesto), por 1er/2do semestre ── */
+/* Valor "actual" de una actividad: el del corte REAL más reciente en que tiene dato (NO se suman los cortes: cada REAL es una foto acumulada, no horas adicionales) */
+function _chUltimoValor(r, realKeys){
+  for (var i=realKeys.length-1; i>=0; i--){ var v=r.periods[realKeys[i]]; if (v!=null) return v; }
+  return 0;
+}
+function _chCursosAgregados(){
+  var realKeys=_ch.realKeys;
+  var lastRk=realKeys[realKeys.length-1];
+  var s1=[], s2=[];
+  _ch.changed.forEach(function(r){
+    if (r.ppt !== null) return; // tenía PPT, no es "agregado"
+    var fi=-1;
+    for (var i=0;i<realKeys.length;i++){ if (r.periods[realKeys[i]]!=null){ fi=i; break; } }
+    if (fi<0) return;
+    r._noRealizado = (r.periods[lastRk] == null); // se agregó pero no llegó al último corte
+    (fi===0 ? s1 : s2).push(r);
+  });
+  return {s1:s1, s2:s2};
+}
+function _chAgregadosFRows(){
+  var d=_chCursosAgregados();
+  function filt(items){
+    return items.filter(function(r){
+      if (_ch.agrSoloNoReal && !r._noRealizado) return false;
+      if (_ch.agrFiltTipo && r.tipo !== _ch.agrFiltTipo) return false;
+      if (_ch.agrFiltProg && r.programa !== _ch.agrFiltProg) return false;
+      if (_ch.agrBuscar && String(r.nombre).toLowerCase().indexOf(_ch.agrBuscar.toLowerCase()) < 0) return false;
+      return true;
+    });
+  }
+  return {s1:filt(d.s1), s2:filt(d.s2), all1:d.s1, all2:d.s2};
+}
 function _chTablaFRows(){
   return _ch.changed.filter(function(r){
     if (_ch.filtEstados && _ch.filtEstados.length && _ch.filtEstados.indexOf(r.estado) < 0) return false;
@@ -18214,9 +18377,37 @@ function _chTablaExcel(){
   ws['!cols'] = [{wch:8},{wch:46},{wch:30},{wch:30},{wch:12},{wch:12},{wch:10}].concat(realKeys.map(function(){ return {wch:10}; })).concat([{wch:9},{wch:24}]);
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Cambios');
+
+  /* Hoja extra: bajas entre 1er y 2do semestre */
+  var bajasSem = _chBajasSemestre();
+  if (bajasSem.length){
+    var h2 = ['ID','Actividad','Tipo','Programa','Fecha Inicio','Fecha Término',_chPLabel(pptKey),_chPLabel(realKeys[0]),_chPLabel(realKeys[realKeys.length-1])];
+    var aoa2 = [h2];
+    bajasSem.forEach(function(r){
+      aoa2.push([r.id, r.nombre, r.tipo, r.programa, _dvFechaDisp(_dvFechaNorm(r.fechaIni))||'—', _dvFechaDisp(_dvFechaNorm(r.fechaTer))||'—',
+        r.ppt, r.periods[realKeys[0]], r.periods[realKeys[realKeys.length-1]]]);
+    });
+    var ws2 = XLSX.utils.aoa_to_sheet(aoa2);
+    ws2['!cols'] = [{wch:8},{wch:46},{wch:30},{wch:30},{wch:12},{wch:12},{wch:10},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Bajas 1er-2do Semestre');
+  }
+
+  /* Hoja extra: cursos solo en PPT (no aparecen en ningún semestre/REAL) */
+  var soloPPT = _chSoloPPT();
+  if (soloPPT.length){
+    var h3 = ['ID','Actividad','Tipo','Programa','Fecha Inicio','Fecha Término',_chPLabel(pptKey)];
+    var aoa3 = [h3];
+    soloPPT.forEach(function(r){
+      aoa3.push([r.id, r.nombre, r.tipo, r.programa, _dvFechaDisp(_dvFechaNorm(r.fechaIni))||'—', _dvFechaDisp(_dvFechaNorm(r.fechaTer))||'—', r.ppt]);
+    });
+    var ws3 = XLSX.utils.aoa_to_sheet(aoa3);
+    ws3['!cols'] = [{wch:8},{wch:46},{wch:30},{wch:30},{wch:12},{wch:12},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, ws3, 'Solo en PPT');
+  }
+
   var suf = (_ch.filtEstados&&_ch.filtEstados.length?'_filtrado':'');
   XLSX.writeFile(wb, 'ControlHoras_Cambios'+suf+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
-  showToast(rows.length+' fila(s) exportadas','ok');
+  showToast(rows.length+' fila(s) \u00b7 '+bajasSem.length+' bajas semestre \u00b7 '+soloPPT.length+' solo en PPT','ok');
 }
 
 /* ── Export PDF del subitem "🔄 Cambios" (respeta filtros: estado/tipo/programa/búsqueda) ── */
@@ -18264,6 +18455,12 @@ function _chTablaGeneratePDF(rows){
       return row;
     });
 
+    var footerFn = function(data){
+      doc.setFontSize(7); doc.setTextColor(140,140,140);
+      doc.text('Dashboard Postgrado UAI · Control de Horas', 10, doc.internal.pageSize.getHeight()-6);
+      doc.text('Página '+doc.internal.getNumberOfPages(), W-10, doc.internal.pageSize.getHeight()-6, {align:'right'});
+    };
+
     doc.autoTable({
       head: head, body: body, startY: 24, theme:'grid',
       styles:{ fontSize:6.5, cellPadding:1.8, textColor:[30,40,50], lineColor:border, lineWidth:.1 },
@@ -18271,15 +18468,64 @@ function _chTablaGeneratePDF(rows){
       alternateRowStyles:{ fillColor:fog },
       columnStyles:{ 0:{cellWidth:44}, 1:{cellWidth:22}, 2:{cellWidth:28}, 3:{cellWidth:17}, 4:{cellWidth:17} },
       margin:{left:10,right:10},
-      didDrawPage: function(data){
-        doc.setFontSize(7); doc.setTextColor(140,140,140);
-        doc.text('Dashboard Postgrado UAI · Control de Horas', 10, doc.internal.pageSize.getHeight()-6);
-        doc.text('Página '+doc.internal.getNumberOfPages(), W-10, doc.internal.pageSize.getHeight()-6, {align:'right'});
-      }
+      didDrawPage: footerFn
     });
 
+    /* ═══ Sección extra: bajas entre 1er y 2do semestre ═══ */
+    var bajasSem = _chBajasSemestre();
+    if (bajasSem.length){
+      doc.addPage();
+      var red=[220,38,38];
+      doc.setFillColor(red[0],red[1],red[2]); doc.rect(0,0,W,20,'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255);
+      doc.text('📉 BAJAS: 1ER SEMESTRE → 2DO SEMESTRE', 14, 12);
+      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.text(bajasSem.length+' curso(s) presentes en '+_chPLabel(realKeys[0])+' (1er sem.) que ya no est\u00e1n en '+_chPLabel(realKeys[realKeys.length-1])+' (2do sem.)', 14, 17);
+      var headB = [['Actividad','Tipo','Programa','Inicio','Término',_chPLabel(pptKey), _chPLabel(realKeys[0])+' (1er sem.)', _chPLabel(realKeys[realKeys.length-1])+' (2do sem.)']];
+      var bodyB = bajasSem.map(function(r){
+        return [r.nombre, (r.tipo||'').replace('Actividad de ','').replace(' de Programa',''), r.programa,
+          _dvFechaDisp(_dvFechaNorm(r.fechaIni))||'—', _dvFechaDisp(_dvFechaNorm(r.fechaTer))||'—',
+          r.ppt!=null?_chFmt(r.ppt):'—', _chFmt(r.periods[realKeys[0]]), '—'];
+      });
+      doc.autoTable({
+        head: headB, body: bodyB, startY: 24, theme:'grid',
+        styles:{ fontSize:6.5, cellPadding:1.8, textColor:[30,40,50], lineColor:border, lineWidth:.1 },
+        headStyles:{ fillColor:red, textColor:255, fontStyle:'bold', fontSize:6.5 },
+        alternateRowStyles:{ fillColor:fog },
+        columnStyles:{ 0:{cellWidth:44}, 1:{cellWidth:22}, 2:{cellWidth:28}, 3:{cellWidth:17}, 4:{cellWidth:17} },
+        margin:{left:10,right:10},
+        didDrawPage: footerFn
+      });
+    }
+
+    /* ═══ Sección extra: cursos solo en PPT (no en ningún semestre/REAL) ═══ */
+    var soloPPT = _chSoloPPT();
+    if (soloPPT.length){
+      doc.addPage();
+      var gold=[200,146,42];
+      doc.setFillColor(gold[0],gold[1],gold[2]); doc.rect(0,0,W,20,'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255);
+      doc.text('📋 SOLO EN PPT — NO APARECEN EN NINGÚN SEMESTRE', 14, 12);
+      doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.text(soloPPT.length+' curso(s) planificados en PPT que nunca se registraron en un corte REAL', 14, 17);
+      var headP = [['Actividad','Tipo','Programa','Inicio','Término',_chPLabel(pptKey)]];
+      var bodyP = soloPPT.map(function(r){
+        return [r.nombre, (r.tipo||'').replace('Actividad de ','').replace(' de Programa',''), r.programa,
+          _dvFechaDisp(_dvFechaNorm(r.fechaIni))||'—', _dvFechaDisp(_dvFechaNorm(r.fechaTer))||'—', r.ppt!=null?_chFmt(r.ppt):'—'];
+      });
+      doc.autoTable({
+        head: headP, body: bodyP, startY: 24, theme:'grid',
+        styles:{ fontSize:6.5, cellPadding:1.8, textColor:[30,40,50], lineColor:border, lineWidth:.1 },
+        headStyles:{ fillColor:gold, textColor:255, fontStyle:'bold', fontSize:6.5 },
+        alternateRowStyles:{ fillColor:fog },
+        columnStyles:{ 0:{cellWidth:50}, 1:{cellWidth:26}, 2:{cellWidth:34} },
+        margin:{left:10,right:10},
+        didDrawPage: footerFn
+      });
+    }
+
     doc.save('ControlHoras_Cambios_'+new Date().toISOString().substring(0,10)+'.pdf');
-    showToast('Informe PDF descargado','ok');
+    showToast('Informe PDF descargado \u00b7 '+bajasSem.length+' bajas semestre \u00b7 '+soloPPT.length+' solo en PPT','ok');
   } catch(e) {
     showToast('Error generando PDF: '+e.message,'err');
   }
