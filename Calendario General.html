@@ -17208,6 +17208,8 @@ function _chHandleFile(file) {
         var COL_PROF   = _chFindCol(sample, ['Profesores','Profesor']);
         var COL_CC     = _chFindCol(sample, ['CC','Centro de Costo','CentroCosto']);
         var COL_FECHAMOD = _chFindCol(sample, ['FechaCambio','Fecha Cambio','Fecha de Cambio','Fecha Modificación','Fecha Modificacion','Fecha de Modificación','Fecha de Modificacion','Fecha de Corte','Fecha Corte','Fecha REAL','Fecha Real','FechaMod','Modificado','Fecha Actualización','Fecha Actualizacion']);
+        var COL_FINI = _chFindCol(sample, ['FechaInicio','Fecha Inicio','Fecha de Inicio','Inicio']);
+        var COL_FTER = _chFindCol(sample, ['FechaTermino','FechaTérmino','Fecha Termino','Fecha Término','Fecha de Termino','Fecha de Término','Termino','Término']);
         var COL_CAMBIOS  = _chFindCol(sample, ['Cambios','Cambio','Tipo de Cambio','TipoCambio']);
         var COL_MODPOR   = _chFindCol(sample, ['Modificado por','ModificadoPor','Modificó','Modifico','Usuario','Responsable','Editado por','Autor','Quien modifica','Quién modifica']);
 
@@ -17244,7 +17246,9 @@ function _chHandleFile(file) {
             prof: COL_PROF ? String(r[COL_PROF]||'') : '',
             fechaMod: COL_FECHAMOD ? r[COL_FECHAMOD] : null,
             modPor: COL_MODPOR ? String(r[COL_MODPOR]||'') : '',
-            cambios: COL_CAMBIOS ? String(r[COL_CAMBIOS]||'').trim() : ''
+            cambios: COL_CAMBIOS ? String(r[COL_CAMBIOS]||'').trim() : '',
+            fechaIni: COL_FINI ? r[COL_FINI] : null,
+            fechaTer: COL_FTER ? r[COL_FTER] : null
           };
         });
 
@@ -17542,9 +17546,11 @@ function _chBuild(){
     }
     if (!estado) return;
 
+    var fechaSrc = realKeys.map(function(rk){ return maps[rk][id]; }).reverse().find(function(rw){ return rw && (rw.fechaIni||rw.fechaTer); }) || ref;
     changed.push({
       id: id, nombre: ref.nombre||'', tipo: ref.tipo||'', programa: ref.prog||'', cc: ref.cc||'',
-      ppt: hp, periods: realVals, estado: estado
+      ppt: hp, periods: realVals, estado: estado,
+      fechaIni: fechaSrc.fechaIni||null, fechaTer: fechaSrc.fechaTer||null
     });
   });
   _ch.changed = changed;
@@ -17917,6 +17923,9 @@ function _chVistaTabla(el){
         'style="flex:1;min-width:160px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
       '<button onclick="_ch.filtEstado=\'\';_ch.filtEstados=[];_ch.filtTipo=\'\';_ch.filtProg=\'\';_ch.buscar=\'\';_chRenderVista()" style="'+selS+';color:var(--t3)">✕ Limpiar</button>'+
       '<span id="chTablaCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
+      '<span style="width:1px;height:22px;background:var(--border)"></span>'+
+      '<button onclick="_chTablaExcel()" title="Descargar esta tabla (con filtros aplicados) en Excel" style="padding:7px 13px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">📊 XLSX</button>'+
+      '<button onclick="_chTablaPDF()" title="Descargar esta tabla (con filtros aplicados) como informe PDF" style="padding:7px 13px;border-radius:7px;border:1px solid #dc2626;background:rgba(220,38,38,.1);color:#f85149;font-size:11px;font-weight:800;cursor:pointer">📄 PDF</button>'+
     '</div>'+
     '<div id="chTablaWrap"></div>';
 
@@ -17925,17 +17934,20 @@ function _chVistaTabla(el){
   _chFillTabla();
 }
 
-function _chFillTabla(){
-  var wrap = document.getElementById('chTablaWrap'); if (!wrap) return;
-  var realKeys = _ch.realKeys, pptKey = _ch.pptKey;
-
-  var rows = _ch.changed.filter(function(r){
+function _chTablaFRows(){
+  return _ch.changed.filter(function(r){
     if (_ch.filtEstados && _ch.filtEstados.length && _ch.filtEstados.indexOf(r.estado) < 0) return false;
     if (_ch.filtTipo && r.tipo !== _ch.filtTipo) return false;
     if (_ch.filtProg && r.programa !== _ch.filtProg) return false;
     if (_ch.buscar && String(r.nombre).toLowerCase().indexOf(_ch.buscar.toLowerCase()) < 0) return false;
     return true;
   });
+}
+function _chFillTabla(){
+  var wrap = document.getElementById('chTablaWrap'); if (!wrap) return;
+  var realKeys = _ch.realKeys, pptKey = _ch.pptKey;
+
+  var rows = _chTablaFRows();
 
   var cnt = document.getElementById('chTablaCount');
   if (cnt) cnt.textContent = rows.length+' de '+_ch.changed.length+' ítems';
@@ -18181,6 +18193,96 @@ function _chExportar(){
 
   XLSX.writeFile(wb, 'ControlHoras_PPTvsReal_'+new Date().toISOString().substring(0,10)+'.xlsx');
   showToast('Exportado (Resumen · Cambios · Docentes)','ok');
+}
+
+/* ── Export XLSX del subitem "🔄 Cambios" (respeta filtros: estado/tipo/programa/búsqueda) ── */
+function _chTablaExcel(){
+  var rows = _chTablaFRows();
+  if (!rows.length){ showToast('No hay filas para exportar con los filtros actuales','err'); return; }
+  var pptKey = _ch.pptKey, realKeys = _ch.realKeys;
+  var h = ['ID','Actividad','Tipo','Programa','Fecha Inicio','Fecha Término',_chPLabel(pptKey)].concat(realKeys.map(function(rk){ return _chPLabel(rk); })).concat(['Δ Neta','Estado']);
+  var aoa = [h];
+  rows.forEach(function(r){
+    var row = [r.id, r.nombre, r.tipo, r.programa, _dvFechaDisp(_dvFechaNorm(r.fechaIni))||'—', _dvFechaDisp(_dvFechaNorm(r.fechaTer))||'—', r.ppt];
+    realKeys.forEach(function(rk){ row.push(r.periods[rk]); });
+    var lastV = r.periods[realKeys[realKeys.length-1]];
+    row.push((lastV!=null&&r.ppt!=null)?Math.round((lastV-r.ppt)*10)/10:'');
+    row.push(r.estado);
+    aoa.push(row);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:8},{wch:46},{wch:30},{wch:30},{wch:12},{wch:12},{wch:10}].concat(realKeys.map(function(){ return {wch:10}; })).concat([{wch:9},{wch:24}]);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cambios');
+  var suf = (_ch.filtEstados&&_ch.filtEstados.length?'_filtrado':'');
+  XLSX.writeFile(wb, 'ControlHoras_Cambios'+suf+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast(rows.length+' fila(s) exportadas','ok');
+}
+
+/* ── Export PDF del subitem "🔄 Cambios" (respeta filtros: estado/tipo/programa/búsqueda) ── */
+function _chTablaPDF(){
+  var rows = _chTablaFRows();
+  if (!rows.length){ showToast('No hay filas para exportar con los filtros actuales','err'); return; }
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable){ _chTablaGeneratePDF(rows); return; }
+  showToast('Cargando generador PDF…','info');
+  var s1 = document.createElement('script');
+  s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s1.onload = function(){
+    var s2 = document.createElement('script');
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+    s2.onload = function(){ _chTablaGeneratePDF(rows); };
+    s2.onerror = function(){ showToast('Error cargando jsPDF-autotable','err'); };
+    document.head.appendChild(s2);
+  };
+  s1.onerror = function(){ showToast('Error cargando jsPDF','err'); };
+  document.head.appendChild(s1);
+}
+function _chTablaGeneratePDF(rows){
+  try {
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+    var W = doc.internal.pageSize.getWidth();
+    var hoy = new Date().toLocaleDateString('es-CL');
+    var pptKey = _ch.pptKey, realKeys = _ch.realKeys;
+    var azure=[26,111,168], fog=[244,247,250], border=[220,229,239];
+
+    doc.setFillColor(azure[0],azure[1],azure[2]); doc.rect(0,0,W,20,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+    doc.text('CONTROL DE HORAS — CAMBIOS DETECTADOS', 14, 12);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text('Emitido: '+hoy+'  ·  '+rows.length+' ítem(s)'+(_ch.filtEstados&&_ch.filtEstados.length?'  ·  Filtro: '+_ch.filtEstados.join(', '):'')+(_ch.filtProg?'  ·  Programa: '+_ch.filtProg:'')+(_ch.filtTipo?'  ·  Tipo: '+_ch.filtTipo:''), 14, 17);
+
+    var head = [['Actividad','Tipo','Programa','Inicio','Término',_chPLabel(pptKey)].concat(realKeys.map(function(rk){ return _chPLabel(rk); })).concat(['Δ Neta','Estado'])];
+    var body = rows.map(function(r){
+      var row = [r.nombre, (r.tipo||'').replace('Actividad de ','').replace(' de Programa',''), r.programa,
+        _dvFechaDisp(_dvFechaNorm(r.fechaIni))||'—', _dvFechaDisp(_dvFechaNorm(r.fechaTer))||'—', r.ppt!=null?_chFmt(r.ppt):'—'];
+      realKeys.forEach(function(rk){ row.push(r.periods[rk]!=null?_chFmt(r.periods[rk]):'—'); });
+      var lastV = r.periods[realKeys[realKeys.length-1]];
+      var delta = (lastV!=null&&r.ppt!=null)?Math.round((lastV-r.ppt)*10)/10:null;
+      row.push(delta!=null?((delta>=0?'+':'')+_chFmt(delta)):'—');
+      row.push(r.estado);
+      return row;
+    });
+
+    doc.autoTable({
+      head: head, body: body, startY: 24, theme:'grid',
+      styles:{ fontSize:6.5, cellPadding:1.8, textColor:[30,40,50], lineColor:border, lineWidth:.1 },
+      headStyles:{ fillColor:azure, textColor:255, fontStyle:'bold', fontSize:6.5 },
+      alternateRowStyles:{ fillColor:fog },
+      columnStyles:{ 0:{cellWidth:44}, 1:{cellWidth:22}, 2:{cellWidth:28}, 3:{cellWidth:17}, 4:{cellWidth:17} },
+      margin:{left:10,right:10},
+      didDrawPage: function(data){
+        doc.setFontSize(7); doc.setTextColor(140,140,140);
+        doc.text('Dashboard Postgrado UAI · Control de Horas', 10, doc.internal.pageSize.getHeight()-6);
+        doc.text('Página '+doc.internal.getNumberOfPages(), W-10, doc.internal.pageSize.getHeight()-6, {align:'right'});
+      }
+    });
+
+    doc.save('ControlHoras_Cambios_'+new Date().toISOString().substring(0,10)+'.pdf');
+    showToast('Informe PDF descargado','ok');
+  } catch(e) {
+    showToast('Error generando PDF: '+e.message,'err');
+  }
 }
 
 /* ── Informe PDF (4 páginas): Portada+Resumen · Aumentos · Disminuciones · Consolidado ── */
