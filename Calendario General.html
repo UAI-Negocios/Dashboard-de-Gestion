@@ -10950,26 +10950,20 @@ function _dvKpi(){
 function _dvTabDecl(){
   var el=document.getElementById('dvBody'); if(!el) return;
 
-  // ── Zona upload si no hay datos ───────────────────────────────
+  // ── Sin datos: dirigir al uploader principal (Gestión C./Declaración → Declaraciones de Horas) ──
   var upz=_dvo.length?'':
-    '<div id="dvoUpZone" style="border:2px dashed var(--border);border-radius:10px;padding:20px;'+
-      'text-align:center;margin-bottom:14px;transition:border-color .2s"'+
-      ' ondragover="event.preventDefault();this.style.borderColor=\'var(--blue)\'"'+
-      ' ondragleave="this.style.borderColor=\'var(--border)\'"'+
-      ' ondrop="dvoHandleDrop(event)">'+
+    '<div style="border:2px dashed var(--border);border-radius:10px;padding:24px;'+
+      'text-align:center;margin-bottom:14px">'+
       '<div style="font-size:24px;margin-bottom:6px">📂</div>'+
-      '<div style="font-weight:600;color:var(--t1);margin-bottom:4px">Arrastra el reporte de declaraciones aquí</div>'+
-      '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Reporte_DeclaracionRealizada_XX.xlsx</div>'+
-      '<label style="cursor:pointer">'+
-        '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="dvoCargar(this.files[0])">'+
-        '<span class="btn btn-p btn-sm">Seleccionar archivo</span>'+
-      '</label>'+
+      '<div style="font-weight:600;color:var(--t1);margin-bottom:4px">Aún no hay un reporte de declaraciones cargado</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:12px">Sube el archivo en la tarjeta <b style="color:var(--t2)">"Declaraciones de Horas"</b> más arriba, en esta misma pantalla — se reflejará aquí automáticamente.</div>'+
+      '<button onclick="document.getElementById(\'gctFileDecl\').click()" class="btn btn-p btn-sm">📁 Cargar Declaraciones</button>'+
     '</div>';
 
   var status='<div id="dvoSt" style="font-size:11px;color:var(--t3);margin-bottom:12px">'+
     (_dvo.length?
       '✅ '+_dvo.length+' declaraciones cargadas ('+_dvoCons.length+' registros consolidados) &nbsp;·&nbsp; '+
-      '<a href="#" onclick="dvoReset();return false" style="color:var(--blue)">cambiar archivo</a>':
+      '<a href="#" onclick="dvoReset();return false" style="color:var(--blue)">limpiar</a>':
       'Carga el Excel para ver declaraciones consolidadas.')+
   '</div>';
 
@@ -10977,7 +10971,9 @@ function _dvTabDecl(){
 
   // ── Filtros ───────────────────────────────────────────────────
   var ccs    =[...new Set(_dvoCons.map(function(r){return r.cc;}))].sort(function(a,b){return Number(a)-Number(b);});
-  var meses  =[...new Set(_dvoCons.map(function(r){return r.mesIni;}))].filter(Boolean).sort();
+  var _MES_ORDEN_DV=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var meses  =[...new Set(_dvoCons.reduce(function(acc,r){ return acc.concat(r.meses&&r.meses.length?r.meses:[r.mesIni]); },[]))]
+                .filter(Boolean).sort(function(a,b){ return _MES_ORDEN_DV.indexOf(a)-_MES_ORDEN_DV.indexOf(b); });
   var tipos     =[...new Set(_dvoCons.map(function(r){return r.tipoAct;}))].sort();
   var tiposProf =[...new Set(_dvoCons.map(function(r){return r.tipoProf;}))].filter(Boolean).sort();
 
@@ -11524,7 +11520,7 @@ function _dvFiltDecl(){
   return _dvoCons.filter(function(r){
     if(vhProfs && !vhProfs.has(r.profesor)) return false;
     if(_dfCC   && r.cc!==_dfCC)        return false;
-    if(_dfMes  && r.mesIni!==_dfMes)   return false;
+    if(_dfMes  && !((r.meses&&r.meses.length?r.meses:[r.mesIni]).includes(_dfMes)))   return false;
     if(_dfTipo && r.tipoAct!==_dfTipo) return false;
     if(_dfTipoProf && r.tipoProf!==_dfTipoProf) return false;
     if(_dfEst  && r.cumplimiento!==_dfEst) return false;
@@ -11809,6 +11805,80 @@ function dvoReset(){
   _dvo=[]; _dvoCons=[]; _dfCC=''; _dfMes=''; _dfTipo=''; _dfTipoProf=''; _dfBus=''; _dfEst=''; _dfVH=''; _dvoPag=1;
   renderDeclarado();
 }
+/* ── Normaliza y consolida un array crudo de Declaraciones (Docente+CC+Sigla) ──
+   Usada tanto por dvoCargar() (subida directa en Declaraciones) como por
+   gctCargarDecl() (subida general en Gesti\u00f3n C./Declaraci\u00f3n), para que
+   AMBAS rutas dejen _dvo/_dvoCons consistentes y actualizados. */
+function _dvBuildConsolidado(raw){
+  var rows=raw.map(function(r){
+    var hrLV=parseFloat(r['movimiento_horas_lv'])||0;
+    var hrSD=parseFloat(r['movimiento_horas_sd'])||0;
+    var hrObl=parseFloat(r['Horas'])||0;
+    var hrDec=Math.round((hrLV+hrSD)*100)/100;
+    var diff=Math.round((hrObl-hrDec)*100)/100;
+    var mnto=parseFloat(String(r['movimiento_monto']||'0').replace(',','.'))||0;
+    return{
+      movId:     r['movimiento_id']||'',
+      actCod:    String(r['ActividadCodigo']||'').trim(),
+      actNom:    String(r['ActividadNombre']||'').trim(),
+      programa:  String(r['Programa']||'').trim(),
+      cc:        String(r['programa_centrocosto']||'').trim(),
+      seccion:   String(r['seccion']||'').trim(),
+      sede:      String(r['sede']||'').trim(),
+      rut:       String(r['NumeroDocumento']||'').trim(),
+      profesor:  String(r['Profesor']||'').trim(),
+      tipoProf:  String(r['TipoProfesor']||'').trim(),
+      tipoAct:   String(r['TipoActividad']||'').trim(),
+      mesIni:    String(r['MesInicio']||'').trim(),
+      mesFin:    String(r['MesTermino']||'').trim(),
+      mesMov:    String(r['Mes']||'').trim(),
+      fechaIni:  _dvFmtFecha(r['FechaInicio']),
+      fechaFin:  _dvFmtFecha(r['FechaTermino']),
+      fechaMov:  _dvFmtFecha(r['movimiento_fecha']),
+      hrObl:hrObl, hrLV:hrLV, hrSD:hrSD, hrDec:hrDec,
+      diff:diff,
+      cumpl:hrObl>0?Math.round(hrDec/hrObl*10000)/100:100,
+      phora:parseFloat(r['movimiento_precio_hora'])||0,
+      monto:mnto,
+    };
+  });
+  _dvo=rows;
+
+  var cIdx={};
+  _dvo.forEach(function(r){
+    var key=r.profesor+'|||'+r.cc+'|||'+r.actCod;
+    if(!cIdx[key]){
+      cIdx[key]=Object.assign({},r,{
+        hrDec:0,hrLV:0,hrSD:0,monto:0,
+        meses:[],nFilas:0,esDuplicado:false,cumplimiento:'pendiente',
+        detalle:[]
+      });
+    }
+    var e=cIdx[key];
+    e.hrDec+=r.hrDec; e.hrLV+=r.hrLV; e.hrSD+=r.hrSD; e.monto+=r.monto;
+    e.nFilas++;
+    e.detalle.push({
+      actNom:r.actNom, tipoAct:r.tipoAct, mesIni:r.mesIni, mesMov:r.mesMov,
+      fechaIni:r.fechaIni, fechaFin:r.fechaFin,
+      hrObl:r.hrObl, hrLV:r.hrLV, hrSD:r.hrSD, hrDec:r.hrDec, monto:r.monto
+    });
+    var mes=r.mesMov||r.mesIni||''; // columna "Mes" = mes real de la declaración/movimiento
+    if(mes&&!e.meses.includes(mes)) e.meses.push(mes);
+  });
+  _dvoCons=Object.values(cIdx).map(function(e){
+    e.hrDec  =Math.round(e.hrDec*100)/100;
+    e.hrLV   =Math.round(e.hrLV*100)/100;
+    e.hrSD   =Math.round(e.hrSD*100)/100;
+    e.monto  =Math.round(e.monto*100)/100;
+    e.diff   =Math.round((e.hrObl-e.hrDec)*100)/100;
+    e.cumpl  =e.hrObl>0?Math.round(e.hrDec/e.hrObl*10000)/100:100;
+    e.esDuplicado=e.nFilas>1;
+    e.cumplimiento=e.hrDec>e.hrObl?'excedido':
+                   e.hrDec===e.hrObl?'cumplido':'pendiente';
+    return e;
+  });
+  return {n:_dvo.length, nCons:_dvoCons.length};
+}
 function dvoCargar(file){
   if(!file) return;
   var st=document.getElementById('dvoSt');
@@ -11819,75 +11889,7 @@ function dvoCargar(file){
       var wb=XLSX.read(ev.target.result,{type:'array'});
       var sh=wb.SheetNames[0];
       var raw=XLSX.utils.sheet_to_json(wb.Sheets[sh],{defval:''});
-      // Mapear filas a objetos normalizados
-      var rows=raw.map(function(r){
-        var hrLV=parseFloat(r['movimiento_horas_lv'])||0;
-        var hrSD=parseFloat(r['movimiento_horas_sd'])||0;
-        var hrObl=parseFloat(r['Horas'])||0;
-        var hrDec=Math.round((hrLV+hrSD)*100)/100;
-        var diff=Math.round((hrObl-hrDec)*100)/100;
-        var mnto=parseFloat(String(r['movimiento_monto']||'0').replace(',','.'))||0;
-        return{
-          movId:     r['movimiento_id']||'',
-          actCod:    String(r['ActividadCodigo']||'').trim(),
-          actNom:    String(r['ActividadNombre']||'').trim(),
-          programa:  String(r['Programa']||'').trim(),
-          cc:        String(r['programa_centrocosto']||'').trim(),
-          seccion:   String(r['seccion']||'').trim(),
-          sede:      String(r['sede']||'').trim(),
-          rut:       String(r['NumeroDocumento']||'').trim(),
-          profesor:  String(r['Profesor']||'').trim(),
-          tipoProf:  String(r['TipoProfesor']||'').trim(),
-          tipoAct:   String(r['TipoActividad']||'').trim(),
-          mesIni:    String(r['MesInicio']||'').trim(),
-          mesFin:    String(r['MesTermino']||'').trim(),
-          mesMov:    String(r['Mes']||'').trim(),
-          fechaIni:  _dvFmtFecha(r['FechaInicio']),
-          fechaFin:  _dvFmtFecha(r['FechaTermino']),
-          fechaMov:  _dvFmtFecha(r['movimiento_fecha']),
-          hrObl:hrObl, hrLV:hrLV, hrSD:hrSD, hrDec:hrDec,
-          diff:diff,
-          cumpl:hrObl>0?Math.round(hrDec/hrObl*10000)/100:100,
-          phora:parseFloat(r['movimiento_precio_hora'])||0,
-          monto:mnto,
-        };
-      });
-      _dvo=rows;
-
-      // Consolidar: agrupar por Profesor + CC + Sigla, sumar horas
-      var cIdx={};
-      _dvo.forEach(function(r){
-        var key=r.profesor+'|||'+r.cc+'|||'+r.actCod;
-        if(!cIdx[key]){
-          cIdx[key]=Object.assign({},r,{
-            hrDec:0,hrLV:0,hrSD:0,monto:0,
-            meses:[],nFilas:0,esDuplicado:false,cumplimiento:'pendiente',
-            detalle:[]
-          });
-        }
-        var e=cIdx[key];
-        e.hrDec+=r.hrDec; e.hrLV+=r.hrLV; e.hrSD+=r.hrSD; e.monto+=r.monto;
-        e.nFilas++;
-        e.detalle.push({
-          actNom:r.actNom, tipoAct:r.tipoAct, mesIni:r.mesIni, mesMov:r.mesMov,
-          fechaIni:r.fechaIni, fechaFin:r.fechaFin,
-          hrObl:r.hrObl, hrLV:r.hrLV, hrSD:r.hrSD, hrDec:r.hrDec, monto:r.monto
-        });
-        var mes=r.mesIni||r.mesMov||'';
-        if(mes&&!e.meses.includes(mes)) e.meses.push(mes);
-      });
-      _dvoCons=Object.values(cIdx).map(function(e){
-        e.hrDec  =Math.round(e.hrDec*100)/100;
-        e.hrLV   =Math.round(e.hrLV*100)/100;
-        e.hrSD   =Math.round(e.hrSD*100)/100;
-        e.monto  =Math.round(e.monto*100)/100;
-        e.diff   =Math.round((e.hrObl-e.hrDec)*100)/100;
-        e.cumpl  =e.hrObl>0?Math.round(e.hrDec/e.hrObl*10000)/100:100;
-        e.esDuplicado=e.nFilas>1;
-        e.cumplimiento=e.hrDec>e.hrObl?'excedido':
-                       e.hrDec===e.hrObl?'cumplido':'pendiente';
-        return e;
-      });
+      _dvBuildConsolidado(raw);
 
       // Ocultar zona upload, mostrar estado
       var uz=document.getElementById('dvoUpZone');
@@ -13008,11 +13010,11 @@ function gctCargarDecl(file) {
       var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
       _ctRawDecl = rows;
       _ctDeclFilename = file.name;
-      // También alimentar el módulo _dvo (declaraciones vs obligación)
-      _dvo = rows;
-      if(typeof _dvCons === 'function') _dvCons();
+      // También alimentar el módulo de Declaraciones (_dvo/_dvoCons), normalizando y consolidando
+      // igual que en la carga directa (dvoCargar) para que ambas rutas queden sincronizadas.
+      var _dvRes=(typeof _dvBuildConsolidado==='function')?_dvBuildConsolidado(rows):{n:rows.length,nCons:0};
       var _hdcAdded=(typeof _hdcHistMerge==='function')?_hdcHistMerge(rows):0;
-      showToast(rows.length+' declaraciones cargadas'+(_hdcAdded?' \u00b7 '+_hdcAdded+' nuevas al hist\u00f3rico':''),'ok');
+      showToast(rows.length+' declaraciones cargadas ('+_dvRes.nCons+' consolidadas)'+(_hdcAdded?' \u00b7 '+_hdcAdded+' nuevas al hist\u00f3rico':''),'ok');
       if(_ctRawCont.length) _ctCruzar();
       renderDeclarado();
     }catch(err){ showToast('Error declaraciones: '+err.message,'err'); }
