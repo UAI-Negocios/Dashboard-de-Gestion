@@ -1709,11 +1709,11 @@ function coordGetInfo(nombre) {
 }
 
 const CATS = {
-  dashboard:    ['home','global','coord','comp','analytics'],
+  dashboard:    ['home','global','comp','analytics'],
   programas:    ['resumen','calidad','cronograma','docentes','horasdoc','correos'],
   calendarios:  ['calendario','reservas','actterm'],
   planificador: ['plancursos','plancoord','malla','planreporte','propuestas','horario','asistencia'],
-  admin:        ['gestion','cargaprog','cargapuntaje','turnos','cargalaboral','coordcarga'],
+  admin:        ['gestion','cargaprog','cargapuntaje','turnos','cargalaboral','coord'],
   control:      ['declaracion','infodecl','horasdecl','declarado','anualdecl','presupuesto','informe','cruce','crucedecl','controlhoras','valoreshora','areacg'],
   ayuda:        ['manual','faqs'],
   adn:          ['adnacademico','finalizados'],
@@ -1724,7 +1724,7 @@ const TAB_LABELS = {
   home:         'Home',
   agente:       '🤖 Agente',
   global:       'Global',
-  coord:        'Coordinadoras',
+  coord:        '👩 Distribución por Coordinadora',
   comp:         'Comparativa',
   analytics:    'Analytics',
   resumen:      'Resumen',
@@ -1754,7 +1754,6 @@ const TAB_LABELS = {
   cargapuntaje: '⚖️ Carga por Puntaje',
   turnos:       'Turnos',
   cargalaboral: 'Control General',
-  coordcarga:   '👥 Coordinadoras',
   plancursos:   'Planificador General',
   plancoord:    'Planificación Coordinadoras',
   propuestas:   '📅 Generador de Propuestas',
@@ -1825,8 +1824,8 @@ window.addEventListener('unhandledrejection', function(ev){
 const today = () => { const d=new Date(); d.setHours(0,0,0,0); return d; }
 
 function fmtDate(d) {
-  if (!d || !(d instanceof Date) || isNaN(d)) return '';
-  return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'});
+  if (!d || typeof d.getFullYear!=='function' || isNaN(d.getTime())) return '';
+  return String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
 }
 function fmtDateShort(d) {
   if (!d || !(d instanceof Date) || isNaN(d)) return '';
@@ -1997,8 +1996,8 @@ function normalizeRow(rawRow) {
   return nr;
 }
 
-function processMain(rawRows, fileName) {
-  if (!rawRows.length) { showToast('Archivo vacío — sin filas de datos','err'); return; }
+function processMain(rawRows, fileName, _returnOnly) {
+  if (!rawRows.length) { if(!_returnOnly) showToast('Archivo vacío — sin filas de datos','err'); return _returnOnly?[]:undefined; }
 
   const sample = normalizeRow(rawRows[0]);
   const allNormKeys = Object.keys(sample);
@@ -2090,7 +2089,7 @@ function processMain(rawRows, fileName) {
 
   const getVal = (r, col) => col ? String(r[normalizeKey(col)]??'').trim() : '';
 
-  APP.df = rawRows.map(raw=>{
+  const _parsedRows = rawRows.map(raw=>{
     const r = normalizeRow(raw);
 
     // Fecha
@@ -2180,6 +2179,9 @@ function processMain(rawRows, fileName) {
       'SPA':                      getVal(r, spaCol),
     };
   }).filter(r=>r['DIAS/FECHAS']!==null);
+
+  if (_returnOnly) return _parsedRows;
+  APP.df = _parsedRows;
 
   if (!APP.df.length) {
     // Diagnóstico detallado — mostrar las columnas reales del archivo y valores de muestra
@@ -3403,7 +3405,6 @@ function refreshView() {
     cargapuntaje: renderCargaPuntaje,
     turnos:       renderTurnos,
     cargalaboral: renderResumenCargaLaboral,
-    coordcarga:   renderCoordinadorasCL,
     plancursos:   renderPlanificador,
     plancoord:    renderPlanCoord,
     propuestas:   renderPropuestasCalendario,
@@ -4308,7 +4309,7 @@ function renderHome() {
       <div style="padding:12px;display:flex;flex-direction:column;gap:6px">
         ${[
           {ico:'📅',lbl:'Calendario',       fn:"goTo('calendarios','calendario')"},
-          {ico:'👩',lbl:'Coordinadoras',    fn:"goTo('dashboard','coord')"},
+          {ico:'👩',lbl:'Coordinadoras (Admin)', fn:"goTo('admin','coord')"},
           {ico:'🏫',lbl:'Reservas',         fn:"goTo('calendarios','reservas')"},
           {ico:'📊',lbl:'Analytics',        fn:"goTo('dashboard','analytics')"},
           {ico:'📋',lbl:'Resumen Programas',fn:"goTo('programas','resumen')"},
@@ -4718,6 +4719,380 @@ function updGlobal() {
 /* ══════════════════════════════════════════════════════
    COORDINADORAS TAB
 ══════════════════════════════════════════════════════ */
+/* Clasifica un programa en EMBA / Master / Diploma / Curso según su nombre */
+/* ── Calendario mensual de coordinadoras y topes ── */
+var _coordCalMonth = null;   // {y, m} mes visible en modo single; null = auto
+var _coordCalSel = [];       // ['Y-M', ...] meses seleccionados en modo multi
+var _coordCalMulti = false;  // false = 1 mes con navegacion; true = varios meses apilados
+function _coordCalShift(delta){
+  if(!_coordCalMonth) return;
+  var m=_coordCalMonth.m+delta, y=_coordCalMonth.y;
+  if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+  _coordCalMonth={y:y, m:m};
+  _coordRenderCalendario();
+}
+function _coordCalGoto(val){
+  if(!val) return; var p=val.split('-');
+  _coordCalMonth={y:+p[0], m:+p[1]};
+  _coordRenderCalendario();
+}
+function _coordCalToggleMulti(){
+  _coordCalMulti=!_coordCalMulti;
+  if(_coordCalMulti && !_coordCalSel.length && _coordCalMonth){ _coordCalSel=[_coordCalMonth.y+'-'+_coordCalMonth.m]; }
+  _coordRenderCalendario();
+}
+function _coordCalToggleMes(val){
+  var i=_coordCalSel.indexOf(val);
+  if(i>=0) _coordCalSel.splice(i,1); else _coordCalSel.push(val);
+  _coordRenderCalendario();
+}
+function _coordCalSelTodos(months){ _coordCalSel=months.map(function(x){return x.y+'-'+x.m;}); _coordRenderCalendario(); }
+function _coordCalSelNinguno(){ _coordCalSel=[]; _coordRenderCalendario(); }
+
+/* Dibuja las CELDAS de un mes (grilla de dias) y devuelve HTML de celdas */
+function _coordCalCells(cal, Y, M){
+  var first=new Date(Y,M,1);
+  var startDow=(first.getDay()+6)%7;
+  var daysInMonth=new Date(Y,M+1,0).getDate();
+  var cells='';
+  for(var i=0;i<startDow;i++) cells+='<div style="background:#0a0d13;border:1px solid #161b22;border-radius:8px;min-height:96px"></div>';
+  for(var day=1; day<=daysInMonth; day++){
+    var dObj=new Date(Y,M,day);
+    var key=fmtDate(dObj);
+    var info=cal[key];
+    var coords= info?Object.keys(info.coords):[];
+    var esTope=false;
+    if(coords.length>=2) esTope=true;
+    else if(coords.length===1 && info.coords[coords[0]].progs.size>=2) esTope=true;
+    var bg = esTope? 'rgba(248,81,73,.08)' : (coords.length? '#0d1117' : '#0a0d13');
+    var bd = esTope? 'rgba(248,81,73,.4)' : (coords.length? '#21262d' : '#161b22');
+    var chips = coords.slice(0,4).map(function(co,ci){
+      var col=(window._COORD_RADAR_COLORS&&window._COORD_RADAR_COLORS[ci%window._COORD_RADAR_COLORS.length])||'#388bfd';
+      var np=info.coords[co].progs.size;
+      var sedesArr=[...info.coords[co].sedes];
+      var sedeTxt=sedesArr.length?(sedesArr.length>1?sedesArr.length+' sedes':sedesArr[0]):'';
+      return '<div title="'+escA(co+' \u2014 '+[...info.coords[co].progs].join(', ')+(sedesArr.length?' \u00b7 Sede: '+sedesArr.join(', '):''))+'" style="font-size:9.5px;font-weight:700;color:'+col+';background:'+col+'18;border:1px solid '+col+'40;border-radius:5px;padding:1px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(abbr(co,14))+(np>1?' ('+np+')':'')+(sedeTxt?'<span style="font-weight:500;opacity:.75"> \u00b7 '+esc(abbr(sedeTxt,10))+'</span>':'')+'</div>';
+    }).join('');
+    var mas = coords.length>4? '<div style="font-size:9px;color:#8b949e;margin-top:1px">+'+(coords.length-4)+' m\u00e1s</div>':'';
+    cells+='<div onclick="'+(coords.length?('_coordCalDia(\'' +key+ '\')'):'')+'" style="background:'+bg+';border:1px solid '+bd+';border-radius:8px;min-height:96px;padding:6px;'+(coords.length?'cursor:pointer;':'')+'display:flex;flex-direction:column;overflow:hidden">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'+
+        '<span style="font-size:12px;font-weight:800;color:'+(coords.length?'#f0f6ff':'#3d4351')+'">'+day+'</span>'+
+        (esTope?'<span style="font-size:8px;font-weight:800;color:#f85149;background:rgba(248,81,73,.15);border-radius:4px;padding:0 4px">TOPE</span>':'')+
+      '</div>'+
+      '<div style="flex:1;overflow:hidden">'+chips+mas+'</div>'+
+    '</div>';
+  }
+  return cells;
+}
+function _coordCalTopesMes(cal, Y, M){
+  var t=0; Object.keys(cal).forEach(function(k){ var d=cal[k].fecha; if(d.getFullYear()===Y&&d.getMonth()===M){ var cs=Object.keys(cal[k].coords); if(cs.length>=2||(cs.length===1&&cal[k].coords[cs[0]].progs.size>=2)) t++; } }); return t;
+}
+function _coordCalGridMes(cal, Y, M, MES_NOM, DOW, conTitulo){
+  return (conTitulo?'<div style="font-size:13px;font-weight:800;color:#f0f6ff;margin:6px 0 8px">'+MES_NOM[M]+' '+Y+' \u00b7 <span style="font-size:11px;font-weight:600;color:#8b949e"><b style="color:#f85149">'+_coordCalTopesMes(cal,Y,M)+'</b> tope(s)</span></div>':'')+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">'+
+      DOW.map(function(d){ return '<div style="text-align:center;font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;padding:4px 0">'+d+'</div>'; }).join('')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px">'+_coordCalCells(cal,Y,M)+'</div>';
+}
+function _coordRenderCalendario(){
+  var wrap=document.getElementById('cCalWrap'); if(!wrap) return;
+  var cal=window._coordCalData||{};
+  var keys=Object.keys(cal);
+  if(!keys.length){ wrap.innerHTML='<div style="padding:24px;text-align:center;color:#6e7681;font-size:12px">Sin fechas para mostrar.</div>'; return; }
+
+  var monthsSet={};
+  keys.forEach(function(k){ var d=cal[k].fecha; monthsSet[d.getFullYear()+'-'+d.getMonth()]=true; });
+  var months=Object.keys(monthsSet).map(function(s){ var p=s.split('-'); return {y:+p[0], m:+p[1]}; })
+    .sort(function(a,b){ return a.y-b.y || a.m-b.m; });
+  var MES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var DOW=['Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b','Dom'];
+  var nav=document.getElementById('cCalNav');
+
+  if(_coordCalMulti){
+    _coordCalSel=_coordCalSel.filter(function(v){ return monthsSet[v]; });
+    if(!_coordCalSel.length && months.length) _coordCalSel=[months[0].y+'-'+months[0].m];
+    if(nav){
+      nav.innerHTML=
+        '<button onclick="_coordCalToggleMulti()" style="padding:5px 11px;border-radius:7px;border:1px solid #388bfd;background:rgba(56,139,253,.12);color:#388bfd;font-size:11px;font-weight:700;cursor:pointer">\U0001F4C5 Un mes</button>'+
+        '<span style="font-size:10.5px;color:#6e7681;margin:0 2px">Meses:</span>'+
+        months.map(function(x){ var v=x.y+'-'+x.m; var on=_coordCalSel.indexOf(v)>=0;
+          return '<button onclick="_coordCalToggleMes(\'' +v+ '\')" style="padding:4px 10px;border-radius:20px;border:1px solid '+(on?'#388bfd':'#30363d')+';background:'+(on?'rgba(56,139,253,.15)':'transparent')+';color:'+(on?'#388bfd':'#8b949e')+';font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap">'+(on?'\u25CF ':'')+MES_NOM[x.m].slice(0,3)+' '+x.y+'</button>';
+        }).join('')+
+        (months.length>1?'<button onclick=\'_coordCalSelTodos('+"'"+'+JSON.stringify(months)+'+"'"+')\' style="padding:4px 9px;border-radius:7px;border:1px solid #30363d;background:transparent;color:#8b949e;font-size:10px;cursor:pointer">Todos</button>':'')+
+        (_coordCalSel.length?'<button onclick="_coordCalSelNinguno()" style="padding:4px 9px;border-radius:7px;border:1px solid #30363d;background:transparent;color:#8b949e;font-size:10px;cursor:pointer">\u2715</button>':'');
+    }
+    var sel=months.filter(function(x){ return _coordCalSel.indexOf(x.y+'-'+x.m)>=0; });
+    if(!sel.length){ wrap.innerHTML='<div style="padding:24px;text-align:center;color:#6e7681;font-size:12px">Selecciona al menos un mes arriba.</div>'; return; }
+    var totSel=0; Object.keys(cal).forEach(function(k){ var d=cal[k].fecha; if(_coordCalSel.indexOf(d.getFullYear()+'-'+d.getMonth())>=0){ var cs=Object.keys(cal[k].coords); if(cs.length>=2||(cs.length===1&&cal[k].coords[cs[0]].progs.size>=2)) totSel++; } });
+    var html=
+      '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap">'+
+        '<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#8b949e"><span style="width:11px;height:11px;border-radius:3px;background:rgba(248,81,73,.4);display:inline-block"></span> D\u00eda con tope</div>'+
+        '<div style="font-size:11px;color:#8b949e"><b style="color:#f85149">'+totSel+'</b> d\u00eda(s) de tope en '+sel.length+' mes(es) seleccionado(s)</div>'+
+      '</div>';
+    sel.forEach(function(x){ html+=_coordCalGridMes(cal, x.y, x.m, MES_NOM, DOW, true); });
+    wrap.innerHTML=html;
+    return;
+  }
+
+  if(!_coordCalMonth || !monthsSet[_coordCalMonth.y+'-'+_coordCalMonth.m]){
+    _coordCalMonth={y:months[0].y, m:months[0].m};
+  }
+  var Y=_coordCalMonth.y, M=_coordCalMonth.m;
+  if(nav){
+    var idx=months.findIndex(function(x){return x.y===Y&&x.m===M;});
+    nav.innerHTML=
+      '<button onclick="_coordCalShift(-1)" '+(idx<=0?'disabled':'')+' style="padding:5px 10px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:'+(idx<=0?'#30363d':'#e6edf3')+';font-size:12px;cursor:'+(idx<=0?'default':'pointer')+'">\u2039</button>'+
+      '<select onchange="_coordCalGoto(this.value)" style="padding:5px 10px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:12px;font-weight:700;cursor:pointer">'+
+        months.map(function(x){ return '<option value="'+x.y+'-'+x.m+'"'+(x.y===Y&&x.m===M?' selected':'')+'>'+MES_NOM[x.m]+' '+x.y+'</option>'; }).join('')+
+      '</select>'+
+      '<button onclick="_coordCalShift(1)" '+(idx>=months.length-1?'disabled':'')+' style="padding:5px 10px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:'+(idx>=months.length-1?'#30363d':'#e6edf3')+';font-size:12px;cursor:'+(idx>=months.length-1?'default':'pointer')+'">\u203a</button>'+
+      (months.length>1?'<button onclick="_coordCalToggleMulti()" style="padding:5px 11px;border-radius:7px;border:1px solid #30363d;background:transparent;color:#8b949e;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px">\U0001F5D3\uFE0F Varios meses</button>':'');
+  }
+  var totTopes=_coordCalTopesMes(cal,Y,M);
+  wrap.innerHTML=
+    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;flex-wrap:wrap">'+
+      '<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#8b949e"><span style="width:11px;height:11px;border-radius:3px;background:rgba(248,81,73,.4);display:inline-block"></span> D\u00eda con tope</div>'+
+      '<div style="font-size:11px;color:#8b949e"><b style="color:#f85149">'+totTopes+'</b> d\u00eda(s) de tope en '+MES_NOM[M]+' '+Y+'</div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">'+
+      DOW.map(function(d){ return '<div style="text-align:center;font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;padding:4px 0">'+d+'</div>'; }).join('')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+_coordCalCells(cal,Y,M)+'</div>';
+}
+function _coordCalDia(key){
+  var cal=window._coordCalData||{}; var info=cal[key]; if(!info) return;
+  var panel=document.getElementById('cCalDetail');
+  if(!panel) return;
+  var coords=Object.keys(info.coords);
+  var esTope = coords.length>=2 || (coords.length===1 && info.coords[coords[0]].progs.size>=2);
+  var fechaTxt=fmtDate(info.fecha);
+  // sedes únicas del día (para el resumen del encabezado)
+  var sedesDia={};
+  coords.forEach(function(co){ [...info.coords[co].sedes].forEach(function(s){ if(s) sedesDia[s]=true; }); });
+  var sedesDiaArr=Object.keys(sedesDia);
+  var rows=coords.map(function(co,i){
+    var col=(window._COORD_RADAR_COLORS&&window._COORD_RADAR_COLORS[i%window._COORD_RADAR_COLORS.length])||'#388bfd';
+    var np=info.coords[co].progs.size;
+    var sedesArr=[...info.coords[co].sedes].filter(Boolean);
+    var sedeCells=sedesArr.length?sedesArr.map(function(s){ return '<span style="display:inline-block;font-size:10px;font-weight:700;color:#34d6ff;background:rgba(52,214,255,.1);border:1px solid rgba(52,214,255,.3);border-radius:5px;padding:1px 7px;margin:1px 2px 1px 0">📍 '+esc(s)+'</span>'; }).join(''):'<span style="color:#6e7681">—</span>';
+    return '<tr style="border-top:1px solid #21262d">'+
+      '<td style="padding:8px 12px;font-weight:700;color:'+col+';white-space:nowrap;vertical-align:top">'+esc(co)+(np>1?' <span style="font-size:9px;color:#f85149;font-weight:800">('+np+' prog.)</span>':'')+'</td>'+
+      '<td style="padding:8px 12px;color:#e6edf3;vertical-align:top">'+esc([...info.coords[co].progs].join(', '))+'</td>'+
+      '<td style="padding:8px 12px;vertical-align:top">'+sedeCells+'</td>'+
+    '</tr>';
+  }).join('');
+  panel.innerHTML=
+    '<div style="background:#0d1117;border:1px solid '+(esTope?'#f8514955':'#388bfd55')+';border-radius:12px;overflow:hidden">'+
+      '<div style="padding:14px 18px;background:'+(esTope?'rgba(248,81,73,.08)':'rgba(56,139,253,.08)')+';border-bottom:1px solid #21262d;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<span style="font-size:18px">\uD83D\uDCC5</span>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:900;color:#f0f6ff">'+fechaTxt+'</div>'+
+          '<div style="font-size:11px;color:#8b949e">'+coords.length+' coordinadora(s) con clases'+(esTope?' \u00b7 <b style="color:#f85149">D\u00cdA DE TOPE</b>':'')+(sedesDiaArr.length?' \u00b7 Sede(s): <b style="color:#34d6ff">'+esc(sedesDiaArr.join(', '))+'</b>':'')+'</div></div>'+
+        '<button onclick="_coordCerrarCalDetalle()" style="padding:6px 12px;border:1px solid #30363d;border-radius:7px;background:transparent;color:#8b949e;font-size:11px;font-weight:700;cursor:pointer">\u2715 Cerrar</button>'+
+      '</div>'+
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'+
+        '<thead><tr style="background:#161b22"><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Coordinadora</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Programas ese d\u00eda</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Sede(s)</th></tr></thead>'+
+        '<tbody>'+rows+'</tbody></table></div>'+
+    '</div>';
+  panel.style.display='block';
+  if(typeof panel.scrollIntoView==='function'){ try{ panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){} }
+}
+
+/* ── Radar comparativo de coordinadoras ── */
+var _COORD_RADAR_SEL = [];              // coordinadoras seleccionadas para comparar
+var _COORD_RADAR_COLORS = ['#388bfd','#f0b429','#a78bfa','#3fb950','#f85149','#34d6ff'];
+var _COORD_RADAR_AXES = [
+  {k:'progs', lbl:'Programas'},
+  {k:'ses',   lbl:'Sesiones'},
+  {k:'dias',  lbl:'Días de clase'},
+  {k:'topes', lbl:'Topes'},
+  {k:'sedes', lbl:'Sedes'}
+];
+function _coordToggleRadar(nombre){
+  var i=_COORD_RADAR_SEL.indexOf(nombre);
+  if(i>=0) _COORD_RADAR_SEL.splice(i,1);
+  else { if(_COORD_RADAR_SEL.length>=6){ if(window.showToast) showToast('Máximo 6 coordinadoras a la vez','warn'); return; } _COORD_RADAR_SEL.push(nombre); }
+  _coordRenderRadar();
+}
+function _coordRadarClear(){ _COORD_RADAR_SEL=[]; _coordRenderRadar(); }
+function _coordRenderRadar(){
+  var data=window._coordRadarData||{};
+  var names=Object.keys(data).sort(function(a,b){ return data[b].ses-data[a].ses; });
+  if(!names.length) return;
+  // Si no hay selección, precargar la coordinadora con más sesiones
+  if(!_COORD_RADAR_SEL.length && names.length) _COORD_RADAR_SEL=[names[0]];
+  // Limpiar selección de nombres que ya no existen (por cambios de filtro)
+  _COORD_RADAR_SEL=_COORD_RADAR_SEL.filter(function(n){ return data[n]; });
+  if(!_COORD_RADAR_SEL.length && names.length) _COORD_RADAR_SEL=[names[0]];
+
+  // ── Selector (chips) ──
+  var picker=document.getElementById('cRadarPicker');
+  if(picker){
+    var opts=names.map(function(n){
+      var on=_COORD_RADAR_SEL.indexOf(n)>=0;
+      var idx=_COORD_RADAR_SEL.indexOf(n);
+      var col=on?_COORD_RADAR_COLORS[idx%_COORD_RADAR_COLORS.length]:'#30363d';
+      return '<button onclick="_coordToggleRadar('+JSON.stringify(n).replace(/"/g,'&quot;')+')" '+
+        'style="padding:4px 10px;border-radius:20px;border:1px solid '+col+';cursor:pointer;font-size:10.5px;font-weight:700;white-space:nowrap;'+
+        'background:'+(on?col+'22':'transparent')+';color:'+(on?col:'#8b949e')+'">'+
+        (on?'● ':'')+esc(abbr(n,22))+'</button>';
+    }).join('');
+    picker.innerHTML=
+      '<select id="cRadarAdd" onchange="if(this.value){_coordToggleRadar(this.value);this.value=\'\';}" '+
+        'style="padding:5px 9px;border-radius:7px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:11px;cursor:pointer;max-width:200px">'+
+        '<option value="">+ Agregar coordinadora…</option>'+
+        names.filter(function(n){return _COORD_RADAR_SEL.indexOf(n)<0;}).map(function(n){ return '<option value="'+escA(n)+'">'+esc(n)+'</option>'; }).join('')+
+      '</select>'+
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">'+opts+'</div>'+
+      (_COORD_RADAR_SEL.length>1?'<button onclick="_coordRadarClear()" style="padding:4px 10px;border-radius:7px;border:1px solid #30363d;background:transparent;color:#8b949e;font-size:10.5px;cursor:pointer">✕ Limpiar</button>':'');
+  }
+
+  // ── Máximos por eje (para normalizar 0–100 y que el radar sea legible) ──
+  var maxByAxis={};
+  _COORD_RADAR_AXES.forEach(function(ax){
+    var mx=0; names.forEach(function(n){ if(data[n][ax.k]>mx) mx=data[n][ax.k]; });
+    maxByAxis[ax.k]=mx||1;
+  });
+
+  // ── Datasets ──
+  var datasets=_COORD_RADAR_SEL.map(function(n,i){
+    var col=_COORD_RADAR_COLORS[i%_COORD_RADAR_COLORS.length];
+    return {
+      label:n,
+      data:_COORD_RADAR_AXES.map(function(ax){ return Math.round((data[n][ax.k]/maxByAxis[ax.k])*100); }),
+      borderColor:col,
+      backgroundColor:col+'25',
+      pointBackgroundColor:col,
+      pointBorderColor:'#0d1117',
+      borderWidth:2,
+      pointRadius:3
+    };
+  });
+
+  if(typeof makeChart==='function'){
+    makeChart('cRadarChart',{
+      type:'radar',
+      data:{ labels:_COORD_RADAR_AXES.map(function(a){return a.lbl;}), datasets:datasets },
+      options:{
+        plugins:{ legend:{ display:true, position:'bottom', labels:{ color:'#8b949e', font:{size:11}, boxWidth:12, padding:10 } },
+          tooltip:{ callbacks:{ label:function(ctx){
+            var n=ctx.dataset.label; var axk=_COORD_RADAR_AXES[ctx.dataIndex].k; var real=data[n]?data[n][axk]:0;
+            return n+' — '+_COORD_RADAR_AXES[ctx.dataIndex].lbl+': '+real;
+          } } } },
+        scales:{ r:{
+          angleLines:{ color:'#21262d' }, grid:{ color:'#21262d' },
+          pointLabels:{ color:'#e6edf3', font:{size:11,weight:'700'} },
+          ticks:{ display:false, stepSize:25 }, suggestedMin:0, suggestedMax:100
+        } }
+      }
+    });
+  }
+
+  // ── Tabla de valores reales al lado ──
+  var tbl=document.getElementById('cRadarTable');
+  if(tbl){
+    if(!_COORD_RADAR_SEL.length){ tbl.innerHTML='<div style="padding:20px;text-align:center;color:#6e7681;font-size:12px">Selecciona una coordinadora arriba.</div>'; return; }
+    tbl.innerHTML=
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead><tr style="background:#161b22"><th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Dimensión</th>'+
+        _COORD_RADAR_SEL.map(function(n,i){ var col=_COORD_RADAR_COLORS[i%_COORD_RADAR_COLORS.length]; return '<th style="padding:8px 10px;text-align:center;font-size:9px;font-weight:800;color:'+col+';text-transform:uppercase" title="'+escA(n)+'">'+esc(abbr(n,14))+'</th>'; }).join('')+
+      '</tr></thead><tbody>'+
+      _COORD_RADAR_AXES.map(function(ax){
+        return '<tr style="border-top:1px solid #21262d"><td style="padding:7px 10px;color:#e6edf3;font-weight:700">'+ax.lbl+'</td>'+
+          _COORD_RADAR_SEL.map(function(n,i){ var col=_COORD_RADAR_COLORS[i%_COORD_RADAR_COLORS.length]; var v=data[n]?data[n][ax.k]:0;
+            var isMax = _COORD_RADAR_SEL.length>1 && v===Math.max.apply(null,_COORD_RADAR_SEL.map(function(x){return data[x]?data[x][ax.k]:0;})) && v>0;
+            return '<td style="padding:7px 10px;text-align:center;font-variant-numeric:tabular-nums;font-weight:'+(isMax?'900':'600')+';color:'+(isMax?col:'#8b949e')+'">'+v+(isMax?' ▲':'')+'</td>';
+          }).join('')+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  }
+}
+
+/* Combina las filas de coordinadoras de TODAS las unidades (Magíster/Diplomados + Cursos + MBA)
+   leyendo cada hoja del workbook cargado, sin alterar APP.df ni la unidad seleccionada.
+   Cachea el resultado en window._coordAllDF. Si no hay workbook, cae a getDF() (unidad actual). */
+function _coordAllUnitsDF(force){
+  if(!force && window._coordAllDF && window._coordAllDF._sig===(window._lastFileName||'')) return window._coordAllDF;
+  var wb=window._lastWB||null;
+  if(!wb || typeof ACAD_UNITS==='undefined' || typeof processMain!=='function'){
+    var cur=getDF()||[];
+    cur.forEach(function(r){ if(!r._unidad) r._unidad=(typeof _unitGet==='function'&&_unitGet()?_unitGet().label:''); });
+    return cur;
+  }
+  var out=[];
+  var nm=function(s){return String(s||'').trim().toUpperCase();};
+  ACAD_UNITS.forEach(function(u){
+    var sheetName=null;
+    for(var a=0;a<u.sheets.length && !sheetName;a++){
+      for(var b=0;b<wb.SheetNames.length;b++){ if(nm(wb.SheetNames[b])===nm(u.sheets[a])){ sheetName=wb.SheetNames[b]; break; } }
+    }
+    if(!sheetName) return;
+    try{
+      var raw=smartParseSheet(wb.Sheets[sheetName]);
+      if(!raw||!raw.length) return;
+      var rows=processMain(raw, sheetName, true)||[];
+      rows.forEach(function(r){ r._unidad=u.label; r._unidadId=u.id; });
+      out=out.concat(rows);
+    }catch(e){ /* hoja no compatible, se omite */ }
+  });
+  if(!out.length){ var cur2=getDF()||[]; cur2.forEach(function(r){ if(!r._unidad)r._unidad=''; }); return cur2; }
+  out._sig=(window._lastFileName||'');
+  window._coordAllDF=out;
+  return out;
+}
+function _coordCategoria(prog){
+  var p=String(prog||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/\bEMBA\b/.test(p)) return 'EMBA';
+  if(/\bMBA\b|MAGISTER|MAGÍSTER|MASTER|\bMGN\b|\bMDF\b|\bMSCM\b|\bMNS\b|\bMI\b\s|PHD|DOCTORADO/.test(p)) return 'Master';
+  if(/DIPLOMA|DIPLOMADO|\bDIP\b|\bDGN\b|\bDEV\b|\bDEC\b|\bDLC/.test(p)) return 'Diploma';
+  return 'Curso';
+}
+var _COORD_CAT_COLOR={EMBA:'#f0b429',Master:'#388bfd',Diploma:'#a78bfa',Curso:'#3fb950'};
+function _coordAbrirDetalle(nombre){
+  var panel=$('cCoordDetail'); if(!panel) return;
+  var info=(window._coordTooltipData||{})[nombre];
+  var cat=(window._coordCatMatrix||{})[nombre];
+  if(!info){ panel.style.display='none'; return; }
+  var CATS_ORDEN=['EMBA','Master','Diploma','Curso'];
+  var catChips=CATS_ORDEN.map(function(k){
+    var n=cat?cat[k].size:0;
+    var progsList=cat?[...cat[k]].join(' \u00b7 '):'';
+    return '<div title="'+escA(progsList)+'" style="flex:1;min-width:110px;background:'+_COORD_CAT_COLOR[k]+'11;border:1px solid '+_COORD_CAT_COLOR[k]+'44;border-radius:10px;padding:10px 12px;text-align:center">'+
+      '<div style="font-size:9px;font-weight:800;color:'+_COORD_CAT_COLOR[k]+';text-transform:uppercase;letter-spacing:.4px">'+k+'</div>'+
+      '<div style="font-size:22px;font-weight:900;color:'+_COORD_CAT_COLOR[k]+';margin-top:2px">'+n+'</div>'+
+    '</div>';
+  }).join('');
+  var topesAll=info.diasTopePropio||[];
+  var topesTbl = !topesAll.length ?
+    '<div style="padding:14px;text-align:center;color:#3fb950;font-size:12px">\u2705 Sin d\u00edas de tope registrados.</div>' :
+    '<div style="overflow-x:auto;max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'+
+      '<thead style="position:sticky;top:0"><tr style="background:#161b22"><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Fecha</th><th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">N\u00b0 Prog.</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Programas que se topan</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Sede(s)</th></tr></thead><tbody>'+
+      topesAll.map(function(t){
+        return '<tr style="border-top:1px solid #21262d"><td style="padding:7px 12px;color:#388bfd;font-weight:700;white-space:nowrap">'+esc(t.fecha)+'</td>'+
+          '<td style="padding:7px 12px;text-align:center"><span style="display:inline-block;min-width:22px;padding:2px 8px;border-radius:9px;font-size:11px;font-weight:800;background:rgba(248,81,73,.15);color:#f85149">'+t.progs.length+'</span></td>'+
+          '<td style="padding:7px 12px;color:#8b949e;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(t.progs.join(', '))+'">'+esc(t.progs.join(', '))+'</td>'+
+          '<td style="padding:7px 12px;color:#8b949e">'+esc(t.sedes.join(', ')||'\u2014')+'</td></tr>';
+      }).join('')+
+      '</tbody></table></div>';
+  panel.innerHTML=
+    '<div style="background:#0d1117;border:1px solid #388bfd55;border-radius:12px;overflow:hidden">'+
+      '<div style="padding:14px 18px;background:linear-gradient(135deg,rgba(56,139,253,.10),rgba(240,180,41,.06));border-bottom:1px solid #21262d;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<div style="width:36px;height:36px;border-radius:50%;background:#388bfd22;border:1px solid #388bfd;display:flex;align-items:center;justify-content:center;font-size:16px">\uD83D\uDC69\u200D\uD83C\uDFEB</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:900;color:#f0f6ff">'+esc(nombre)+'</div>'+
+          '<div style="font-size:11px;color:#8b949e">'+info.ses+' sesi\u00f3n(es) \u00b7 '+info.diasActivos+' d\u00eda(s) activos \u00b7 '+topesAll.length+' d\u00eda(s) de tope</div></div>'+
+        '<button onclick="_coordCerrarDetalle()" style="padding:6px 12px;border:1px solid #30363d;border-radius:7px;background:transparent;color:#8b949e;font-size:11px;font-weight:700;cursor:pointer">\u2715 Cerrar</button>'+
+      '</div>'+
+      '<div style="padding:16px">'+
+        '<div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Programas por categor\u00eda</div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">'+catChips+'</div>'+
+        '<div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">\uD83D\uDD34 D\u00edas donde se topa (2+ programas el mismo d\u00eda)</div>'+
+        topesTbl+
+      '</div>'+
+    '</div>';
+  panel.style.display='block';
+  if(typeof panel.scrollIntoView==='function'){ try{ panel.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
+}
+function _coordCerrarDetalle(){ var panel=$('cCoordDetail'); if(panel){ panel.style.display='none'; panel.innerHTML=''; } }
 function renderCoord() {
   $('page').innerHTML =
     // Header
@@ -4730,10 +5105,38 @@ function renderCoord() {
         '</div>'+
       '</div>'+
     '</div>'+
+    // Panel de detalle (se llena al hacer clic en una coordinadora)
+    '<div id="cCoordDetail" style="display:none;margin-bottom:20px"></div>'+
     // Filtros
     '<div id="cFiltros" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px"></div>'+
     // KPI strip
     '<div id="cKPIs" style="margin-bottom:18px"></div>'+
+    // Radar comparativo de coordinadoras
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden;margin-bottom:20px">'+
+      '<div style="padding:12px 18px;border-bottom:1px solid #21262d;background:#161b22;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'+
+        '<div>'+
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">📡 Radar Comparativo de Carga</div>'+
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Selecciona una o varias coordinadoras para comparar su carga en 5 dimensiones (Programas, Sesiones, D\u00edas de clase, Topes, Sedes)</div>'+
+        '</div>'+
+        '<div id="cRadarPicker" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%"></div>'+
+      '</div>'+
+      '<div style="padding:16px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start" id="cRadarGrid">'+
+        '<div style="position:relative;min-height:360px"><canvas id="cRadarChart"></canvas></div>'+
+        '<div id="cRadarTable"></div>'+
+      '</div>'+
+    '</div>'+
+    // Calendario de topes de coordinadoras
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden;margin-bottom:20px">'+
+      '<div style="padding:12px 18px;border-bottom:1px solid #21262d;background:#161b22;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'+
+        '<div>'+
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">📅 Calendario de Coordinadoras y Topes</div>'+
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Qu\u00e9 d\u00eda tiene clases cada coordinadora \u2014 los d\u00edas con 2+ coordinadoras (o una con 2+ programas) se marcan como tope</div>'+
+        '</div>'+
+        '<div id="cCalNav" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"></div>'+
+      '</div>'+
+      '<div id="cCalWrap" style="padding:16px"></div>'+
+      '<div id="cCalDetail" style="display:none;padding:0 16px 16px"></div>'+
+    '</div>'+
     // Barra de filtros de cards
     '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">'+
       '<div style="flex:1;min-width:180px;position:relative">'+
@@ -4924,7 +5327,7 @@ function updCoordCards() {
     const diasSem   = cd.diasSem;
     const sedeCount = cd.sedeCount;
 
-    // Topes: para cada fecha de la coord, ver si otra coord también tiene sesiones ese día
+    // Topes (original): días donde OTRAS coordinadoras también tienen sesiones ese día
     const diasTopeArr = [];
     const fechasCo    = Object.keys(cd.sesPorFecha);
     for(let f=0; f<fechasCo.length; f++){
@@ -4946,6 +5349,22 @@ function updCoordCards() {
     diasTopeArr.sort((a,b)=>a.fecha.localeCompare(b.fecha));
     const nTopes = diasTopeArr.length;
 
+    // Topes PROPIOS (nuevo, adicional): días donde ESTA coordinadora tiene 2+ programas propios el mismo día
+    const diasTopePropio = [];
+    for(let f2=0; f2<fechasCo.length; f2++){
+      const fecha2 = fechasCo[f2];
+      const fechaInfo2 = cd.sesPorFecha[fecha2];
+      if(fechaInfo2.progs.size>=2){
+        diasTopePropio.push({
+          fecha: fecha2,
+          diaSem: fechaInfo2.diaSem,
+          sedes:  [...fechaInfo2.sedes],
+          progs:  [...fechaInfo2.progs],
+        });
+      }
+    }
+    diasTopePropio.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+
     const sedeTop  = [...co.sedes].slice(0,2).join(', ') || '—';
     const modalTop = Object.entries(co.modalidades).sort((a,b)=>b[1]-a[1])
       .slice(0,2).map(e=>e[0]).join(' / ') || '—';
@@ -4959,6 +5378,8 @@ function updCoordCards() {
       diasSem,
       nTopes,
       diasTopeArr: diasTopeArr.slice(0,5),
+      diasTopeAll: diasTopeArr,
+      diasTopePropio: diasTopePropio,
       progs:       [...co.progs],
       ses:         co.ses,
       diasActivos: co.dias.size,
@@ -4970,10 +5391,11 @@ function updCoordCards() {
 
     cardsHTML.push('<div class="coord-card" data-coord="'+esc(co.nombre)+'" '+
       'style="background:#0d1117;border:1px solid '+rCfg.bd+';border-radius:12px;'+
-        'padding:0;border-top:3px solid '+rCfg.c+';'+
+        'padding:0;border-top:3px solid '+rCfg.c+';cursor:pointer;'+
         'box-shadow:0 2px 8px rgba(0,0,0,.25);'+
         'transition:transform .15s ease,box-shadow .15s ease;'+
         'position:relative;overflow:hidden" '+
+      'onclick="_coordAbrirDetalle(\''+nameJS+'\')" '+
       'onmouseenter="this.style.transform=\'translateY(-3px)\';this.style.boxShadow=\'0 10px 28px rgba(0,0,0,.45)\';showCoordTooltip(this,\''+nameJS+'\')" '+
       'onmouseleave="this.style.transform=\'\';this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.25)\';hideCoordTooltip(false)">'+
 
@@ -5193,7 +5615,7 @@ function _coordTopesPanel(diasTopeArr, nTopes){
 
 
 function updCoord() {
-  let df = getDF();
+  let df = (typeof _coordAllUnitsDF==='function') ? _coordAllUnitsDF() : getDF();
   // Aplicar filtros
   const sy=getDF_sel('cYear'),sm=getDF_sel('cMes'),ss=getDF_sel('cSede');
   const smod=getDF_sel('cMod'),sc=getDF_sel('cCoord'),sp=getDF_sel('cProg');
@@ -5219,6 +5641,10 @@ function updCoord() {
   const crit = Object.values(diaMap).filter(d=>d.progs.size>2)
     .sort((a,b)=>b.progs.size-a.progs.size||a.fecha_d-b.fecha_d);
 
+  // Topes (umbral confirmado: 2+ programas propios el mismo día, distinto del ">2" usado en "Días con Sobrecarga")
+  const topesCoord = {};
+  Object.values(diaMap).forEach(d=>{ if(d.progs.size>=2){ topesCoord[d.coord]=(topesCoord[d.coord]||0)+1; } });
+
   // ── Construir datos por coordinadora ─────────────────────────
   const coordMap = {};
   df.forEach(r=>{
@@ -5237,6 +5663,17 @@ function updCoord() {
   const coordList = Object.values(coordMap)
     .sort((a,b)=>b.progs.size-a.progs.size);
   const maxProgs  = Math.max(...coordList.map(c=>c.progs.size), 1);
+
+  // ── Matriz Coordinadora × Categoría (EMBA/Master/Diploma/Curso) ──
+  // Usada por el panel de detalle de cada tarjeta (chips por categoría). El Mapa Total fue removido.
+  const catMatrix = {}; // coord -> {EMBA:Set, Master:Set, Diploma:Set, Curso:Set}
+  df.forEach(r=>{
+    const co = r['COORDINADORA RESPONSABLE']; const pr = r['PROGRAMA'];
+    if(!co || !pr) return;
+    if(!catMatrix[co]) catMatrix[co] = {EMBA:new Set(),Master:new Set(),Diploma:new Set(),Curso:new Set()};
+    catMatrix[co][_coordCategoria(pr)].add(pr);
+  });
+  window._coordCatMatrix = catMatrix;
 
   // ── KPI strip ─────────────────────────────────────────────────
   const nCoords  = coordList.length;
@@ -5264,6 +5701,36 @@ function updCoord() {
   // Guardar datos enriquecidos en _coordListData para que updCoordCards los use
   window._coordListData = coordList;
   updCoordCards();
+
+  // ── Radar comparativo: preparar datos por coordinadora ──
+  window._coordRadarData = {};
+  Object.keys(coordMap).forEach(function(co){
+    var m=coordMap[co];
+    window._coordRadarData[co] = {
+      nombre: co,
+      progs: m.progs.size,
+      ses:   m.ses,
+      dias:  m.dias.size,
+      topes: topesCoord[co]||0,
+      sedes: m.sedes.size
+    };
+  });
+
+  // ── Calendario: fecha → coordinadoras (con sus programas y sedes) ──
+  window._coordCalData = {};
+  df.forEach(function(r){
+    var co=r['COORDINADORA RESPONSABLE']; var d=r['DIAS/FECHAS'];
+    if(!co || !d || typeof d.getFullYear!=='function' || isNaN(d.getTime && d.getTime())) return;
+    var key=fmtDate(d);
+    if(!window._coordCalData[key]) window._coordCalData[key]={fecha:d, coords:{}};
+    var cd=window._coordCalData[key];
+    if(!cd.coords[co]) cd.coords[co]={progs:new Set(), sedes:new Set()};
+    if(r['PROGRAMA']) cd.coords[co].progs.add(r['PROGRAMA']);
+    if(r['SEDE'])     cd.coords[co].sedes.add(r['SEDE']);
+  });
+
+  _coordRenderRadar();
+  _coordRenderCalendario();
 
   // ── Gráfico días ─────────────────────────────────────────────
   const top25 = Object.values(diaMap).sort((a,b)=>b.progs.size-a.progs.size).slice(0,25);
@@ -32061,7 +32528,7 @@ function _agDeclAnswer(qn){
     var ccs={}; acts.forEach(function(r){ if(!ccs[r.cc]) ccs[r.cc]=r; });
     if(/monto|contrat|emision|emisi\u00f3n/.test(qn)){
       var body=Object.keys(ccs).map(function(cc){ var r=ccs[cc];
-        return _agDeclCard('<b style="color:#34d6ff">CC '+esc(cc)+'</b> \u00b7 '+esc(r.progLbl)+'<br>'+(r.nCont?('\uD83D\uDCB0 <b style="color:#a78bfa">$'+fmt(Math.round(r.monto))+'</b>'+(r.nCont>1?' ('+r.nCont+' contratos)':'')+' \u00b7 \uD83D\uDCC5 Emitido: '+esc(r.fechaEmi||'\u2014')+(r.estCont?' \u00b7 '+esc(r.estCont):'')):_agBadge('Sin contrato','#f85149')));
+        return _agDeclCard('<b style="color:#34d6ff">CC '+esc(cc)+'</b> \u00b7 '+esc(r.progLbl)+'<br>'+(r.nCont?('\uD83D\uDCB0 <b style="color:#a78bfa">$'+fmt(Math.round(r.monto))+'</b>'+(r.nCont>1?' ('+r.nCont+' contratos)':'')+' \u00b7 \uD83D\uDCC5 Emitido: '+esc(r.fechaEmi||'\u2014')+(r.estCont?' \u00b7 '+esc(r.estCont):'')):(r.esHora?_agBadge('Sin contrato','#f85149'):'<span style="color:#8b949e;font-size:11px">\u2014 No aplica (no es Hora)</span>')));
       }).join('');
       return '<div style="font-weight:700;margin-bottom:6px">\uD83D\uDCB0 Contratos de '+esc(doc)+'</div>'+body;
     }
@@ -32566,10 +33033,11 @@ function _idmBuild(){
     var k=(rut||_ctNorm(prof))+'\u241F'+cc+'\u241F'+aid;
     if(!map[k]) map[k]={rut:rut,doc:prof,cc:cc,progLbl:String(r['Programa']||'').trim(),
       actCod:String(r['ActividadCodigo']||'').trim(),actNom:String(r['ActividadNombre']||'').trim(),
-      hrObl:0,hrDec:0,meses:{},ext:false};
+      hrObl:0,hrDec:0,meses:{},ext:false,tipoProf:String(r['TipoProfesor']||'').trim()};
     var e=map[k];
     if(!e.progLbl && r['Programa']) e.progLbl=String(r['Programa']).trim();
     if(!e.actNom && r['ActividadNombre']) e.actNom=String(r['ActividadNombre']).trim();
+    if(!e.tipoProf && r['TipoProfesor']) e.tipoProf=String(r['TipoProfesor']).trim();
     var ho=parseFloat(r['Horas'])||0; if(ho>e.hrObl) e.hrObl=ho;
     e.hrDec+=(parseFloat(r['movimiento_horas_lv'])||0)+(parseFloat(r['movimiento_horas_sd'])||0);
     if(mes) e.meses[mes]=1;
@@ -32578,7 +33046,8 @@ function _idmBuild(){
   /* 3) Cruce con contratos + mes ordenado */
   var out=Object.keys(map).map(function(k){
     var e=map[k];
-    var c=contIdx[_ctNorm(e.doc)+'|'+e.cc]||null;
+    e.esHora=/^HORA/i.test(e.tipoProf||'');
+    var c=e.esHora?(contIdx[_ctNorm(e.doc)+'|'+e.cc]||null):null;
     e.monto=c?c.monto:0; e.nCont=c?c.n:0; e.fechaEmi=c?_dvFechaDisp(c.fecha):''; e.estCont=c?c.estado:'';
     e.mesLbl=_IDM_MESES.filter(function(m){return e.meses[m];}).join(', ')||'\u2014';
     e.pct=e.hrObl>0?Math.round(e.hrDec/e.hrObl*100):(e.hrDec>0?100:0);
@@ -32615,7 +33084,7 @@ function renderInfoDeclMes(){
   var totDec=fr.reduce(function(a,r){return a+r.hrDec;},0);
   /* monto por docente×CC único (no repetir por actividad) */
   var mSeen={}, totMon=0, sinContSet=new Set();
-  fr.forEach(function(r){ var k=(r.rut||r.doc)+'|'+r.cc; if(!mSeen[k]){ mSeen[k]=1; totMon+=r.monto; if(!r.nCont) sinContSet.add(k); } });
+  fr.forEach(function(r){ var k=(r.rut||r.doc)+'|'+r.cc; if(!mSeen[k]){ mSeen[k]=1; totMon+=r.monto; if(r.esHora && !r.nCont) sinContSet.add(k); } });
   var pctG=totObl>0?Math.round(totDec/totObl*100):0;
   var kpi=function(ico,val,lbl,clr){ return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:124px"><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:700">'+ico+' '+lbl+'</div><div style="font-size:19px;font-weight:800;color:'+clr+';margin-top:4px">'+val+'</div></div>'; };
   var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
@@ -32627,7 +33096,7 @@ function renderInfoDeclMes(){
       kpi('\u2705',fmt(Math.round(totDec))+'h','Hrs declaradas','#3fb950')+
       kpi('\uD83D\uDCCA',pctG+'%','Cumplimiento',''+(pctG>=90?'#3fb950':pctG>=60?'#f0b429':'#f85149'))+
       kpi('\uD83D\uDCB0','$'+fmt(Math.round(totMon)),'Monto contratos','#a78bfa')+
-      kpi('\u26A0\uFE0F',sinContSet.size,'Sin contrato','#f85149')+
+      kpi('\u26A0\uFE0F',sinContSet.size,'Sin contrato (Hora)','#f85149')+
     '</div>'+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
       '<select onchange="_IDM.mes=this.value;renderInfoDeclMes()" style="'+selS+'"><option value="">Todos los meses</option>'+meses.map(function(m){return '<option value="'+m+'"'+(_IDM.mes===m?' selected':'')+'>'+m+'</option>';}).join('')+'</select>'+
@@ -32648,7 +33117,7 @@ function _idmFRows(){
   var ccSel=_idmCCSel();
   return (window._idmRows||[]).filter(function(r){
     if(ccSel.size && !ccSel.has(r.ccLbl)) return false;
-    if(_IDM.est==='sin'&&r.nCont) return false;
+    if(_IDM.est==='sin'&&(!r.esHora||r.nCont)) return false;
     if(_IDM.est==='inc'&&(r.pct>=100||!r.hrObl)) return false;
     if(_IDM.est==='ok'&&r.pct<100) return false;
     if(q && r.cc.toLowerCase().indexOf(q)<0 && r.rut.toLowerCase().indexOf(q)<0 && r.doc.toLowerCase().indexOf(q)<0 && r.progLbl.toLowerCase().indexOf(q)<0 && r.actCod.toLowerCase().indexOf(q)<0 && r.actNom.toLowerCase().indexOf(q)<0) return false;
@@ -32679,8 +33148,8 @@ function _idmFill(){
         '<td style="padding:8px 10px;color:#22d3ee;font-weight:700;white-space:nowrap">'+esc(r.mesLbl)+'</td>'+
         '<td style="padding:8px 10px;min-width:180px"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums;white-space:nowrap">'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+'h</span><span style="font-size:10px;font-weight:800;color:'+clr+'">'+r.pct+'%</span></div><div style="height:5px;background:#161b22;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+barW+'%;background:'+clr+';border-radius:4px"></div></div></td>'+
         '<td style="padding:8px 10px;color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap">'+esc(r.rut||'\u2014')+'</td>'+
-        '<td style="padding:8px 10px;color:var(--t1);font-weight:700;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.doc)+'">'+esc(r.doc)+'</td>'+
-        '<td style="padding:8px 10px;text-align:right;white-space:nowrap">'+(r.nCont?'<span style="color:#a78bfa;font-weight:800;font-variant-numeric:tabular-nums">$'+fmt(Math.round(r.monto))+'</span>'+(r.nCont>1?'<div style="font-size:9px;color:var(--t4)">'+r.nCont+' contratos \u00b7 total CC</div>':'<div style="font-size:9px;color:var(--t4)">total CC</div>'):'<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#f8514922;color:#f85149;border:1px solid #f8514955">\u26A0\uFE0F Sin contrato</span>')+'</td>'+
+        '<td style="padding:8px 10px;color:var(--t1);font-weight:700;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(r.doc)+'">'+esc(r.doc)+(r.esHora?' <span style="font-size:8px;font-weight:800;padding:1px 5px;border-radius:5px;background:rgba(56,139,253,.12);color:var(--blue)">HORA</span>':'')+'</td>'+
+        '<td style="padding:8px 10px;text-align:right;white-space:nowrap">'+(r.nCont?'<span style="color:#a78bfa;font-weight:800;font-variant-numeric:tabular-nums">$'+fmt(Math.round(r.monto))+'</span>'+(r.nCont>1?'<div style="font-size:9px;color:var(--t4)">'+r.nCont+' contratos \u00b7 total CC</div>':'<div style="font-size:9px;color:var(--t4)">total CC</div>'):(r.esHora?'<span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:7px;background:#f8514922;color:#f85149;border:1px solid #f8514955">\u26A0\uFE0F Sin contrato</span>':'<span style="font-size:9px;color:var(--t4)">\u2014 No aplica</span>'))+'</td>'+
         '<td style="padding:8px 10px;color:var(--t2);white-space:nowrap;font-variant-numeric:tabular-nums">'+esc(r.fechaEmi||'\u2014')+(r.estCont?'<div style="font-size:9px;color:var(--t4)">'+esc(r.estCont)+'</div>':'')+'</td>'+
       '</tr>';
     }).join('') : '<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
@@ -32798,14 +33267,15 @@ function _idmExcel(){
     '% Cumplimiento': r.pct+'%',
     'RUT': r.rut,
     'Docente': r.doc,
+    'Tipo Profesor': r.tipoProf||'',
     'Monto Contrato (total CC)': r.nCont?Math.round(r.monto):'',
     'N\u00b0 Contratos': r.nCont||'',
     'Fecha Emisi\u00f3n': r.fechaEmi||'',
-    'Estado Contrato': r.nCont?(r.estCont||''):'SIN CONTRATO',
+    'Estado Contrato': !r.esHora?'NO APLICA (no es Hora)':(r.nCont?(r.estCont||''):'SIN CONTRATO'),
     'Extensi\u00f3n': r.ext?'S\u00ed':'No'
   };});
   var ws=XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[{wch:7},{wch:40},{wch:12},{wch:34},{wch:12},{wch:13},{wch:12},{wch:11},{wch:13},{wch:32},{wch:16},{wch:9},{wch:12},{wch:18},{wch:9}];
+  ws['!cols']=[{wch:7},{wch:40},{wch:12},{wch:34},{wch:12},{wch:13},{wch:12},{wch:11},{wch:13},{wch:13},{wch:32},{wch:16},{wch:9},{wch:12},{wch:20},{wch:9}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Informe Declaraci\u00f3n');
   XLSX.writeFile(wb,'Informe_Declaracion_'+(_IDM.mes||'Todos')+'_'+new Date().toISOString().substring(0,10)+'.xlsx');
@@ -32835,7 +33305,7 @@ function _idmPDF(){
       '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap"><b>'+_hdFmt(r.hrDec)+' / '+_hdFmt(r.hrObl)+' h</b> <span style="color:'+clr+';font-weight:800">('+r.pct+'%)</span></td>'+
       '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap">'+esc(r.rut||'\u2014')+'</td>'+
       '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec">'+esc(r.doc)+'</td>'+
-      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;text-align:right;white-space:nowrap">'+(r.nCont?('<b>$'+fmt(Math.round(r.monto))+'</b>'+(r.nCont>1?' <span style="font-size:8px;color:#888">('+r.nCont+')</span>':'')):'<span style="color:#cf222e;font-weight:700;font-size:8.5px">SIN CONTRATO</span>')+'</td>'+
+      '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;text-align:right;white-space:nowrap">'+(r.nCont?('<b>$'+fmt(Math.round(r.monto))+'</b>'+(r.nCont>1?' <span style="font-size:8px;color:#888">('+r.nCont+')</span>':'')):(r.esHora?'<span style="color:#cf222e;font-weight:700;font-size:8.5px">SIN CONTRATO</span>':'<span style="color:#999;font-size:8.5px">\u2014 No aplica</span>'))+'</td>'+
       '<td style="padding:6px 8px;border-bottom:1px solid #e5e8ec;white-space:nowrap">'+esc(r.fechaEmi||'\u2014')+'</td>'+
     '</tr>';
   }).join('');
@@ -33316,14 +33786,18 @@ function _adnHeatBuild(progName){
     if(_ADN.anioSel && _adnYear(r.cohorte)!==_ADN.anioSel) return;
     if(r.sigla) asig[r.sigla]=r.nombreAsig||r.sigla;
     var sk=r.idExpediente||('?'+(r.nombres||'')+(r.apPaterno||''));
-    if(!stu[sk]){ stu[sk]={id:sk, name:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' ')||sk, rut:(r.rut||''), notes:{}, stat:{}}; order.push(sk); }
+    if(!stu[sk]){ stu[sk]={id:sk, name:[r.nombres,r.apPaterno,r.apMaterno].filter(Boolean).join(' ')||sk, rut:(r.rut||''), notes:{}, stat:{}, estadoExp:'', razonInact:'', comentInact:'', fInact:''}; order.push(sk); }
+    // Razón de inactividad (a nivel de expediente; se toma del primer registro que la traiga)
+    if(!stu[sk].razonInact && r.razonInactividad) stu[sk].razonInact=r.razonInactividad;
+    if(!stu[sk].comentInact && r.comentInact) stu[sk].comentInact=r.comentInact;
+    if(!stu[sk].fInact && (r.fInactividad||r.fInact)) stu[sk].fInact=(r.fInactividad||r.fInact);
     if(r.sigla){
       if(r.nota!=null && !isNaN(r.nota) && r.nota>0){ var cur=stu[sk].notes[r.sigla]; if(cur==null||r.nota>cur) stu[sk].notes[r.sigla]=r.nota; }
       else { var _es=String(r.estado||'').toUpperCase(); if(_es.indexOf('HOMOLOG')>=0) stu[sk].stat[r.sigla]='HO'; else if(_es.indexOf('PENDIENTE')>=0 && stu[sk].stat[r.sigla]!=='HO') stu[sk].stat[r.sigla]='P'; }
     }
   });
   var siglas=Object.keys(asig).sort();
-  var students=order.map(function(sk){ var s=stu[sk]; var vals=siglas.map(function(k){return s.notes[k];}).filter(function(v){return v!=null;}); var prom=vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:0; return {id:sk,name:s.name,rut:s.rut,notes:s.notes,stat:s.stat,prom:prom,cnt:vals.length}; });
+  var students=order.map(function(sk){ var s=stu[sk]; var vals=siglas.map(function(k){return s.notes[k];}).filter(function(v){return v!=null;}); var prom=vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:0; var estAlu=(s.razonInact&&s.razonInact.trim())?'Inactivo':'Activo'; return {id:sk,name:s.name,rut:s.rut,notes:s.notes,stat:s.stat,prom:prom,cnt:vals.length,estadoAlumno:estAlu,razonInact:s.razonInact,comentInact:s.comentInact,fInact:s.fInact}; });
   students.sort(function(a,b){ return (b.prom||0)-(a.prom||0) || a.name.localeCompare(b.name,'es'); });
   return {siglas:siglas, asig:asig, students:students};
 }
@@ -33339,6 +33813,8 @@ function _adnHeatHtml(p){
   var search='<input id="adnStuSearch" type="text" value="'+esc(_ADN.stuSearch||'')+'" oninput="_ADN.stuSearch=this.value;renderAdnAcademico()" placeholder="&#128269; Buscar alumno..." style="width:100%;max-width:320px;padding:8px 12px;border:1px solid #21262d;border-radius:8px;background:#161b22;color:#e6edf3;font-size:12px;margin-bottom:10px">';
   var thead='<tr><th style="position:sticky;left:0;top:0;z-index:4;background:#161b22;padding:8px 10px;text-align:left;font-weight:700;color:#8b949e;min-width:170px">Alumno</th>'+
     H.siglas.map(function(sg){return '<th title="'+escA(H.asig[sg]||sg)+'" style="padding:8px 4px;font-weight:700;color:#8b949e;font-family:monospace;font-size:11px;white-space:nowrap;min-width:52px;text-align:center">'+esc(sg)+'</th>';}).join('')+
+    '<th style="padding:8px 8px;font-weight:800;color:#c9d1d9;text-align:center;min-width:70px;border-left:1px solid #30363d">Estado</th>'+
+    '<th style="padding:8px 10px;font-weight:800;color:#c9d1d9;text-align:left;min-width:130px">Razón inactividad</th>'+
     '<th style="padding:8px 6px;font-weight:800;color:#c9d1d9;text-align:center;min-width:52px;border-left:1px solid #30363d">Prom</th></tr>';
   var body=studs.map(function(s){
     var cells=H.siglas.map(function(sg){ var n=s.notes[sg]; var st=(s.stat&&s.stat[sg])||''; var label,c;
@@ -33349,9 +33825,18 @@ function _adnHeatHtml(p){
       var _t=(H.asig[sg]||sg)+': '+(n!=null?_adnNota(n):(st==='HO'?'homologado':st==='P'?'pendiente':'sin nota'));
       return '<td style="padding:0;text-align:center"><div style="margin:2px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:'+c.bg+';color:'+c.fg+';font-size:12px;font-weight:700" title="'+escA(_t)+'">'+label+'</div></td>'; }).join('');
     var pc=_adnNoteClr(s.prom);
-    return '<tr><td style="position:sticky;left:0;z-index:1;background:#0d1117;padding:6px 10px;max-width:190px;border-right:1px solid #21262d" title="'+esc(s.name)+'"><div style="color:#f0f6ff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.name)+'</div>'+(s.rut?'<div style="font-size:10px;color:#6e7681;font-family:monospace">'+esc(s.rut)+'</div>':'')+'</td>'+cells+'<td style="padding:0;text-align:center;border-left:1px solid #30363d"><div style="margin:2px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:'+pc.bg+';color:'+pc.fg+';font-size:12px;font-weight:800">'+(s.prom?_adnNota(s.prom):'')+'</div></td></tr>';
+    var esInact=s.estadoAlumno==='Inactivo';
+    var estBadge='<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:800;white-space:nowrap;background:'+(esInact?'rgba(248,81,73,.15)':'rgba(63,185,80,.15)')+';color:'+(esInact?'#f85149':'#3fb950')+';border:1px solid '+(esInact?'rgba(248,81,73,.35)':'rgba(63,185,80,.35)')+'">'+(esInact?'● Inactivo':'● Activo')+'</span>';
+    var razLow=(s.razonInact||'').toLowerCase();
+    var razC='#8b949e';
+    if(razLow.indexOf('graduado')>=0) razC='#10b981';
+    else if(razLow.indexOf('diplomado')>=0) razC='#388bfd';
+    else if(razLow.indexOf('termino')>=0||razLow.indexOf('término')>=0) razC='#a78bfa';
+    else if(razLow.indexOf('aband')>=0||razLow.indexOf('elimin')>=0||razLow.indexOf('retiro')>=0) razC='#f85149';
+    var razCell=s.razonInact?('<span style="color:'+razC+';font-weight:600;font-size:10.5px" title="'+escA(s.razonInact+(s.comentInact?' — '+s.comentInact:'')+(s.fInact?' ('+s.fInact+')':''))+'">'+esc(s.razonInact)+'</span>'+(s.fInact?'<div style="font-size:9px;color:#6e7681;font-family:monospace">'+esc(s.fInact)+'</div>':'')):'<span style="color:#6e7681">—</span>';
+    return '<tr><td style="position:sticky;left:0;z-index:1;background:#0d1117;padding:6px 10px;max-width:190px;border-right:1px solid #21262d" title="'+esc(s.name)+'"><div style="color:#f0f6ff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.name)+'</div>'+(s.rut?'<div style="font-size:10px;color:#6e7681;font-family:monospace">'+esc(s.rut)+'</div>':'')+'</td>'+cells+'<td style="padding:6px 8px;text-align:center">'+estBadge+'</td><td style="padding:6px 10px;text-align:left;text-transform:capitalize">'+razCell+'</td><td style="padding:0;text-align:center;border-left:1px solid #30363d"><div style="margin:2px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:'+pc.bg+';color:'+pc.fg+';font-size:12px;font-weight:800">'+(s.prom?_adnNota(s.prom):'')+'</div></td></tr>';
   }).join('');
-  return legend+search+'<div style="overflow:auto;border:1px solid #21262d;border-radius:10px;max-height:70vh"><table style="border-collapse:collapse;font-size:12px;width:100%"><thead>'+thead+'</thead><tbody>'+(studs.length?body:'<tr><td colspan="'+(H.siglas.length+2)+'" style="padding:24px;text-align:center;color:#6e7681">Sin resultados</td></tr>')+'</tbody></table></div><div style="font-size:10px;color:#6e7681;margin-top:6px">&#128161; Cada celda es la nota del alumno en esa asignatura (ordenados por promedio). Pasa el cursor sobre una celda para ver el detalle.</div>';
+  return legend+search+'<div style="overflow:auto;border:1px solid #21262d;border-radius:10px;max-height:70vh"><table style="border-collapse:collapse;font-size:12px;width:100%"><thead>'+thead+'</thead><tbody>'+(studs.length?body:'<tr><td colspan="'+(H.siglas.length+4)+'" style="padding:24px;text-align:center;color:#6e7681">Sin resultados</td></tr>')+'</tbody></table></div><div style="font-size:10px;color:#6e7681;margin-top:6px">&#128161; Cada celda es la nota del alumno en esa asignatura (ordenados por promedio). Pasa el cursor sobre una celda para ver el detalle.</div>';
 }
 function _adnYear(coh){ var m=String(coh==null?'':coh).match(/(19|20)\d{2}/); return m?m[0]:''; }
 function _adnAllProgs(){ var s={}; (_ADN.raw||[]).forEach(function(r){ if(r.programa)s[r.programa]=1; }); return Object.keys(s).sort(function(a,b){return a.localeCompare(b,'es');}); }
@@ -34246,9 +34731,8 @@ function renderManual(){
     ['📅 Calendarios','El Calendario Académico muestra una vista mensual tipo agenda con horario, programa, asignatura, profesor y sala en cada evento.','Exporta en iCal (.ics) para Google/Outlook/Apple Calendar, o a Excel filtrado por el mes y período seleccionado.'],
     ['🧬 ADN Académico','Analiza el avance de cierre de notas por programa y alumno. Carga el reporte de notas y verás KPIs de avance de cierre, notas por cerrar, alumnos y casos en riesgo.','Navega de la vista general a un programa y luego a cada alumno para ver sus asignaturas pendientes y su promedio. Se destacan los alumnos en riesgo (bajo promedio o bajo avance).'],
     ['⚖️ Control General','Antes llamado Resumen Carga Laboral. Compara <strong>Magister y Diplomados vs MBA</strong> con KPIs consolidados, gráfico Planificado vs Real, matriz de desviación y tendencia por sede. Filtra por Año y Sede.','Incluye la <strong>Distribución por Coordinadora</strong>: tarjetas con el puntaje de carga de cada una — haz clic en una tarjeta para desplegar su detalle (programas, sesiones, días y gráfico mensual). También lista los <strong>días críticos</strong>. El puntaje de carga es (sesiones ÷ 4) × factor de alumnos, acumulado por mes.'],
-    ['👥 Coordinadoras','El ítem Coordinadoras (en Administración) centraliza a todas las coordinadoras de ambas unidades: programas, sesiones, días presenciales, alumnos y puntaje de carga.','Haz clic en una coordinadora para ver su detalle completo: KPIs, la tabla de sus programas y un gráfico de sesiones por mes. Filtra por Año y Sede.'],
     ['🗂️ Planificación Coordinadoras','En el Planificador, organiza la oferta por programa. Carga un Excel (arrastrar y soltar o clic) con columnas PROGRAMA, PERIODO ACADÉMICO, AÑO PERIODO, SIGLA y NOMBRE ASIGNATURA; las asignaturas se agrupan automáticamente bajo su programa.','Asigna una coordinadora a cada programa (con autocompletado), despliega cada tarjeta para ver sus asignaturas y usa el filtro: buscar por programa o sigla, por coordinadora (o sin coordinadora) y por año. Todo se guarda en el navegador.'],
-    ['⚙️ Administración','Accede con la contraseña <strong>admin</strong> al panel de gestión. Reúne Gestión, Carga por Programa, Carga por Puntaje, Turnos, <strong>Control General</strong> y <strong>Coordinadoras</strong>.','Desde aquí ves la matriz de sesiones, calculas la carga laboral y revisas la distribución y los días críticos por coordinadora.'],
+    ['⚙️ Administración','Accede con la contraseña <strong>admin</strong> al panel de gestión. Reúne Gestión, Carga por Programa, Carga por Puntaje, Turnos, <strong>Control General</strong> y <strong>Distribución por Coordinadora</strong>.','Desde aquí ves la matriz de sesiones, calculas la carga laboral y revisas la distribución, el radar comparativo y el calendario de topes por coordinadora.'],
   ];
   $('page').innerHTML=`<div class="page-title">Manual de Usuario</div>
   <div class="subtabs" style="margin:-20px -20px 20px;background:var(--bg1);border-radius:0">
@@ -34831,4 +35315,3 @@ document.addEventListener('DOMContentLoaded', init);
 </div>
 </body>
 </html>
-
