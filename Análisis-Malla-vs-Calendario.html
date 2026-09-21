@@ -6,7 +6,15 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
      background:#f4f6f9;color:#1b2733;font-size:14px}
-header{background:linear-gradient(135deg,#0f2b46,#1d4e79);color:#fff;padding:22px 28px}
+header{background:linear-gradient(135deg,#0f2b46,#1d4e79);color:#fff;padding:22px 28px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+#btnPrint{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35);
+  border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+#btnPrint:hover{background:rgba(255,255,255,.24)}
+/* --- grupos de pestañas (Análisis / Herramientas) --- */
+.tabgroup{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:#94a3b8;padding:0 10px 0 4px;align-self:center;user-select:none}
+.tabgroup:not(:first-child){border-left:1px solid #e2e8f0;margin-left:6px}
 header h1{margin:0;font-size:21px;font-weight:650;letter-spacing:-.2px}
 header p{margin:6px 0 0;opacity:.75;font-size:13px}
 .wrap{max-width:1400px;margin:0 auto;padding:20px 28px 60px}
@@ -16,6 +24,32 @@ header p{margin:6px 0 0;opacity:.75;font-size:13px}
 .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-top:4px}
 .kpi.ok .v{color:#12805c}.kpi.warn .v{color:#b45309}.kpi.crit .v{color:#b91c1c}
 .kpi.vacio .v{color:#cbd5e1}
+/* --- panel de estado (semáforo) para lectura rápida de cualquier persona --- */
+.veredicto{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e2e8f0;
+  border-left:6px solid #94a3b8;border-radius:10px;padding:16px 20px;margin:18px 0}
+.veredicto.ok{border-left-color:#16a34a;background:#f0fdf4}
+.veredicto.warn{border-left-color:#d97706;background:#fffbeb}
+.veredicto.crit{border-left-color:#dc2626;background:#fef2f2}
+.veredicto .ic{font-size:30px;line-height:1}
+.veredicto .tx{font-size:14.5px;color:#1b2733;line-height:1.5}
+.veredicto .tx b{font-weight:700}
+.sem{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+.sem .c{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;cursor:pointer;
+  transition:box-shadow .15s,transform .05s;border-top:4px solid #cbd5e1}
+.sem .c:hover{box-shadow:0 4px 14px rgba(15,43,70,.12)}
+.sem .c:active{transform:translateY(1px)}
+.sem .c.on{box-shadow:0 0 0 2px #1d4e79 inset}
+.sem .c .n{font-size:28px;font-weight:750;line-height:1}
+.sem .c .t{font-size:12px;color:#475569;margin-top:5px;line-height:1.35}
+.sem .c.g{border-top-color:#16a34a}.sem .c.g .n{color:#12805c}
+.sem .c.y{border-top-color:#d97706}.sem .c.y .n{color:#b45309}
+.sem .c.r{border-top-color:#dc2626}.sem .c.r .n{color:#b91c1c}
+.sem .c.b{border-top-color:#1d4e79}.sem .c.b .n{color:#1d4e79}
+.est{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap}
+.est .p{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.est.ok{color:#12805c}.est.ok .p{background:#16a34a}
+.est.warn{color:#b45309}.est.warn .p{background:#d97706}
+.est.crit{color:#b91c1c}.est.crit .p{background:#dc2626}
 .tabs{display:flex;gap:6px;border-bottom:2px solid #e2e8f0;margin-top:24px;flex-wrap:wrap}
 .tab{padding:10px 18px;cursor:pointer;border:none;background:none;font-size:14px;color:#64748b;
      font-weight:550;border-bottom:2px solid transparent;margin-bottom:-2px}
@@ -140,10 +174,28 @@ td.hpmalla:hover{background:#eef4fb}
 label.repf{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;
   letter-spacing:.4px;color:#64748b}
 label.repf input{text-transform:none;letter-spacing:0;font-size:13px;color:#1b2733}
+/* --- impresión / PDF: solo la pestaña activa, limpia para enviar --- */
+@media print{
+  body{background:#fff}
+  header{background:#0f2b46 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #btnPrint,.tabs,.carga,#dzMalla,#dzCal,.dz,.filters,footer,.btn,#pan_clear{display:none !important}
+  .wrap{max-width:100%;padding:0 6px}
+  .panel{display:none !important}
+  .panel.active{display:block !important}
+  .card{border:1px solid #cbd5e1;break-inside:avoid;page-break-inside:avoid}
+  .sem,.veredicto,tr{break-inside:avoid;page-break-inside:avoid}
+  .sem .c,.kpi,.veredicto,.est .p{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tblwrap{overflow:visible !important}
+  table{font-size:10px}
+  a[href]:after{content:""}
+}
 </style></head><body>
 <header>
-  <h1 id="htit">Analizador Planificación</h1>
-  <p id="hsub">Cargue la malla y los calendarios académicos para ejecutar la validación</p>
+  <div>
+    <h1 id="htit">Analizador Planificación</h1>
+    <p id="hsub">Cargue la malla y los calendarios académicos para ejecutar la validación</p>
+  </div>
+  <button id="btnPrint" onclick="window.print()" title="Imprimir o guardar como PDF la pestaña actual">🖨 Imprimir / PDF</button>
 </header>
 <div class="wrap">
   <div class="tabs" id="tabs"></div>
@@ -1871,6 +1923,7 @@ function validarSPA(malla, detalle, spaRows) {
   detalle.filter(d => d.sesiones > 0 && d.sigla).forEach(d => calBySig.set(norm(d.sigla), d));
 
   const rows = [];
+  const porSigla = {};   // TODA la malla (calce o no), para la tabla consolidada por asignatura
   const dif = (sigla, nombre, hpM, hCal, hSpa, spaCod, spaNom, tipos) =>
     rows.push({ sigla, nombre, hp_malla: hpM, horas_cal: hCal, horas_spa: hSpa,
                 spa_codigo: spaCod, spa_nombre: spaNom, tipos });
@@ -1904,6 +1957,8 @@ function validarSPA(malla, detalle, spaRows) {
     if (spa && !siglaDistinta && similitud(a.nombre, spa.nombre) < 0.72) tipos.push('Nombre distinto en SPA');
     if (hCal !== null && Math.abs(hCal - a.hp) > 0.5) tipos.push('Horas calendario ≠ malla');
     if (hSpa !== null && Math.abs(hSpa - a.hp) > 0.5) tipos.push('Horas SPA ≠ malla');
+    porSigla[k] = { horas_spa: hSpa, spa_codigo: spaCod, spa_nombre: spa ? spa.nombre : '',
+                    en_spa: hSpa !== null, tipos: tipos.slice() };
     if (tipos.length) dif(a.sigla, a.nombre, a.hp, hCal, hSpa, spaCod, spa ? spa.nombre : '', tipos);
   });
 
@@ -1920,7 +1975,7 @@ function validarSPA(malla, detalle, spaRows) {
 
   const cnt = t => rows.filter(r => r.tipos.includes(t)).length;
   return {
-    grupo, ranking, diffs: rows,
+    grupo, ranking, diffs: rows, porSigla,
     resumen: {
       asignaturas_malla: malla.length, asignaturas_cal: calBySig.size,
       asignaturas_spa: spaSig.size, calzan,
@@ -2503,6 +2558,7 @@ function dragdrop(el,cb){
 
 /* ===================== tablas ===================== */
 function kpi(v,l,cls){return `<div class="kpi ${cls||''}"><div class="v">${v}</div><div class="l">${l}</div></div>`;}
+function kpiInline(v,l){return `<b>${v}</b> ${esc(l)}`;}
 
 function claseEstado(e){
   if(e.indexOf('CUMPLIDO')>=0) return 'g-CUMPLIDO';
@@ -3149,6 +3205,101 @@ function wireMallaPop(){
   });
 }
 
+/* ============ panel de estado por asignatura (lectura para cualquier persona) ========= */
+// Resume el estado de UNA asignatura combinando malla + calendario + SPA en un semáforo.
+function estadoAsig(d, spaInfo, spaOn){
+  const f={sincal:false, faltaspa:false, horas:false, obs:false};
+  if(!d || d.sesiones===0){ f.sincal=true; return {niv:'crit', txt:'No está en el calendario', f}; }
+  const hp=d.hp_malla, motivos=[];
+  if(spaOn && (!spaInfo || !spaInfo.en_spa)){ f.faltaspa=true; motivos.push('No está registrada en el SPA'); }
+  if(Math.abs(d.delta||0)>0.5){ f.horas=true; motivos.push('Calendario '+(d.delta>0?'+':'')+d.delta+' h vs malla'); }
+  if(spaOn && spaInfo && spaInfo.en_spa && spaInfo.horas_spa!=null && Math.abs(spaInfo.horas_spa-hp)>0.5){
+    f.horas=true; motivos.push('SPA '+spaInfo.horas_spa+' h vs '+hp+' HP'); }
+  if(d.hallazgos && d.hallazgos.length){ f.obs=true; motivos.push(d.hallazgos.length+' observación(es) de calendario'); }
+  const niv = f.faltaspa?'crit' : (f.horas||f.obs)?'warn':'ok';
+  return {niv, txt: motivos.length?motivos.join(' · '):'Todo cuadra', f};
+}
+
+function panelResumen(D){
+  const m=D.modalidades[0], spaOn=!!D.spa, porSig=spaOn?(D.spa.porSigla||{}):{};
+  const filas=m.detalle.slice().sort((a,b)=>(a.periodo+a.sigla).localeCompare(b.periodo+b.sigla));
+  let ok=0,warn=0,crit=0,sincal=0,faltaspa=0,horas=0;
+  const etq={ok:'En regla',warn:'Revisar',crit:'Crítico'};
+  const trs=filas.map(d=>{
+    const info=porSig[norm(d.sigla)], e=estadoAsig(d, info, spaOn);
+    if(e.niv==='ok')ok++; else if(e.niv==='warn')warn++; else crit++;
+    if(e.f.sincal)sincal++; if(e.f.faltaspa)faltaspa++; if(e.f.horas)horas++;
+    const spaCell = spaOn ? `<td class="num">${(info&&info.en_spa)?hcell(info.horas_spa,d.hp_malla):'<span style="color:#b91c1c">No está</span>'}</td>` : '';
+    return `<tr data-niv="${e.niv}" data-sincal="${e.f.sincal?1:0}" data-faltaspa="${e.f.faltaspa?1:0}" data-horas="${e.f.horas?1:0}" data-q="${esc((d.sigla+' '+d.nombre).toLowerCase())}">
+      <td><span class="est ${e.niv}"><span class="p"></span>${etq[e.niv]}</span></td>
+      <td class="mono">${esc(d.sigla)}</td><td>${esc(d.nombre)}</td><td class="num">${esc(d.periodo)}</td>
+      <td class="num">${d.hp_malla} h</td>
+      <td class="num">${d.sesiones===0?'<span style="color:#b91c1c">—</span>':hcell(d.horas_programadas,d.hp_malla)}</td>
+      ${spaCell}
+      <td>${esc(e.txt)}</td></tr>`;
+  }).join('');
+  const total=filas.length, nivG = crit?'crit':warn?'warn':'ok';
+  const ic = nivG==='ok'?'✅':nivG==='warn'?'⚠️':'⛔';
+  let ver=`<b>${ok} de ${total}</b> asignaturas están en regla.`;
+  if(crit) ver+=` <b style="color:#b91c1c">${crit}</b> necesita(n) atención`+
+    ((sincal||faltaspa)?' ('+[sincal?sincal+' sin calendarizar':'',spaOn&&faltaspa?faltaspa+' sin registro en SPA':''].filter(Boolean).join(', ')+')':'')+'.';
+  if(warn) ver+=` ${warn} con observaciones menores.`;
+  const card=(n,t,cls,f)=>`<div class="c ${cls}" data-f="${f}"><div class="n">${n}</div><div class="t">${t}</div></div>`;
+  const multi = D.modalidades.length>1?`<div class="nota">Esta tabla usa el calendario <b>${esc(m.modalidad)}</b>. Para los otros calendarios revisa las pestañas «Malla vs …».</div>`:'';
+  return `
+    <div class="veredicto ${nivG}"><div class="ic">${ic}</div><div class="tx">${ver}</div></div>
+    <div class="sem">
+      ${card(total,'Asignaturas de la malla','b','')}
+      ${card(ok,'En regla','g','ok')}
+      ${card(warn,'Para revisar','y','warn')}
+      ${card(sincal,'Sin calendarizar','r','sincal')}
+      ${spaOn?card(faltaspa,'Sin registro en SPA','r','faltaspa'):''}
+      ${card(horas,'Con desvío de horas','y','horas')}
+    </div>
+    <div class="card">
+      <h2>Estado por asignatura</h2>
+      <div class="sub">Una fila por asignatura de la malla, con su estado en el calendario${spaOn?' y en el SPA':''}.
+        Toca una tarjeta de arriba para filtrar (ej. ver solo las críticas).</div>
+      ${multi}
+      <div class="filters">
+        <input type="search" id="pan_q" placeholder="Buscar sigla o asignatura…">
+        <span class="legend" id="pan_cnt"></span>
+        <button class="btn sec" id="pan_clear" style="padding:5px 12px;font-size:12px">Ver todas</button>
+      </div>
+      <div class="tblwrap"><table class="mvtab" id="pan_tab"><thead><tr>
+        <th style="width:118px">Estado</th><th style="width:88px">Sigla</th><th>Asignatura</th>
+        <th class="num">Período</th><th class="num">HP Malla</th><th class="num">Calendario</th>
+        ${spaOn?'<th class="num">SPA</th>':''}<th>Detalle</th></tr></thead>
+      <tbody>${trs}</tbody></table></div>
+    </div>`;
+}
+
+function wirePanel(){
+  const tab=$('pan_tab'); if(!tab) return;
+  let filtro=''; const q=$('pan_q'), cnt=$('pan_cnt');
+  const aplicar=()=>{
+    const s=(q?q.value:'').toLowerCase().trim(); let v=0;
+    [...tab.tBodies[0].rows].forEach(r=>{
+      let ok=true;
+      if(filtro==='ok'||filtro==='warn'||filtro==='crit') ok=r.dataset.niv===filtro;
+      else if(filtro==='sincal') ok=r.dataset.sincal==='1';
+      else if(filtro==='faltaspa') ok=r.dataset.faltaspa==='1';
+      else if(filtro==='horas') ok=r.dataset.horas==='1';
+      if(ok && s) ok=r.dataset.q.includes(s);
+      r.classList.toggle('hide',!ok); if(ok)v++;
+    });
+    if(cnt) cnt.textContent=v+' de '+tab.tBodies[0].rows.length+' asignaturas';
+  };
+  document.querySelectorAll('.sem .c').forEach(c=>c.onclick=()=>{
+    const f=c.dataset.f; filtro=(filtro===f)?'':f;
+    document.querySelectorAll('.sem .c').forEach(x=>x.classList.toggle('on', x.dataset.f===filtro && filtro!==''));
+    aplicar();
+  });
+  if(q) q.addEventListener('input',aplicar);
+  const cl=$('pan_clear'); if(cl) cl.onclick=()=>{ filtro=''; if(q)q.value=''; document.querySelectorAll('.sem .c').forEach(x=>x.classList.remove('on')); aplicar(); };
+  aplicar();
+}
+
 /* ===================== render ===================== */
 let TAB_ACTIVA=0;
 
@@ -3177,29 +3328,27 @@ function render(forzarTab){
       tot.crit+=m.hallazgos.filter(h=>h.nivel==='CRITICO').length;
     });
     const cump=RE.filas.filter(f=>f.estado.indexOf('CUMPLIDO')>=0).length;
-    home=`<div class="kpis">
-      ${kpi(cump+'/'+RE.filas.length,'Indicadores cumplidos',cump===RE.filas.length?'ok':'warn')}
-      ${kpi(tot.ok,'Validaciones OK','ok')}${kpi(tot.adv,'Advertencias','warn')}
-      ${kpi(tot.crit,'Incumplimientos críticos','crit')}
-      ${kpi(D.malla.length,'Asignaturas en malla')}${kpi(D.modalidades.length,'Calendarios analizados')}</div>
-      ${bloqueCarga()}
+    home=`${bloqueCarga()}
+      ${panelResumen(D)}
       <div class="card">
-        <h2>Resumen consolidado de cumplimiento &mdash; métricas</h2>
-        <div class="sub">Programa <b>${esc(D.programa)}</b> · malla base contrastada contra cada calendario académico</div>
+        <h2>Resumen técnico de cumplimiento</h2>
+        <div class="sub">Programa <b>${esc(D.programa)}</b> · malla base contrastada contra cada calendario académico.
+          ${kpiInline(cump+'/'+RE.filas.length,'indicadores cumplidos')} ·
+          ${kpiInline(tot.ok,'OK')} · ${kpiInline(tot.adv,'advertencias')} · ${kpiInline(tot.crit,'críticos')}</div>
         ${cuadroMando(RE)}
         <div class="nota"><b>Nota:</b> todas las cifras se recalculan desde los archivos cargados;
         no hay valores digitados a mano. Contraste los totales de la malla contra el decreto vigente
         del programa antes de emitir el informe.</div>
       </div>`;
   }
-  secciones.push({titulo:'Resumen Ejecutivo', html:home, after:wireCarga});
+  secciones.push({titulo:'Resumen Ejecutivo', grupo:'Análisis', html:home, after:()=>{wireCarga();wirePanel();}});
 
   /* --- pestañas por modalidad --- */
   if(D) D.modalidades.forEach(m=>{
     const H=m.hallazgos, R=m.resumen;
     const c=H.filter(h=>h.nivel==='CRITICO').length, a=H.filter(h=>h.nivel==='ADVERTENCIA').length,
           o=H.filter(h=>h.nivel==='OK').length;
-    secciones.push({titulo:'Malla vs '+m.modalidad, after:()=>wireHallazgos(m.id), html:`
+    secciones.push({titulo:'Malla vs '+m.modalidad, grupo:'Análisis', after:()=>wireHallazgos(m.id), html:`
       <div class="kpis">
         ${kpi(o,'Requisitos cumplidos','ok')}${kpi(a,'Advertencias','warn')}
         ${kpi(c,'Incumplimientos críticos','crit')}${kpi(R.asignaturas_malla,'Asignaturas en malla')}
@@ -3225,7 +3374,7 @@ function render(forzarTab){
   if(D&&D.comparacion){
     const C=D.comparacion.filas, na=D.comparacion.a, nb=D.comparacion.b;
     const dif=C.filter(c=>c.diferencias.length).length;
-    secciones.push({titulo:'Comparación '+na+' vs '+nb, after:()=>{}, html:`
+    secciones.push({titulo:'Comparación '+na+' vs '+nb, grupo:'Análisis', after:()=>{}, html:`
       <div class="kpis">${kpi(C.length,'Asignaturas contrastadas')}
         ${kpi(dif,'Con desviaciones',dif?'warn':'ok')}${kpi(C.length-dif,'Idénticas','ok')}</div>
       <div class="card"><h2>Contraste entre versiones del programa</h2>
@@ -3234,25 +3383,31 @@ function render(forzarTab){
   }
 
   /* --- validación SPA --- */
-  if(D&&D.spa) secciones.push({titulo:'Validación SPA', after:wireSPA, html:seccionSPA(D)});
+  if(D&&D.spa) secciones.push({titulo:'Validación SPA', grupo:'Análisis', after:wireSPA, html:seccionSPA(D)});
 
   /* --- reporte de programación --- */
-  if(D) secciones.push({titulo:'Reporte de Programación', after:wireReporte, html:seccionReporte()});
+  if(D) secciones.push({titulo:'Reporte de Programación', grupo:'Análisis', after:wireReporte, html:seccionReporte()});
 
   /* --- creación de calendario (siempre disponible) --- */
-  secciones.push({titulo:'Creación de Calendario', after:wireCreador, html:seccionCreador()});
+  secciones.push({titulo:'Creación de Calendario', grupo:'Herramientas', after:wireCreador, html:seccionCreador()});
 
   /* --- fichas financieras (siempre disponible) --- */
-  secciones.push({titulo:'Fichas Financieras', after:wireFichas, html:seccionFichas()});
+  secciones.push({titulo:'Fichas Financieras', grupo:'Herramientas', after:wireFichas, html:seccionFichas()});
 
   /* --- períodos académicos (siempre disponible) --- */
-  secciones.push({titulo:'Períodos Académicos', after:wirePeriodos, html:seccionPeriodos()});
+  secciones.push({titulo:'Períodos Académicos', grupo:'Herramientas', after:wirePeriodos, html:seccionPeriodos()});
 
   /* --- pintar --- */
   const tabs=$('tabs'), panels=$('panels');
   tabs.innerHTML=''; panels.innerHTML='';
   if(TAB_ACTIVA>=secciones.length) TAB_ACTIVA=0;
+  let grupoActual=null;
   secciones.forEach((s,i)=>{
+    if(s.grupo && s.grupo!==grupoActual){          // rótulo del grupo (Análisis / Herramientas)
+      grupoActual=s.grupo;
+      const g=document.createElement('span'); g.className='tabgroup'; g.textContent=s.grupo;
+      tabs.appendChild(g);
+    }
     const b=document.createElement('button');
     b.className='tab'+(i===TAB_ACTIVA?' active':''); b.textContent=s.titulo;
     b.onclick=()=>render(i);
@@ -3274,5 +3429,4 @@ function render(forzarTab){
 
 render();
 </script></body></html>
-
 
