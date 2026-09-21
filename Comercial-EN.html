@@ -171,6 +171,7 @@ tbody tr:hover td{background:var(--sf2);}
     <button class="sb-item" data-tab="mkt" onclick="nav('mkt',this)"><svg class="sb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 14 3-4 4 3 5-6"/></svg>Marketing</button>
     <div class="sb-section">Análisis</div>
     <button class="sb-item" data-tab="prg" onclick="nav('prg',this)"><svg class="sb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>Programas</button>
+    <button class="sb-item" data-tab="bench" onclick="nav('bench',this)"><svg class="sb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Benchmark</button>
     <button class="sb-item" data-tab="comp" onclick="nav('comp',this)"><svg class="sb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 3v18M16 3v18M3 8h5M16 8h5M3 16h5M16 16h5"/></svg>Comparar</button>
     <button class="sb-item" data-tab="rent" onclick="nav('rent',this)"><svg class="sb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Rentabilidad</button>
     <button class="sb-item" data-tab="post" onclick="nav('post',this)"><svg class="sb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Postulaciones</button>
@@ -299,6 +300,26 @@ tbody tr:hover td{background:var(--sf2);}
   </div>
   <div id="progView"><div class="cd" style="display:flex;align-items:center;justify-content:center;height:280px;color:var(--sb);font-size:13px;text-align:center;">
     <div><div style="font-size:36px;opacity:.15;margin-bottom:8px;">📊</div>Selecciona un programa para ver su ficha completa<br><span style="font-size:10px;">Ventas · Perfil · ISN · Pricing · Competencia · ADN</span></div>
+  </div></div>
+</div><!-- /pnl-inner -->
+</div>
+
+<!-- ═══ BENCHMARK ═══ -->
+<div id="p-bench" class="pnl">
+  <div class="pnl-empty"></div>
+  <div class="pnl-inner">
+  <div class="fbar">
+    <span class="fbl">Benchmark competitivo</span>
+    <select id="benchTypeF" onchange="buildBenchSel()" class="fsel">
+      <option value="">Todos los tipos</option><option>Magíster</option><option>Diplomado</option><option>MBA</option>
+    </select>
+    <select id="benchSel" onchange="showBench()" class="fsel" style="flex:1;min-width:260px;max-width:440px;">
+      <option value="">— Selecciona un programa —</option>
+    </select>
+    <span id="benchCount" class="fcnt"></span>
+  </div>
+  <div id="benchView"><div class="cd" style="display:flex;align-items:center;justify-content:center;height:280px;color:var(--sb);font-size:13px;text-align:center;">
+    <div><div style="font-size:36px;opacity:.15;margin-bottom:8px;">🎯</div>Selecciona un programa para ver su benchmark competitivo<br><span style="font-size:10px;">Drivers 2024·2025·2026 · Competencia · Experiencia del alumno</span></div>
   </div></div>
 </div><!-- /pnl-inner -->
 </div>
@@ -557,6 +578,7 @@ const TAB_META={
   ov:['Escuela de Negocios','Resumen ejecutivo'],
   mkt:['Marketing','Eficiencia comercial y conversión'],
   prg:['Análisis','Ficha por programa'],
+  bench:['Análisis','Benchmark competitivo'],
   comp:['Análisis','Comparador de programas'],
   rent:['Análisis','Rentabilidad por programa'],
   post:['Postulaciones','ADN del postulante'],
@@ -573,7 +595,7 @@ function nav(id,btn){
   document.getElementById('crumb').textContent=meta[0];
   document.getElementById('pageTitle').textContent=meta[1];
   // Refresca el gate de datos de la sección visitada
-  const R={ov:renderResumen,mkt:renderMkt,prg:renderPrg,comp:renderComp,rent:renderRent,post:renderPost,evdoc:renderEvdoc,expal:renderExpal};
+  const R={ov:renderResumen,mkt:renderMkt,prg:renderPrg,bench:renderBench,comp:renderComp,rent:renderRent,post:renderPost,evdoc:renderEvdoc,expal:renderExpal};
   if(R[id])try{R[id]();}catch(e){}
   if(window.innerWidth<=900)closeSidebar();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -587,30 +609,40 @@ function st(id,btn){navTo(id);}
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('open');}
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('open');}
 
-const D={progs:[],rent:[],rentSub:[],adn:{},adnY:{},states:{},byYear:{},gender:{},country:{},monthly:{},monthlyConv:{},funnel:{},medios:{},mktChannels:[]};
+const D={progs:[],rent:[],rentSub:[],adn:{},adnY:{},states:{},byYear:{},gender:{},country:{},monthly:{},monthlyConv:{},funnel:{},medios:{},mktChannels:[],expByProg:{}};
 let P=D.progs,R=D.rent,ADN=D.adn;
 let PF=[...P];
 // ═══════════ GESTIÓN DE DATOS POR SECCIÓN ═══════════
 // Qué "fuente de datos" alimenta cada sección y cómo detectar/parsear su hoja.
 const DATASETS={
-  consolidado:{loaded:false, label:'Análisis Consolidado', detect:d=>{
-    // Fila 4 con encabezados de sigla/tipo; datos desde fila 5
-    for(let i=0;i<Math.min(d.length,8);i++){const row=d[i].map(c=>String(c).toLowerCase());
-      if(row.some(c=>c.includes('sigla'))&&row.some(c=>c.includes('venta')||c.includes('ppto')||c.includes('lead')))return true;}
-    return false;
+  consolidado:{loaded:false, label:'Análisis Consolidado', detect:(d,sn)=>{
+    // Firma fuerte: sigla + "nombre programa" + venta/ppto/lead (distingue del resto de hojas)
+    const strong=d.slice(0,8).some(r=>{const h=r.map(c=>String(c).toLowerCase());
+      return h.some(c=>c.includes('sigla'))&&h.some(c=>c.includes('nombre programa'))&&h.some(c=>c.includes('venta')||c.includes('ppto')||c.includes('lead'));});
+    if(sn&&/consolidado/i.test(sn))
+      return strong||d.slice(0,8).some(r=>r.some(c=>String(c).toLowerCase().includes('sigla')));
+    return strong;
   }, apply:d=>{const progs=parseConsolidado(d);if(!progs)return false;
     D.progs=progs;P=D.progs;PF=[...P];DATASETS.consolidado.loaded=true;return true;}},
 
-  postula:{loaded:false, label:'Postulaciones', detect:d=>{
+  postula:{loaded:false, label:'Postulaciones', detect:(d,sn)=>{
+    if(sn&&!/postula/i.test(sn)&&!/postulaci/i.test(sn)){
+      // fuera de una hoja "Postula", exigir cabecera muy específica
+      if(!d.length)return false;const h0=d[0].map(c=>String(c).toLowerCase());
+      if(!(h0.some(c=>c==='estado')&&h0.some(c=>c==='programa')&&h0.some(c=>c==='sigla')))return false;
+    }
     if(!d.length)return false;const h=d[0].map(c=>String(c).toLowerCase());
     return h.some(c=>c==='estado')&&h.some(c=>c==='programa')&&h.some(c=>c.includes('postulaci')||c==='sigla');
   }, apply:d=>{const res=parsePostula(d);if(!res)return false;
     Object.assign(D,res);ADN=D.adn;DATASETS.postula.loaded=true;return true;}},
 
-  rentabilidad:{loaded:false, label:'Rentabilidad', detect:d=>{
-    for(let i=0;i<Math.min(d.length,4);i++){const row=d[i].map(c=>String(c).toLowerCase());
-      if(row.some(c=>c.includes('escuela'))&&row.some(c=>c.includes('rent')||c.includes('margen')||c.includes('mc')))return true;}
-    return false;
+  rentabilidad:{loaded:false, label:'Rentabilidad', detect:(d,sn)=>{
+    if(sn&&!/rentab/i.test(sn))return false;
+    // Encabezado en dos filas: "Escuela/Programa" en una, "MC/Rent" en otra
+    const top=d.slice(0,4).map(r=>r.map(c=>String(c).toLowerCase()));
+    const hasEsc=top.some(r=>r.some(c=>c.includes('escuela')));
+    const hasRent=top.some(r=>r.some(c=>c.includes('rent')||c.includes('margen')||c==='mc'));
+    return hasEsc&&hasRent;
   }, apply:d=>{const res=parseRentabilidad(d);if(!res)return false;
     D.rent=res.rent;D.rentSub=res.rentSub;R=D.rent;DATASETS.rentabilidad.loaded=true;return true;}},
 
@@ -624,6 +656,12 @@ const DATASETS={
     const hi=flat.findIndex(r=>r.some(c=>/nps/i.test(c))&&r.some(c=>/programa|satisf/i.test(c)));
     return hi!==-1;
   }, apply:(d,fname,sn)=>parseExpAl(d,fname||'archivo',sn||'')},
+
+  expbench:{loaded:false, label:'Experiencia por programa', detect:(d,sn)=>{
+    if(sn&&!/experiencia/i.test(sn))return false; // solo la hoja «Experiencia Alumnos»
+    const flat=d.map(r=>r.map(c=>String(c||'').trim()));
+    return flat.slice(0,12).some(r=>r.some(c=>/^sigla$/i.test(c))&&r.some(c=>/isn/i.test(c)));
+  }, apply:d=>parseExpBench(d)},
 };
 
 // Procesa un archivo Excel: escanea todas las hojas y aplica los datasets que se pidan.
@@ -638,7 +676,7 @@ function ingestFile(file, wantKeys, onDone){
       const ds=DATASETS[key];if(!ds)continue;
       for(const sn of wbk.SheetNames){
         const d=XLSX.utils.sheet_to_json(wbk.Sheets[sn],{header:1,defval:''});
-        if(ds.detect(d)&&ds.apply(d,file.name,sn)){found.push(key);break;}
+        if(ds.detect(d,sn)&&ds.apply(d,file.name,sn)){found.push(key);break;}
       }
     }
     onDone({found,fname:file.name,sheets:wbk.SheetNames.length});
@@ -672,6 +710,11 @@ function loadedBanner(accent,text){
 // ═══════════ PARSERS DE HOJAS EXCEL ═══════════
 // Cada uno recibe la matriz de filas (header:1) y llena la estructura D correspondiente.
 function sfNum(v){const f=parseFloat(String(v).replace(',','.'));return isNaN(f)?null:Math.round(f*10000)/10000;}
+function sTxt(v){const s=String(v==null?'':v).trim();return (s===''||s.toLowerCase()==='nan')?'':s;}
+// Driver de un año (Consolidado, cols base): moneda, arancel, matrícula, modalidad, días, sede
+function driverBlock(r,b){return {moneda:sTxt(r[b]),arancel:sTxt(r[b+1]),matricula:sTxt(r[b+2]),modalidad:sTxt(r[b+3]),dias:sTxt(r[b+4]),sede:sTxt(r[b+5])};}
+// Competidor de benchmark (10 campos desde col base): uni, moneda, arancel, matrícula, formato, horario, comuna, viaje, link, comentario
+function compBlock(r,b){return {uni:sTxt(r[b]),moneda:sTxt(r[b+1]),arancel:sTxt(r[b+2]),matricula:sTxt(r[b+3]),formato:sTxt(r[b+4]),horario:sTxt(r[b+5]),comuna:sTxt(r[b+6]),viaje:sTxt(r[b+7]),link:sTxt(r[b+8]),coment:sTxt(r[b+9])};}
 
 // ── CONSOLIDADO EN → progs[] ──
 function parseConsolidado(rows){
@@ -694,6 +737,12 @@ function parseConsolidado(rows){
       isn:{i22:sfNum(r[57]),i23:sfNum(r[58]),i24:sfNum(r[59]),n22:sfNum(r[60]),n23:sfNum(r[61]),n24:sfNum(r[62])},
       sc:{s23:sfNum(r[64]),s24:sfNum(r[65])},
       precio:{moneda:String(r[82]||'').trim(),arancel:sfNum(r[83]),matricula:sfNum(r[84]),modalidad:String(r[85]||'').trim(),dias:String(r[86]||'').trim(),sede:String(r[87]||'').trim()},
+      // Drivers por año (evolución de valores y modalidades) — cols BS-CJ
+      drivers:{y24:driverBlock(r,70),y25:driverBlock(r,76),y26:driverBlock(r,82)},
+      // Benchmark de competencia (3 universidades) — cols CP en adelante
+      bench:[compBlock(r,93),compBlock(r,103),compBlock(r,113)],
+      winrate25:sfNum(r[123]),
+      propuesta:String(r[124]||'').trim(),
       comp:[
         {uni:String(r[93]||'').trim(),arancel:sfNum(r[95]),formato:String(r[97]||'').trim()},
         {uni:String(r[103]||'').trim(),arancel:sfNum(r[105]),formato:String(r[107]||'').trim()},
@@ -702,6 +751,35 @@ function parseConsolidado(rows){
     });
   }
   return progs.length?progs:null;
+}
+
+// ── EXPERIENCIA ALUMNOS (por programa) → D.expByProg[sigla] = {isn:{22..25}, nps:{22..25}, com} ──
+function parseExpBench(rows){
+  const flat=rows.map(r=>r.map(c=>String(c==null?'':c).trim()));
+  let hi=-1,cSig=-1,cCom=-1;const isnC={},npsC={};
+  for(let i=0;i<Math.min(flat.length,12);i++){
+    const row=flat[i];
+    const sIdx=row.findIndex(c=>/^sigla$/i.test(c));
+    if(sIdx!==-1 && row.some(c=>/isn/i.test(c))){
+      hi=i;cSig=sIdx;
+      row.forEach((c,j)=>{
+        const cc=c.replace(/\s+/g,' ');
+        let m=cc.match(/isn\s*(20\d{2})/i); if(m)isnC[m[1].slice(2)]=j;
+        m=cc.match(/nps\s*(20\d{2})/i); if(m)npsC[m[1].slice(2)]=j;
+        if(/comentario/i.test(cc))cCom=j;
+      });
+      break;
+    }
+  }
+  if(hi===-1||cSig===-1)return false;
+  const map={};
+  for(let i=hi+1;i<flat.length;i++){
+    const sig=flat[i][cSig]; if(!sig)continue;
+    const gv=obj=>{const o={};for(const y in obj)o[y]=sfNum(flat[i][obj[y]]);return o;};
+    map[sig]={isn:gv(isnC),nps:gv(npsC),com:cCom!==-1?flat[i][cCom]:''};
+  }
+  if(!Object.keys(map).length)return false;
+  D.expByProg=map;DATASETS.expbench.loaded=true;return true;
 }
 
 // ── RENTABILIDAD → rent[], rentSub[] ──
@@ -1272,6 +1350,96 @@ function showProg(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fm(c.parsed.y)}}},scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:11}},border:{display:false}},y:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'},callback:v=>fm(v)},border:{display:false}}}}});},30);
 }
 
+// ═══ BENCHMARK ═══
+function benchColor(v){return v==null?'var(--sb)':v>=50?'#059669':v>=0?'#D97706':'#DC2626';}
+// Formatea valores numéricos puros con separador de miles (es-CL); deja texto libre (UF, $/, etc.) intacto
+function fmtVal(v){if(v==null)return'';const s=String(v).trim();if(!s)return'';
+  if(/^\d+([.,]\d+)?$/.test(s)){const n=parseFloat(s.replace(',','.'));if(!isNaN(n)&&Math.abs(n)>=1000)return n.toLocaleString('es-CL');}
+  return s;}
+function buildBenchSel(){
+  const t=document.getElementById('benchTypeF')?.value||'';
+  const f=t?PF.filter(p=>p.t===t):PF;
+  const el=document.getElementById('benchSel');const cur=el.value;
+  el.innerHTML='<option value="">— Selecciona un programa —</option>'+f.map(p=>`<option value="${p.s}">${p.s} — ${p.n}</option>`).join('');
+  if(cur&&f.some(p=>p.s===cur))el.value=cur;
+  const c=document.getElementById('benchCount');if(c)c.textContent=f.length+' de '+P.length+' programas';
+  if(el.value)showBench();
+  else document.getElementById('benchView').innerHTML='<div class="cd" style="display:flex;align-items:center;justify-content:center;height:280px;color:var(--sb);font-size:13px;text-align:center;"><div><div style="font-size:36px;opacity:.15;margin-bottom:8px;">🎯</div>Selecciona un programa para ver su benchmark competitivo<br><span style="font-size:10px;">Drivers 2024·2025·2026 · Competencia · Experiencia del alumno</span></div></div>';
+}
+function showBench(){
+  const sig=document.getElementById('benchSel').value;if(!sig)return;
+  const p=P.find(x=>x.s===sig);if(!p)return;
+  const dv=p.drivers||{y24:{},y25:{},y26:{}};
+  const bench=(p.bench||[]).filter(c=>c.uni);
+  const exp=(D.expByProg&&D.expByProg[sig])||null;
+  const CC=['#1E6FD9','#8B5CF6','#D97706'];
+  const wr=p.winrate25;
+
+  // Cabecera + KPIs
+  const head=`<div style="font-size:16px;font-weight:400;margin-bottom:.75rem;">${p.n} <span class="mono" style="background:var(--bg);padding:2px 8px;border-radius:6px;font-size:11px;">${p.s}</span> <span class="pill" style="background:${p.st==='Iniciado'?'#d1fae5':'#dbeafe'};color:${p.st==='Iniciado'?'#065f46':'#1e3a8a'}">${p.st||'—'}</span></div>
+    <div class="g4" style="margin-bottom:1rem;">
+      <div class="m hi"><div class="ml">Win Rate 2025</div><div class="mv">${wr!=null?fp(wr):'—'}</div><div class="ms">tasa de conversión vs competencia</div></div>
+      <div class="m"><div class="ml">Arancel 2026 (UAI)</div><div class="mv">${fmtVal(dv.y26?.arancel)||'—'}</div><div class="ms">${dv.y26?.moneda||''} · Modalidad ${dv.y26?.modalidad||'—'}</div></div>
+      <div class="m"><div class="ml">Competidores</div><div class="mv">${bench.length}</div><div class="ms">universidades en benchmark</div></div>
+      <div class="m"><div class="ml">Tipo</div><div class="mv" style="font-size:14px;">${p.t||'—'}</div></div>
+    </div>`;
+
+  // Drivers: evolución 2024·2025·2026 (resalta cambios año a año)
+  const fields=[['Moneda','moneda'],['Valor Arancel','arancel'],['Valor Matrícula','matricula'],['Modalidad','modalidad'],['Días','dias'],['Sede','sede']];
+  const cell=(cur,prev)=>{const ch=prev!=null&&cur&&prev&&cur!==prev;return `<td class="mono" style="text-align:center;font-size:11px;${ch?'color:#1E6FD9;font-weight:600;background:#eff6ff;':''}">${cur||'—'}</td>`;};
+  const driversTbl=`<div class="sec">Drivers del programa · evolución 2024 → 2026</div>
+    <div class="tw"><table><thead><tr><th>Driver</th><th style="text-align:center">2024</th><th style="text-align:center">2025</th><th style="text-align:center">2026</th></tr></thead><tbody>`+
+    fields.map(([lbl,k])=>{const a=dv.y24?.[k]||'',b=dv.y25?.[k]||'',c=dv.y26?.[k]||'';
+      return `<tr><td style="font-weight:500;font-size:11px;">${lbl}</td>${cell(fmtVal(a),null)}${cell(fmtVal(b),fmtVal(a))}${cell(fmtVal(c),fmtVal(b))}</tr>`;}).join('')+
+    `</tbody></table></div><div style="font-size:9px;color:var(--sb);margin-top:5px;">Las celdas <span style="color:#1E6FD9;font-weight:600;">resaltadas</span> cambiaron respecto al año anterior.</div>`;
+
+  // Competencia: tarjeta UAI + competidores
+  const uaiCard=`<div class="cd" style="border-top:3px solid #0f2744;">
+    <div style="font-size:13px;font-weight:700;color:#0f2744;margin-bottom:8px;">UAI · ${p.s} <span class="pill" style="background:#e0e7ff;color:#3730a3;font-size:9px;">Nuestro</span></div>
+    <div style="font-size:20px;font-weight:700;font-family:'JetBrains Mono';">${fmtVal(dv.y26?.arancel)||'—'} <span style="font-size:11px;color:var(--sb);font-weight:400;">${dv.y26?.moneda||''}</span></div>
+    <div style="font-size:10px;color:var(--sb);margin-bottom:8px;">Arancel 2026 · Matrícula ${fmtVal(dv.y26?.matricula)||'—'}</div>
+    <div style="font-size:11px;line-height:1.7;">
+      <div><b>Modalidad:</b> ${dv.y26?.modalidad||'—'}</div>
+      <div><b>Días:</b> ${dv.y26?.dias||'—'}</div>
+      <div><b>Sede:</b> ${dv.y26?.sede||'—'}</div>
+    </div></div>`;
+  const compCards=bench.map((c,i)=>`<div class="cd" style="border-top:3px solid ${CC[i]};">
+    <div style="font-size:13px;font-weight:700;color:${CC[i]};margin-bottom:8px;">${c.uni} <span class="pill" style="background:var(--bg);color:var(--sb);font-size:9px;">Competidor ${i+1}</span></div>
+    <div style="font-size:20px;font-weight:700;font-family:'JetBrains Mono';">${fmtVal(c.arancel)||'—'} <span style="font-size:11px;color:var(--sb);font-weight:400;">${c.moneda||''}</span></div>
+    <div style="font-size:10px;color:var(--sb);margin-bottom:8px;">Arancel · Matrícula ${fmtVal(c.matricula)||'—'}</div>
+    <div style="font-size:11px;line-height:1.6;">
+      ${c.formato?`<div><b>Formato:</b> ${c.formato}</div>`:''}
+      ${c.horario?`<div style="margin-top:2px;"><b>Horario:</b> <span style="color:var(--mt);">${c.horario}</span></div>`:''}
+      ${c.comuna?`<div style="margin-top:2px;"><b>Comuna:</b> ${c.comuna}</div>`:''}
+      ${c.viaje?`<div style="margin-top:2px;"><b>Viaje/Internac.:</b> ${c.viaje}</div>`:''}
+    </div>
+    ${c.coment&&c.coment!=='.'&&c.coment!=='**'?`<div style="font-size:10px;color:var(--mt);margin-top:8px;padding-top:8px;border-top:1px solid var(--bd);font-style:italic;">${c.coment}</div>`:''}
+    ${/^https?:/i.test(c.link)?`<a href="${c.link}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font-size:10px;color:${CC[i]};text-decoration:none;font-weight:600;">Ver programa ↗</a>`:''}
+  </div>`).join('');
+  const compSection=`<div class="sec">Competencia · benchmark de mercado</div>`+
+    (bench.length?`<div class="g4">${uaiCard}${compCards}</div>`:
+      `<div class="g2"><div>${uaiCard}</div><div class="cd" style="display:flex;align-items:center;justify-content:center;color:var(--sb);font-size:12px;text-align:center;">Sin competencia registrada para este programa en la hoja de análisis.</div></div>`);
+
+  // Propuesta estratégica
+  const propuesta=p.propuesta?`<div class="cd" style="margin-top:1rem;background:linear-gradient(135deg,#f0f9ff,#fff);border-left:3px solid #0891B2;">
+    <div class="ct" style="color:#0891B2;">💡 Propuesta / acción sugerida</div>
+    <div style="font-size:12.5px;color:var(--tx);line-height:1.6;white-space:pre-wrap;">${p.propuesta}</div></div>`:'';
+
+  // Experiencia del alumno (ISN / NPS por año)
+  let expSection;
+  if(exp&&(Object.values(exp.isn||{}).some(v=>v!=null)||Object.values(exp.nps||{}).some(v=>v!=null))){
+    const row=(obj,lbl)=>['22','23','24','25'].map(y=>{const v=obj?.[y];return `<div class="m"><div class="ml">${lbl} 20${y}</div><div class="mv" style="color:${benchColor(v)}">${v!=null?(v>0?'+':'')+v:'—'}</div></div>`;}).join('');
+    expSection=`<div class="sec">Experiencia del alumno · ISN y NPS histórico</div>
+      <div class="g4" style="margin-bottom:.6rem;">${row(exp.isn,'ISN')}</div>
+      <div class="g4">${row(exp.nps,'NPS')}</div>
+      ${exp.com&&exp.com.length>2?`<div class="cd" style="margin-top:.8rem;"><div class="ct">Comentarios de alumnos</div><div style="font-size:12px;color:var(--mt);line-height:1.6;white-space:pre-wrap;">${exp.com}</div></div>`:''}`;
+  }else{
+    expSection=`<div class="sec">Experiencia del alumno</div><div class="cd" style="text-align:center;color:var(--sb);font-size:12px;padding:1.4rem;">Sin datos de ISN/NPS para este programa.${DATASETS.expbench.loaded?'':' Carga la hoja «Experiencia Alumnos» del Excel.'}</div>`;
+  }
+
+  document.getElementById('benchView').innerHTML=head+driversTbl+compSection+propuesta+expSection;
+}
+
 // ═══ COMPARAR ═══
 function drawCompare(){
   const sA=document.getElementById('compA').value,sB=document.getElementById('compB').value;
@@ -1808,9 +1976,9 @@ function loadFile(file){
   if(!file)return;
   document.getElementById('fstat').style.display='flex';
   document.getElementById('fstat').innerHTML='<div style="width:8px;height:8px;border-radius:50%;background:var(--c3)"></div>Cargando '+file.name+'…';
-  ingestFile(file,['consolidado','postula','rentabilidad','evdoc','expal'],res=>{
+  ingestFile(file,['consolidado','postula','rentabilidad','evdoc','expal','expbench'],res=>{
     if(res.error){document.getElementById('fstat').innerHTML='<div style="width:8px;height:8px;border-radius:50%;background:#DC2626"></div>'+res.error;return;}
-    const labels={consolidado:'Consolidado',postula:'Postulaciones',rentabilidad:'Rentabilidad',evdoc:'Eval. Docente',expal:'Exp. Alumno'};
+    const labels={consolidado:'Consolidado',postula:'Postulaciones',rentabilidad:'Rentabilidad',evdoc:'Eval. Docente',expal:'Exp. Alumno',expbench:'Experiencia x Prog'};
     const foundTxt=res.found.map(k=>'✓ '+labels[k]).join(' · ');
     document.getElementById('fstat').innerHTML=
       '<div style="width:8px;height:8px;border-radius:50%;background:#059669"></div>'+
@@ -1851,6 +2019,7 @@ function loadRent(file){ingestFile(file,['rentabilidad','consolidado'],res=>{aft
 function loadPost(file){ingestFile(file,['postula'],res=>{afterLoad(res);renderPost();});}
 function loadEvdoc(file){ingestFile(file,['evdoc'],res=>{afterLoad(res);renderEvdoc();});}
 function loadExpal(file){ingestFile(file,['expal'],res=>{afterLoad(res);renderExpal();});}
+function loadBench(file){ingestFile(file,['consolidado','expbench'],res=>{afterLoad(res);renderBench();});}
 
 function afterLoad(res){
   if(res.error){alert(res.error);return;}
@@ -1880,6 +2049,10 @@ function renderMkt(){
 function renderPrg(){
   if(!gate('p-prg',['consolidado'],'Carga el análisis de programas','Sube el Excel con la hoja «Análisis Consolidado EN» para ver la ficha de cada programa.','#059669','loadPrg'))return;
   buildPrgSel();
+}
+function renderBench(){
+  if(!gate('p-bench',['consolidado'],'Carga el benchmark competitivo','Sube el Excel con «Análisis Consolidado EN» (drivers y competencia desde la columna CP). Si además trae la hoja «Experiencia Alumnos», se muestra el ISN/NPS por programa.','#0891B2','loadBench'))return;
+  buildBenchSel();
 }
 function renderComp(){
   if(!gate('p-comp',['consolidado'],'Carga los programas a comparar','Sube el Excel con «Análisis Consolidado EN» para comparar programas lado a lado.','#D97706','loadComp'))return;
@@ -1914,7 +2087,7 @@ function updateSbFoot(){
   el.innerHTML=loaded.length+' fuentes cargadas<br>'+bits.join(' · ');
 }
 function renderAll(){
-  renderResumen();renderMkt();renderPrg();renderComp();renderRent();renderPost();renderEvdoc();renderExpal();
+  renderResumen();renderMkt();renderPrg();renderBench();renderComp();renderRent();renderPost();renderEvdoc();renderExpal();
   updateSbFoot();
 }
 renderAll();
