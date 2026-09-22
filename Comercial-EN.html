@@ -691,9 +691,10 @@ function emptyState(container,title,sub,accent,onFileId){
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="${accent}" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
     </div>
     <div style="font-size:15px;font-weight:600;color:var(--tx);margin-bottom:5px;">${title}</div>
-    <div style="font-size:12px;color:var(--sb);margin-bottom:16px;max-width:420px;margin-left:auto;margin-right:auto;">${sub}</div>
+    <div style="font-size:12px;color:var(--sb);margin-bottom:10px;max-width:440px;margin-left:auto;margin-right:auto;">${sub}</div>
+    <div style="font-size:11px;color:${accent};margin-bottom:16px;font-weight:600;">✓ Con una sola carga se completan todas las secciones automáticamente</div>
     <label style="display:inline-block;padding:9px 22px;background:${accent};color:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;">
-      Seleccionar archivo Excel
+      Cargar reporte completo
       <input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="${onFileId}(this.files[0])">
     </label>
   </div>`;
@@ -2010,16 +2011,21 @@ populateGlobalFilter();
 // Cada sección se "renderiza" verificando primero si sus datos están cargados.
 // Si no, pinta el estado vacío con su cargador propio.
 
-// Loaders individuales (uno por sección; algunos comparten dataset)
-function loadResumen(file){ingestFile(file,['consolidado','postula'],res=>{afterLoad(res);renderResumen();});}
-function loadMkt(file){ingestFile(file,['consolidado','postula'],res=>{afterLoad(res);renderMkt();});}
-function loadPrg(file){ingestFile(file,['consolidado','postula'],res=>{afterLoad(res);renderPrg();});}
-function loadComp(file){ingestFile(file,['consolidado'],res=>{afterLoad(res);renderComp();});}
-function loadRent(file){ingestFile(file,['rentabilidad','consolidado'],res=>{afterLoad(res);renderRent();});}
-function loadPost(file){ingestFile(file,['postula'],res=>{afterLoad(res);renderPost();});}
-function loadEvdoc(file){ingestFile(file,['evdoc'],res=>{afterLoad(res);renderEvdoc();});}
-function loadExpal(file){ingestFile(file,['expal'],res=>{afterLoad(res);renderExpal();});}
-function loadBench(file){ingestFile(file,['consolidado','expbench'],res=>{afterLoad(res);renderBench();});}
+// Todas las fuentes que trae el reporte. Cargar una vez (en cualquier sección)
+// parsea TODAS las hojas del libro y llena automáticamente el resto de las secciones.
+const ALLKEYS=['consolidado','postula','rentabilidad','evdoc','expal','expbench'];
+function loadReporte(file){
+  if(!file)return;
+  ingestFile(file,ALLKEYS,res=>{
+    afterLoad(res);
+    renderAll();            // refresca las 9 secciones y el pie del sidebar
+  });
+}
+// Cada botón "Cargar archivo" de sección usa el mismo cargador completo:
+// con una sola carga, todos los ítems leen la información automáticamente.
+const loadResumen=loadReporte, loadMkt=loadReporte, loadPrg=loadReporte,
+      loadComp=loadReporte, loadRent=loadReporte, loadPost=loadReporte,
+      loadEvdoc=loadReporte, loadExpal=loadReporte, loadBench=loadReporte;
 
 function afterLoad(res){
   if(res.error){alert(res.error);return;}
@@ -2094,3 +2100,4 @@ renderAll();
 </script>
 </body>
 </html>
+
