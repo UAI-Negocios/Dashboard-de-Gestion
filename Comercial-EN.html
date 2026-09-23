@@ -423,27 +423,46 @@ tbody tr:hover td{background:var(--sf2);}
   <div class="pnl-empty"></div>
   <div class="pnl-inner">
   <div class="fbar">
-    <span class="fbl">Filtros de postulaciones</span>
+    <span class="fbl">Análisis de postulaciones</span>
     <select id="postYear" onchange="buildPost()" class="fsel">
       <option value="">Todos los años</option>
       <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option>
     </select>
-    <select id="postEstado" onchange="buildPost()" class="fsel">
-      <option value="">Todos los estados</option>
-      <option value="Matriculado">Matriculado</option>
-      <option value="Aceptado">Aceptado</option>
-      <option value="Retirado">Retirado</option>
-      <option value="Nuevo">Nuevo</option>
+    <select id="postSeg" onchange="buildPost()" class="fsel">
+      <option value="all">Todos los postulantes</option>
+      <option value="mat">Solo matriculados</option>
     </select>
     <span id="postCount" class="fcnt"></span>
   </div>
-  <div class="g4" id="postKpis"></div>
+  <div class="g6" id="postKpis"></div>
+
+  <div class="sec">Embudo de conversión & evolución</div>
   <div class="g2">
-    <div class="cd"><div class="ct">Estados</div><div style="position:relative;height:220px;"><canvas id="cStates"></canvas></div></div>
-    <div class="cd"><div class="ct">Género</div><div style="position:relative;height:150px;"><canvas id="cGender"></canvas></div>
-      <div class="sec" style="margin-top:12px;">País</div><div style="position:relative;height:130px;"><canvas id="cCountry"></canvas></div>
-    </div>
+    <div class="cd"><div class="ct">Embudo de conversión (estados)</div><div id="postFunnel"></div></div>
+    <div class="cd"><div class="ct">Evolución mensual de postulaciones</div><div style="position:relative;height:250px;"><canvas id="cPostMonthly"></canvas></div></div>
   </div>
+
+  <div class="sec">Perfil demográfico</div>
+  <div class="g3">
+    <div class="cd"><div class="ct">Género</div><div style="position:relative;height:210px;"><canvas id="cGender"></canvas></div></div>
+    <div class="cd"><div class="ct">Rango etario</div><div style="position:relative;height:210px;"><canvas id="cPostEdad"></canvas></div></div>
+    <div class="cd"><div class="ct">Experiencia laboral (años)</div><div style="position:relative;height:210px;"><canvas id="cPostExp"></canvas></div></div>
+  </div>
+
+  <div class="sec">Origen geográfico</div>
+  <div class="g2">
+    <div class="cd"><div class="ct">País de nacionalidad</div><div style="position:relative;height:230px;"><canvas id="cCountry"></canvas></div></div>
+    <div class="cd"><div class="ct">Región (Chile)</div><div style="position:relative;height:230px;"><canvas id="cPostReg"></canvas></div></div>
+  </div>
+
+  <div class="sec">Perfil profesional</div>
+  <div class="g2">
+    <div class="cd"><div class="ct">Industria de procedencia</div><div style="position:relative;height:260px;"><canvas id="cPostInd"></canvas></div></div>
+    <div class="cd"><div class="ct">Posición ejecutiva</div><div style="position:relative;height:260px;"><canvas id="cPostPos"></canvas></div></div>
+  </div>
+
+  <div class="sec">Comparativa anual</div>
+  <div class="cd"><div class="ct">Postulaciones, matriculados y tasa de conversión por año</div><div style="position:relative;height:260px;"><canvas id="cPostYear"></canvas></div></div>
 </div><!-- /pnl-inner -->
 </div>
 
@@ -685,21 +704,35 @@ const DATASETS={
 };
 
 // Procesa un archivo Excel: escanea todas las hojas y aplica los datasets que se pidan.
+// Nombres de hoja que sugieren una fuente conocida (para no parsear las ~36 hojas del libro)
+const SHEET_HINT=/(consolidado|an[aá]lisis|postula|postulaci|rentab|margen|experiencia|alumno|docente|encuesta|c[aá]tedra|eval)/i;
 function ingestFile(file, wantKeys, onDone){
   const reader=new FileReader();
   reader.onload=function(e){
-    let wbk;
-    try{wbk=XLSX.read(new Uint8Array(e.target.result),{type:'array'});}
+    const buf=new Uint8Array(e.target.result);
+    // 1) Leer SOLO los nombres de hoja (rápido, sin parsear celdas)
+    let names;
+    try{names=(XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames)||[];}
     catch(err){onDone({error:'No se pudo leer el archivo'});return;}
+    // 2) Parsear únicamente las hojas candidatas por nombre (evita parsear todo el libro)
+    let target=names.filter(n=>SHEET_HINT.test(n));
+    if(!target.length)target=names; // sin coincidencias: parsear todo como respaldo
+    let wbk;
+    try{wbk=XLSX.read(buf,{type:'array',dense:true,cellFormula:false,cellHTML:false,cellStyles:false,bookVBA:false,sheets:target});}
+    catch(err){try{wbk=XLSX.read(buf,{type:'array'});}catch(e2){onDone({error:'No se pudo leer el archivo'});return;}}
+    // 3) Convertir cada hoja UNA sola vez y probar contra todas las fuentes pendientes
+    const pending=new Set(wantKeys.filter(k=>DATASETS[k]));
     const found=[];
-    for(const key of wantKeys){
-      const ds=DATASETS[key];if(!ds)continue;
-      for(const sn of wbk.SheetNames){
-        const d=XLSX.utils.sheet_to_json(wbk.Sheets[sn],{header:1,defval:''});
-        if(ds.detect(d,sn)&&ds.apply(d,file.name,sn)){found.push(key);break;}
+    for(const sn of target){
+      if(!pending.size)break;
+      const ws=wbk.Sheets[sn];if(!ws)continue;
+      const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      for(const key of [...pending]){
+        const ds=DATASETS[key];
+        try{if(ds.detect(d,sn)&&ds.apply(d,file.name,sn)){found.push(key);pending.delete(key);}}catch(_){}
       }
     }
-    onDone({found,fname:file.name,sheets:wbk.SheetNames.length});
+    onDone({found,fname:file.name,sheets:names.length});
   };
   reader.readAsArrayBuffer(file);
 }
@@ -856,6 +889,21 @@ function parsePostula(rows){
   const states={},byYear={},gender={},country={},monthly={},funnel={},medios={};
   const adn={},adnY={},chAgg={},monthlyConv={};
   const norm=v=>String(v==null?'':v).trim();
+  // ── Agregación demográfica para análisis profesional (por año y segmento) ──
+  const AGG={all:{},mat:{}};
+  const _blk=()=>({n:0,mat:0,eSum:0,eN:0,xSum:0,xN:0,gen:{},pais:{},reg:{},ind:{},pos:{},eb:[0,0,0,0,0,0],xb:[0,0,0,0,0,0],est:{}});
+  const _get=(seg,y)=>{const o=AGG[seg];return o[y]||(o[y]=_blk());};
+  const _add=(b,gen,pais,reg,ind,pos,est,edad,exp,isMat)=>{
+    b.n++;if(isMat)b.mat++;
+    if(gen)b.gen[gen]=(b.gen[gen]||0)+1;
+    if(pais)b.pais[pais]=(b.pais[pais]||0)+1;
+    if(reg)b.reg[reg]=(b.reg[reg]||0)+1;
+    if(ind)b.ind[ind]=(b.ind[ind]||0)+1;
+    if(pos)b.pos[pos]=(b.pos[pos]||0)+1;
+    if(est)b.est[est]=(b.est[est]||0)+1;
+    if(edad!=null){b.eSum+=edad;b.eN++;const bi=edad<25?0:edad<30?1:edad<35?2:edad<40?3:edad<45?4:5;b.eb[bi]++;}
+    if(exp!=null){b.xSum+=exp;b.xN++;const xi=exp<3?0:exp<6?1:exp<11?2:exp<16?3:exp<21?4:5;b.xb[xi]++;}
+  };
 
   for(let i=1;i<rows.length;i++){
     const r=rows[i];
@@ -892,6 +940,18 @@ function parsePostula(rows){
       splitMedios(r[iMed]).forEach(ch=>{const k=canonCh(ch);if(seen.has(k))return;seen.add(k);
         if(!chAgg[k])chAgg[k]={total:0,mat:0};chAgg[k].total++;if(est==='Matriculado')chAgg[k].mat++;
         medios[k]=(medios[k]||0)+1;});
+    }
+    // Acumulación demográfica global (por año + segmento)
+    {
+      const indV=iInd!==-1?norm(r[iInd]):'', posV=iPos!==-1?norm(r[iPos]):'', regV=iReg!==-1?norm(r[iReg]):'';
+      const edadV=iEdad!==-1?(isNaN(parseFloat(r[iEdad]))?null:parseFloat(r[iEdad])):null;
+      const expV=iExp!==-1?(isNaN(parseFloat(r[iExp]))?null:parseFloat(r[iExp])):null;
+      const isMat=est==='Matriculado';
+      const g=(gen&&gen!=='N/I')?gen:'', pa=(pais&&pais!=='N/I')?pais:'';
+      _add(_get('all','ALL'),g,pa,regV,indV,posV,est,edadV,expV,isMat);
+      if(ay)_add(_get('all',ay),g,pa,regV,indV,posV,est,edadV,expV,isMat);
+      if(isMat){_add(_get('mat','ALL'),g,pa,regV,indV,posV,est,edadV,expV,true);
+        if(ay)_add(_get('mat',ay),g,pa,regV,indV,posV,est,edadV,expV,true);}
     }
     // ADN por programa
     if(prog&&prog.length>2){
@@ -935,7 +995,8 @@ function parsePostula(rows){
 
   return {
     states:srt(states,12),byYear,gender:srt(gender,3),country:srt(country,8),
-    monthly:monthlyOrd,funnel,medios:srt(medios,6),adn,adnY,mktChannels,monthlyConv:monthlyConvOrd
+    monthly:monthlyOrd,funnel,medios:srt(medios,6),adn,adnY,mktChannels,monthlyConv:monthlyConvOrd,
+    pAgg:AGG
   };
 }
 
@@ -978,7 +1039,7 @@ function resetFilters(){
   document.getElementById('gType').value='';
   document.getElementById('gEstado').value='';
   // Limpiar también los filtros locales de cada pestaña
-  ['prgTypeF','compTypeF','rentPerf','postYear','postEstado','evSigla','evISN','mktTypeF','mktSort'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['prgTypeF','compTypeF','rentPerf','postYear','postSeg','evSigla','evISN','mktTypeF','mktSort'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const ry=document.getElementById('rentYear');if(ry)ry.value='r25';
   const es=document.getElementById('evSearch');if(es)es.value='';
   PF=[...P];
@@ -1682,53 +1743,118 @@ function adnMatchesPF(name){
 }
 function buildPost(){
   const yr=document.getElementById('postYear')?.value||'';
-  const estF=document.getElementById('postEstado')?.value||'';
-  const noFilters=(PF.length===P.length)&&!yr&&!estF;
-
-  let S,G,C,BY,total,mat;
-  if(noFilters){
-    S=D.states;G=D.gender;C=D.country;BY=D.byYear;
-    total=Object.values(BY).reduce((s,v)=>s+v,0);mat=S['Matriculado']||0;
-  }else{
-    // Agrega desde D.adnY: {programa:{año:{t,m,g,p,e}}}
-    S={};G={};C={};BY={};
-    Object.entries(D.adnY).forEach(([name,years])=>{
-      if(!adnMatchesPF(name))return;
-      Object.entries(years).forEach(([y,v])=>{
-        if(yr&&y!==yr)return;
-        BY[y]=(BY[y]||0)+v.t;
-        for(const[k2,v2]of Object.entries(v.e||{}))S[k2]=(S[k2]||0)+v2;
-        for(const[k2,v2]of Object.entries(v.g||{}))G[k2]=(G[k2]||0)+v2;
-        for(const[k2,v2]of Object.entries(v.p||{}))C[k2]=(C[k2]||0)+v2;
-      });
-    });
-    total=Object.values(BY).reduce((s,v)=>s+v,0);
-    mat=Object.entries(S).filter(([k])=>/^matricul/i.test(k)).reduce((s,[,v])=>s+v,0);
-    if(estF){
-      const S2={};Object.keys(S).filter(k=>k.toLowerCase().includes(estF.toLowerCase())).forEach(k=>S2[k]=S[k]);S=S2;
-    }
-    const srt=(o,n)=>Object.fromEntries(Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n));
-    S=srt(S,12);G=srt(G,3);C=srt(C,8);
-  }
-  const ret=Object.entries(S).filter(([k])=>/retirad/i.test(k)).reduce((s,[,v])=>s+v,0);
+  const seg=document.getElementById('postSeg')?.value||'all';
+  const AGG=D.pAgg||{all:{},mat:{}};
+  const b=(AGG[seg]&&AGG[seg][yr||'ALL'])||null;
+  const segTxt=seg==='mat'?'matriculados':'postulantes';
   const cnt=document.getElementById('postCount');
-  if(cnt)cnt.textContent=fn(total)+' postulaciones'+(noFilters?'':' (filtrado)');
 
-  document.getElementById('postKpis').innerHTML=`
-    <div class="m hi"><div class="ml">Total</div><div class="mv">${fn(total)}</div><div class="ms">${yr||'2024–2026'}</div></div>
-    <div class="m ok"><div class="ml">Matriculados</div><div class="mv">${fn(mat)}</div><div class="ms">${total?(mat/total*100).toFixed(1)+'%':'—'}</div></div>
-    <div class="m wr"><div class="ml">Retirados</div><div class="mv">${fn(ret)}</div><div class="ms">${total?(ret/total*100).toFixed(1)+'%':'—'}</div></div>
-    <div class="m"><div class="ml">${yr||'2026'}</div><div class="mv">${fn(BY[yr||'2026']||0)}</div></div>`;
-  if(!Object.keys(S).length){
-    ['cStates','cGender','cCountry'].forEach(dc);
+  if(!b||!b.n){
+    if(cnt)cnt.textContent='Sin datos para este filtro';
+    document.getElementById('postKpis').innerHTML='';
+    ['cGender','cCountry','cPostMonthly','cPostEdad','cPostExp','cPostReg','cPostInd','cPostPos','cPostYear'].forEach(dc);
+    const pf=document.getElementById('postFunnel');if(pf)pf.innerHTML='';
     return;
   }
-  dc('cStates');charts.cStates=new Chart(document.getElementById('cStates'),{type:'bar',data:{labels:Object.keys(S).slice(0,8).map(l=>l.length>18?l.substring(0,18)+'…':l),datasets:[{data:Object.values(S).slice(0,8),backgroundColor:CS.map(c=>c+'cc'),borderRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}},y:{grid:{display:false},ticks:{color:tc,font:{size:9,family:'Sora'}},border:{display:false}}}}});
-  dc('cGender');charts.cGender=new Chart(document.getElementById('cGender'),{type:'doughnut',data:{labels:Object.keys(G),datasets:[{data:Object.values(G),backgroundColor:['#1E6FD9','#BE185D','#a1a1aa'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom',labels:{font:{size:10,family:'Sora'}}}}}});
-  dc('cCountry');charts.cCountry=new Chart(document.getElementById('cCountry'),{type:'bar',data:{labels:Object.keys(C),datasets:[{data:Object.values(C),backgroundColor:'#1E6FD944',borderColor:'#1E6FD9',borderWidth:1,borderRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:7,family:'Sora'}},border:{display:false}},y:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}}}}});
+  if(cnt)cnt.textContent=fn(b.n)+' '+segTxt+(yr?' · '+yr:' · 2024–2026');
+
+  // ── Métricas derivadas ──
+  const est=b.est||{};
+  const eMat=Object.entries(est).filter(([k])=>/^matricul/i.test(k)).reduce((s,[,v])=>s+v,0);
+  const eAcep=Object.entries(est).filter(([k])=>/^aceptad/i.test(k)).reduce((s,[,v])=>s+v,0);
+  const eRet=Object.entries(est).filter(([k])=>/retirad/i.test(k)).reduce((s,[,v])=>s+v,0);
+  const matN=seg==='mat'?b.n:eMat;
+  const conv=(seg==='all'&&b.n)?(matN/b.n*100):null;
+  const edadAvg=b.eN?(b.eSum/b.eN):null;
+  const expAvg=b.xN?(b.xSum/b.xN):null;
+  const genSum=Object.values(b.gen).reduce((s,v)=>s+v,0);
+  const fem=Object.entries(b.gen).filter(([k])=>/^fem/i.test(k)).reduce((s,[,v])=>s+v,0);
+  const pctFem=genSum?(fem/genSum*100):null;
+  const paisSum=Object.values(b.pais).reduce((s,v)=>s+v,0);
+  const chile=Object.entries(b.pais).filter(([k])=>/chile/i.test(k)).reduce((s,[,v])=>s+v,0);
+  const pctChile=paisSum?(chile/paisSum*100):null;
+
+  document.getElementById('postKpis').innerHTML=`
+    <div class="m hi"><div class="ml">${seg==='mat'?'Matriculados':'Postulaciones'}</div><div class="mv">${fn(b.n)}</div><div class="ms">${yr||'2024–2026'}</div></div>
+    <div class="m ok"><div class="ml">Matriculados</div><div class="mv">${fn(matN)}</div><div class="ms">${conv!=null?conv.toFixed(1)+'% conversión':'—'}</div></div>
+    <div class="m wr"><div class="ml">Retiros</div><div class="mv">${fn(eRet)}</div><div class="ms">${b.n?(eRet/b.n*100).toFixed(1)+'% del total':'—'}</div></div>
+    <div class="m"><div class="ml">Edad promedio</div><div class="mv">${edadAvg!=null?edadAvg.toFixed(1):'—'}</div><div class="ms">años</div></div>
+    <div class="m"><div class="ml">% Mujeres</div><div class="mv">${pctFem!=null?pctFem.toFixed(0)+'%':'—'}</div></div>
+    <div class="m"><div class="ml">Exp. laboral prom</div><div class="mv">${expAvg!=null?expAvg.toFixed(1):'—'}</div><div class="ms">años · ${pctChile!=null?pctChile.toFixed(0)+'% Chile':''}</div></div>`;
+
+  // ── Embudo de conversión (estados) ──
+  const avanzaron=eAcep+eMat; // pasaron admisión
+  const stages=[
+    {l:'Postulaciones',v:b.n,c:'#1E6FD9',d:'Total recibidas'},
+    {l:'Admitidos',v:avanzaron,c:'#8B5CF6',d:'Aceptados + matriculados'},
+    {l:'Matriculados',v:eMat,c:'#059669',d:'Cierre efectivo'}
+  ];
+  const maxV=Math.max(...stages.map(s=>s.v),1);
+  document.getElementById('postFunnel').innerHTML=stages.map((s,i)=>{
+    const w=Math.max(s.v/maxV*100,6);
+    const convFromTop=i===0?100:(stages[0].v?s.v/stages[0].v*100:0);
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <div style="min-width:96px;text-align:right;"><div style="font-size:11px;font-weight:600;color:var(--tx);">${s.l}</div><div style="font-size:9px;color:var(--sb);">${s.d}</div></div>
+      <div style="flex:1;"><div style="width:${w}%;background:linear-gradient(135deg,${s.c},${s.c}cc);border-radius:7px;padding:9px 12px;color:#fff;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 6px ${s.c}33;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;">${fn(s.v)}</span>
+        <span style="font-size:10px;opacity:.9;">${convFromTop.toFixed(1)}%</span></div></div>
+    </div>`;
+  }).join('')+`<div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:10px;border-top:1px solid var(--bd);font-size:11px;">
+      <span style="color:var(--mt);">Tasa admisión → matrícula</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#059669;">${avanzaron?(eMat/avanzaron*100).toFixed(1):'0'}%</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;">
+      <span style="color:var(--mt);">Retiros sobre total</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#DC2626;">${b.n?(eRet/b.n*100).toFixed(1):'0'}%</span></div>`;
+
+  // ── Evolución mensual ──
+  const mc=D.monthlyConv||{};
+  let mk=Object.keys(mc).sort();
+  if(yr)mk=mk.filter(k=>k.startsWith(yr));
+  dc('cPostMonthly');charts.cPostMonthly=new Chart(document.getElementById('cPostMonthly'),{type:'line',data:{labels:mk,datasets:[
+    {label:seg==='mat'?'Matriculados':'Postulaciones',data:mk.map(k=>seg==='mat'?mc[k].mat:mc[k].post),borderColor:'#1E6FD9',backgroundColor:'#1E6FD918',fill:true,tension:.35,pointRadius:2,borderWidth:2.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},interaction:{mode:'index',intersect:false},
+    scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:8,family:'JetBrains Mono'},maxRotation:45}},y:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}}}}});
+
+  // ── Género donut ──
+  const gk=Object.keys(b.gen);
+  dc('cGender');charts.cGender=new Chart(document.getElementById('cGender'),{type:'doughnut',data:{labels:gk,datasets:[{data:gk.map(k=>b.gen[k]),backgroundColor:['#1E6FD9','#BE185D','#a1a1aa','#D97706'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'bottom',labels:{font:{size:10,family:'Sora'},boxWidth:10}}}}});
+
+  // ── Rango etario ──
+  const ebLbl=['<25','25–29','30–34','35–39','40–44','45+'];
+  dc('cPostEdad');charts.cPostEdad=new Chart(document.getElementById('cPostEdad'),{type:'bar',data:{labels:ebLbl,datasets:[{data:b.eb,backgroundColor:'#8B5CF6cc',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:9}},border:{display:false}},y:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}}}}});
+
+  // ── Experiencia laboral ──
+  const xbLbl=['0–2','3–5','6–10','11–15','16–20','20+'];
+  dc('cPostExp');charts.cPostExp=new Chart(document.getElementById('cPostExp'),{type:'bar',data:{labels:xbLbl,datasets:[{data:b.xb,backgroundColor:'#0891B2cc',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:9}},border:{display:false}},y:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}}}}});
+
+  // ── Helper barra horizontal top-N ──
+  const topBar=(id,obj,n,color)=>{
+    const e=Object.entries(obj).filter(([k])=>k&&!/^n\/i$/i.test(k)).sort((a,b2)=>b2[1]-a[1]).slice(0,n);
+    dc(id);charts[id]=new Chart(document.getElementById(id),{type:'bar',data:{labels:e.map(x=>x[0].length>26?x[0].substring(0,26)+'…':x[0]),datasets:[{data:e.map(x=>x[1]),backgroundColor:color+'cc',borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fn(c.parsed.x)+' ('+(b.n?(c.parsed.x/b.n*100).toFixed(1):'0')+'%)'}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}},y:{grid:{display:false},ticks:{color:tc,font:{size:9,family:'Sora'}},border:{display:false}}}}});
+  };
+  topBar('cCountry',b.pais,8,'#1E6FD9');
+  topBar('cPostReg',b.reg,8,'#059669');
+  topBar('cPostInd',b.ind,8,'#D97706');
+  topBar('cPostPos',b.pos,6,'#8B5CF6');
+
+  // ── Comparativa anual (siempre todos los años, segmento = todos) ──
+  const yrs=['2024','2025','2026'];
+  const allBy=yrs.map(y=>(AGG.all[y]||{n:0}).n);
+  const matBy=yrs.map(y=>{const bb=AGG.all[y];if(!bb)return 0;return Object.entries(bb.est||{}).filter(([k])=>/^matricul/i.test(k)).reduce((s,[,v])=>s+v,0);});
+  const convBy=yrs.map((y,i)=>allBy[i]?Math.round(matBy[i]/allBy[i]*1000)/10:0);
+  dc('cPostYear');charts.cPostYear=new Chart(document.getElementById('cPostYear'),{data:{labels:yrs,datasets:[
+    {type:'bar',label:'Postulaciones',data:allBy,backgroundColor:'#1E6FD9aa',borderRadius:4,order:2},
+    {type:'bar',label:'Matriculados',data:matBy,backgroundColor:'#059669aa',borderRadius:4,order:2},
+    {type:'line',label:'Conversión %',data:convBy,borderColor:'#D97706',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,yAxisID:'y1',order:1,tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10,family:'Sora'},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.dataset.yAxisID==='y1'?c.parsed.y+'%':fn(c.parsed.y))}}},
+    scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:11,family:'JetBrains Mono'}},border:{display:false}},
+      y:{grid:{color:gc},ticks:{color:tc,font:{size:9,family:'JetBrains Mono'}},border:{display:false}},
+      y1:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:'#D97706',font:{size:9,family:'JetBrains Mono'},callback:v=>v+'%'},border:{display:false}}}}});
 }
 
 // ═══ EVAL DOCENTE ═══
@@ -1992,7 +2118,7 @@ function parseExpAl(data,fname,sheet){
 }
 
 // ═══ FILE UPLOAD ═══
-let wb=null;
+let wbBuf=null; // buffer del último archivo, para previsualizar hojas bajo demanda
 function dzDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f)loadFile(f);}
 function loadFile(file){
   if(!file)return;
@@ -2007,18 +2133,22 @@ function loadFile(file){
       file.name+' · '+res.sheets+' pestañas · '+(foundTxt||'sin datos reconocidos');
     // Re-renderiza todas las secciones
     renderAll();
-    // Preview de la primera hoja
+    // Pestañas de hojas: solo nombres (sin parsear celdas). El preview se genera al hacer clic.
     const reader=new FileReader();
-    reader.onload=e=>{wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      const tabsEl=document.getElementById('sheetTabs');if(tabsEl){tabsEl.style.display='flex';
-        tabsEl.innerHTML=wb.SheetNames.map((s,i)=>`<div style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid var(--bd);background:${i===0?'var(--c1)':'var(--sf)'};color:${i===0?'white':'var(--mt)'};cursor:pointer;" onclick="selSheet(this,'${s.replace(/'/g,"\\'")}')">${s}</div>`).join('');
-        showPreview(wb.SheetNames[0]);}
+    reader.onload=e=>{wbBuf=new Uint8Array(e.target.result);
+      let names=[];try{names=(XLSX.read(wbBuf,{type:'array',bookSheets:true}).SheetNames)||[];}catch(_){}
+      const tabsEl=document.getElementById('sheetTabs');if(tabsEl&&names.length){tabsEl.style.display='flex';
+        tabsEl.innerHTML=names.map((s,i)=>`<div style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid var(--bd);background:${i===0?'var(--c1)':'var(--sf)'};color:${i===0?'white':'var(--mt)'};cursor:pointer;" onclick="selSheet(this,'${s.replace(/'/g,"\\'")}')">${s}</div>`).join('');
+        showPreview(names[0]);}
     };reader.readAsArrayBuffer(file);
   });
 }
 function selSheet(el,n){document.querySelectorAll('#sheetTabs>div').forEach(t=>{t.style.background='var(--sf)';t.style.color='var(--mt)';});el.style.background='var(--c1)';el.style.color='white';showPreview(n);}
 function showPreview(n){
-  if(!wb)return;const d=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''});const rows=d.slice(0,12);if(!rows.length)return;
+  if(!wbBuf)return;
+  let ws;try{ws=XLSX.read(wbBuf,{type:'array',dense:true,cellFormula:false,cellHTML:false,cellStyles:false,sheets:[n]}).Sheets[n];}catch(_){return;}
+  if(!ws)return;
+  const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});const rows=d.slice(0,12);if(!rows.length)return;
   const cols=Math.min(Math.max(...rows.map(r=>r.length),1),15);const L=Array.from({length:cols},(_,i)=>String.fromCharCode(65+i));
   let h='<div class="tw"><table><thead><tr>'+L.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
   rows.forEach(row=>{h+='<tr>'+Array.from({length:cols},(_,ci)=>`<td class="mono" style="font-size:9px">${String(row[ci]||'').substring(0,35)}</td>`).join('')+'</tr>';});
@@ -2197,5 +2327,3 @@ renderAll();
 </script>
 </body>
 </html>
-
-
