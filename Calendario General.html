@@ -5272,6 +5272,17 @@ function renderCoord() {
       '<div id="cCalWrap" style="padding:16px"></div>'+
       '<div id="cCalDetail" style="display:none;padding:0 16px 16px"></div>'+
     '</div>'+
+    // ── Cobertura entre Coordinadoras (quién puede cubrir a quién) ──
+    '<div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;overflow:hidden;margin-bottom:20px">'+
+      '<div style="padding:12px 18px;border-bottom:1px solid #21262d;background:#161b22;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'+
+        '<div>'+
+          '<div style="font-size:13px;font-weight:800;color:#f0f6ff">\uD83E\uDD1D Cobertura entre Coordinadoras</div>'+
+          '<div style="font-size:10px;color:#8b949e;margin-top:2px">Si una coordinadora se ausenta, qui\u00e9n puede cubrirla \u2014 seg\u00fan disponibilidad en sus d\u00edas, afinidad de programa (MBA/Curso) y sede</div>'+
+        '</div>'+
+        '<div id="cCovControls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"></div>'+
+      '</div>'+
+      '<div id="cCovWrap" style="padding:16px"></div>'+
+    '</div>'+
     // Barra de filtros de cards
     '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">'+
       '<div style="flex:1;min-width:180px;position:relative">'+
@@ -5749,7 +5760,303 @@ function _coordTopesPanel(diasTopeArr, nTopes){
 }
 
 
+/* ══════════════════════════════════════════════════════════════
+   COBERTURA ENTRE COORDINADORAS — quién puede cubrir a quién
+══════════════════════════════════════════════════════════════ */
+var _coordCovSel = '';        // coordinadora a cubrir (ausente)
+var _coordCovFiltroCat = '';  // '', 'afin' (misma categoría) 
+var _coordCovDesde = '';      // rango de días a cubrir (YYYY-MM-DD)
+var _coordCovHasta = '';
+
+/* ¿Dos slots de horario se solapan? (ambos con horario) */
+function _covSolapa(a, b){
+  if(a.ini==null||a.fin==null||b.ini==null||b.fin==null) return false; // sin horario no contamos solape
+  return a.fin>b.ini && b.fin>a.ini;
+}
+
+/* Evalúa si la candidata `cand` puede cubrir el día `slotsAus` (slots de la ausente ese día). 
+   Devuelve: 'libre' (candidata sin clases ese día), 'compatible' (tiene clases pero sin tope),
+   'tope' (choca en horario), o 'ocupada_sh' (tiene clases el mismo día sin horario definido → riesgo). */
+function _covEstadoDia(candDia, slotsAus){
+  if(!candDia) return 'libre';                       // la candidata no tiene nada ese día
+  var candSlots = candDia.slots;
+  // ¿algún par solapa?
+  for(var i=0;i<candSlots.length;i++){
+    for(var j=0;j<slotsAus.length;j++){
+      if(_covSolapa(candSlots[i], slotsAus[j])) return 'tope';
+    }
+  }
+  // Tiene clases el mismo día pero sin solape detectado.
+  // Si hay slots sin horario en ambos lados, marcamos riesgo (mismo día, horario incierto).
+  var candSH = candSlots.some(function(s){return s.ini==null;});
+  var ausSH  = slotsAus.some(function(s){return s.ini==null;});
+  if(candSH && ausSH) return 'ocupada_sh';
+  return 'compatible';
+}
+
+/* Calcula, para la coordinadora ausente, el ranking de candidatas que pueden cubrirla */
+/* Normaliza cualquier valor de fecha (Date | string ISO | 'dd-mm-yyyy' | 'dd/mm/yyyy' | serial Excel) a Date.
+   Necesario porque, tras el reprocesamiento de algunas unidades, DIAS/FECHAS puede llegar como string ISO. */
+function _covToDate(v){
+  if(v==null||v==='') return null;
+  if(typeof v.getFullYear==='function'){ return isNaN(v.getTime())?null:v; }
+  if(typeof v==='number'){ var d0=new Date(Math.round((v-25569)*86400000)); return isNaN(d0.getTime())?null:d0; }
+  var s=String(v).trim();
+  // ISO (2027-04-08 o 2027-04-08T..)
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m){ var d1=new Date(+m[1],+m[2]-1,+m[3]); return isNaN(d1.getTime())?null:d1; }
+  // dd-mm-yyyy o dd/mm/yyyy
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){ var yy=+m[3]; if(yy<100)yy+=2000; var d2=new Date(yy,+m[2]-1,+m[1]); return isNaN(d2.getTime())?null:d2; }
+  var d3=new Date(s); return isNaN(d3.getTime())?null:d3;
+}
+/* 'YYYY-MM-DD' -> 'dd-mm-yyyy' para mostrar */
+function _covFmtISO(iso){ if(!iso) return '—'; var p=String(iso).split('-'); return p.length===3?(p[2]+'-'+p[1]+'-'+p[0]):iso; }
+/* Fecha (Date) -> 'YYYY-MM-DD' para comparar con inputs date */
+function _covISOKey(d){
+  var dd=_covToDate(d);
+  if(!dd) return '';
+  return dd.getFullYear()+'-'+('0'+(dd.getMonth()+1)).slice(-2)+'-'+('0'+dd.getDate()).slice(-2);
+}
+/* ¿La fecha d cae dentro del rango [desde,hasta]? (rango abierto si falta un extremo) */
+function _covEnRango(d){
+  var iso=_covISOKey(d);
+  if(!iso) return true;
+  if(_coordCovDesde && iso<_coordCovDesde) return false;
+  if(_coordCovHasta && iso>_coordCovHasta) return false;
+  return true;
+}
+function _coordCalcCobertura(ausente){
+  var cov = window._coordCovData || {};
+  var A = cov[ausente];
+  if(!A) return null;
+  var ausDiasKeys = Object.keys(A.dias).filter(function(k){ return _covEnRango(A.dias[k].fecha); });
+  var totalDias = ausDiasKeys.length;
+  // Rango real disponible de la ausente (para mostrar límites en los inputs)
+  var _allKeys=Object.keys(A.dias);
+  var _isos=_allKeys.map(function(k){return _covISOKey(A.dias[k].fecha);}).filter(Boolean).sort();
+  var minISO=_isos.length?_isos[0]:'', maxISO=_isos.length?_isos[_isos.length-1]:'';
+
+  var candidatas = [];
+  Object.keys(cov).forEach(function(co){
+    if(co===ausente) return;
+    var C = cov[co];
+    var libres=0, compatibles=0, topes=0, riesgo=0;
+    var detalleDias=[];
+    ausDiasKeys.forEach(function(k){
+      var est=_covEstadoDia(C.dias[k], A.dias[k].slots);
+      if(est==='libre') libres++;
+      else if(est==='compatible') compatibles++;
+      else if(est==='tope') topes++;
+      else if(est==='ocupada_sh') riesgo++;
+      detalleDias.push({fecha:k, fecha_d:A.dias[k].fecha, estado:est,
+        progsAus:[...new Set(A.dias[k].slots.map(function(s){return s.prog;}).filter(Boolean))]});
+    });
+    var cubribles = libres + compatibles;          // días que sí podría tomar
+    var pct = totalDias? Math.round(cubribles/totalDias*100) : 0;
+
+    // Afinidad de categoría: comparten familia dominante o alguna categoría en común
+    var mismaFamilia = (A.catDom===C.catDom);
+    var catComun = [...A.catSet].some(function(x){return C.catSet.has(x);});
+    // Afinidad de sede
+    var sedeComun = [...A.sedeSet].some(function(x){return C.sedeSet.has(x);});
+    var mismaSedeDom = (A.sedeDom && A.sedeDom===C.sedeDom);
+
+    // Puntaje: prioriza cobertura, luego afinidad, penaliza topes y carga alta
+    var score = pct*1.0
+      + (mismaFamilia?12:0) + (catComun?6:0)
+      + (mismaSedeDom?8:0) + (sedeComun?4:0)
+      - topes*3
+      - (C.ses/50);   // leve penalización por carga
+    candidatas.push({
+      nombre:co, libres:libres, compatibles:compatibles, topes:topes, riesgo:riesgo,
+      cubribles:cubribles, pct:pct, mismaFamilia:mismaFamilia, catComun:catComun,
+      sedeComun:sedeComun, mismaSedeDom:mismaSedeDom, catDom:C.catDom, sedeDom:C.sedeDom,
+      ses:C.ses, nDias:C.nDias, score:score, detalleDias:detalleDias
+    });
+  });
+  candidatas.sort(function(a,b){return b.score-a.score;});
+  return {ausente:ausente, totalDias:totalDias, catDom:A.catDom, sedeDom:A.sedeDom,
+    ses:A.ses, candidatas:candidatas, minISO:minISO, maxISO:maxISO,
+    diasTotalesAus:_allKeys.length, desde:_coordCovDesde, hasta:_coordCovHasta};
+}
+
+function _coordCovSelChange(v){ _coordCovSel=v; _coordCovDesde=''; _coordCovHasta=''; _coordRenderCobertura(); }
+function _coordCovSetDesde(v){
+  _coordCovDesde=v;
+  // Si el usuario invierte el orden (desde > hasta), corregir intercambiando
+  if(_coordCovDesde && _coordCovHasta && _coordCovDesde>_coordCovHasta){ var t=_coordCovHasta; _coordCovHasta=_coordCovDesde; _coordCovDesde=t; }
+  _coordRenderCobertura();
+}
+function _coordCovSetHasta(v){
+  _coordCovHasta=v;
+  if(_coordCovDesde && _coordCovHasta && _coordCovDesde>_coordCovHasta){ var t=_coordCovHasta; _coordCovHasta=_coordCovDesde; _coordCovDesde=t; }
+  _coordRenderCobertura();
+}
+function _coordCovRangoLimpiar(){ _coordCovDesde=''; _coordCovHasta=''; _coordRenderCobertura(); }
+function _coordCovFiltro(v){ _coordCovFiltroCat=v; _coordRenderCobertura(); }
+
+function _coordRenderCobertura(){
+  var wrap=$('cCovWrap'); var ctrls=$('cCovControls');
+  if(!wrap) return;
+  var cov=window._coordCovData||{};
+  var nombres=Object.keys(cov).sort();
+  if(!nombres.length){ wrap.innerHTML='<div style="padding:20px;text-align:center;color:#8b949e;font-size:12px">Carga el calendario para ver la cobertura.</div>'; if(ctrls)ctrls.innerHTML=''; return; }
+
+  // Selector de coordinadora + rango de fechas + filtro afinidad
+  if(!_coordCovSel || !cov[_coordCovSel]) _coordCovSel=nombres[0];
+
+  var res=_coordCalcCobertura(_coordCovSel);
+
+  if(ctrls){
+    var rangoActivo = !!(_coordCovDesde || _coordCovHasta);
+    ctrls.innerHTML=
+      '<span style="font-size:10px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.3px">Cubrir a:</span>'+
+      '<select onchange="_coordCovSelChange(this.value)" style="padding:7px 10px;border:1px solid #30363d;border-radius:7px;background:#0d1117;color:#e6edf3;font-size:12px;cursor:pointer;max-width:210px">'+
+        nombres.map(function(n){return '<option value="'+escA(n)+'"'+(n===_coordCovSel?' selected':'')+'>'+esc(n)+'</option>';}).join('')+
+      '</select>'+
+      '<span style="font-size:10px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-left:4px" title="'+((res&&res.minISO)?'Actividad entre '+res.minISO+' y '+res.maxISO:'')+'">Entre:</span>'+
+      '<input type="date" id="cCovDesdeInp" value="'+esc(_coordCovDesde)+'" onchange="_coordCovSetDesde(this.value)" title="'+((res&&res.minISO)?'Disponible desde '+_covFmtISO(res.minISO):'')+'" style="padding:6px 8px;border:1px solid '+(rangoActivo?'#22d3ee':'#30363d')+';border-radius:7px;background:#0d1117;color:#e6edf3;font-size:11px;cursor:pointer;color-scheme:dark">'+
+      '<span style="font-size:11px;color:#8b949e">y</span>'+
+      '<input type="date" id="cCovHastaInp" value="'+esc(_coordCovHasta)+'" onchange="_coordCovSetHasta(this.value)" title="'+((res&&res.maxISO)?'Disponible hasta '+_covFmtISO(res.maxISO):'')+'" style="padding:6px 8px;border:1px solid '+(rangoActivo?'#22d3ee':'#30363d')+';border-radius:7px;background:#0d1117;color:#e6edf3;font-size:11px;cursor:pointer;color-scheme:dark">'+
+      ((res&&res.minISO)?'<span style="font-size:9.5px;color:#6e7681">('+_covFmtISO(res.minISO)+' a '+_covFmtISO(res.maxISO)+')</span>':'')+
+      (rangoActivo?'<button onclick="_coordCovRangoLimpiar()" title="Ver todo el período" style="padding:6px 9px;border:1px solid #30363d;border-radius:7px;background:transparent;color:#8b949e;font-size:11px;font-weight:700;cursor:pointer">✕ rango</button>':'')+
+      '<button onclick="_coordCovFiltro(\''+(_coordCovFiltroCat==='afin'?'':'afin')+'\')" style="padding:7px 12px;border:1px solid '+(_coordCovFiltroCat==='afin'?'#3fb950':'#30363d')+';border-radius:7px;background:'+(_coordCovFiltroCat==='afin'?'rgba(63,185,80,.12)':'transparent')+';color:'+(_coordCovFiltroCat==='afin'?'#3fb950':'#8b949e')+';font-size:11px;font-weight:700;cursor:pointer">'+(_coordCovFiltroCat==='afin'?'✓ Solo afines (MBA/Curso)':'🎯 Solo afines')+'</button>'+
+      '<button onclick="_coordCovExcel()" style="padding:7px 12px;border:1px solid #30363d;border-radius:7px;background:transparent;color:#8b949e;font-size:11px;font-weight:700;cursor:pointer">📊 Exportar</button>';
+  }
+
+  if(!res || !res.diasTotalesAus){ wrap.innerHTML='<div style="padding:20px;text-align:center;color:#8b949e;font-size:12px">Esta coordinadora no tiene días con actividad registrada.</div>'; return; }
+  if(!res.totalDias){ wrap.innerHTML='<div style="padding:24px;text-align:center;color:#f0b429;font-size:12px">📅 No hay días con actividad de <b>'+esc(res.ausente)+'</b> dentro del rango elegido'+(res.minISO?' (tiene actividad entre '+esc(res.minISO)+' y '+esc(res.maxISO)+')':'')+'. Ajusta las fechas o pulsa <b>✕ rango</b>.</div>'; return; }
+
+  var cands=res.candidatas;
+  if(_coordCovFiltroCat==='afin') cands=cands.filter(function(x){return x.catComun;});
+
+  var CATC=(typeof _COORD_CAT_COLOR!=='undefined')?_COORD_CAT_COLOR:{EMBA:'#f0b429',Master:'#388bfd',Diploma:'#a78bfa',Curso:'#3fb950'};
+
+  // Encabezado con la ausente
+  var head=
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;background:rgba(56,139,253,.06);border:1px solid #21262d;border-radius:10px">'+
+      '<div style="width:40px;height:40px;border-radius:50%;background:#f8514922;border:1px solid #f85149;display:flex;align-items:center;justify-content:center;font-size:18px">🚫</div>'+
+      '<div style="flex:1;min-width:180px">'+
+        '<div style="font-size:14px;font-weight:900;color:#f0f6ff">'+esc(res.ausente)+' <span style="font-size:10px;font-weight:600;color:#8b949e">se ausenta</span></div>'+
+        '<div style="font-size:11px;color:#8b949e;margin-top:2px">'+res.totalDias+' día(s) a cubrir'+(res.diasTotalesAus&&res.totalDias!==res.diasTotalesAus?' <span style="color:#6e7681">(de '+res.diasTotalesAus+' totales)</span>':'')+' · categoría '+
+          '<span style="color:'+(CATC[res.catDom]||'#8b949e')+';font-weight:700">'+esc(res.catDom)+'</span>'+
+          (res.sedeDom?' · sede '+esc(res.sedeDom):'')+'</div>'+
+        '<div style="font-size:11px;color:#22d3ee;margin-top:3px;font-weight:600">📅 Período a cubrir: '+_covFmtISO(res.desde||res.minISO)+' → '+_covFmtISO(res.hasta||res.maxISO)+((res.desde||res.hasta)?' <span style="color:#6e7681;font-weight:400">(rango filtrado)</span>':'')+'</div>'+
+      '</div>'+
+      '<div style="font-size:10px;color:#8b949e;text-align:right;max-width:230px">Se ordena por aptitud: disponibilidad en esos días + afinidad de programa y sede, penalizando topes.</div>'+
+    '</div>';
+
+  if(!cands.length){ wrap.innerHTML=head+'<div style="padding:20px;text-align:center;color:#8b949e;font-size:12px">No hay candidatas'+(_coordCovFiltroCat==='afin'?' afines':'')+' disponibles.</div>'; return; }
+
+  // Ranking de candidatas (top 8 en tarjetas)
+  var top=cands.slice(0,8);
+  var cards=top.map(function(x,i){
+    var barColor = x.pct>=80?'#3fb950':x.pct>=50?'#f0b429':'#f85149';
+    var medalla = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º';
+    var badges='';
+    if(x.mismaFamilia) badges+='<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;background:'+(CATC[x.catDom]||'#388bfd')+'22;color:'+(CATC[x.catDom]||'#388bfd')+';border:1px solid '+(CATC[x.catDom]||'#388bfd')+'55">misma familia '+esc(x.catDom)+'</span>';
+    else if(x.catComun) badges+='<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;background:#8b949e22;color:#8b949e">categoría en común</span>';
+    if(x.mismaSedeDom) badges+=' <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;background:#22d3ee22;color:#22d3ee;border:1px solid #22d3ee55">misma sede</span>';
+    else if(x.sedeComun) badges+=' <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;background:#8b949e22;color:#8b949e">sede en común</span>';
+    return '<div style="background:#161b22;border:1px solid '+(i===0?'#3fb95055':'#21262d')+';border-radius:10px;padding:12px 14px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<span style="font-size:15px">'+medalla+'</span>'+
+        '<span style="flex:1;font-size:13px;font-weight:800;color:#f0f6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.nombre)+'</span>'+
+        '<span style="font-size:18px;font-weight:900;color:'+barColor+'">'+x.pct+'%</span>'+
+      '</div>'+
+      '<div style="height:7px;background:#0d1117;border-radius:20px;overflow:hidden;margin-bottom:10px"><div style="width:'+x.pct+'%;height:100%;background:'+barColor+';border-radius:20px"></div></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:10px">'+
+        '<span style="color:#3fb950"><b>'+x.libres+'</b> libres</span>'+
+        '<span style="color:#8b949e">·</span>'+
+        '<span style="color:#f0b429"><b>'+x.compatibles+'</b> compatibles</span>'+
+        '<span style="color:#8b949e">·</span>'+
+        '<span style="color:#f85149"><b>'+x.topes+'</b> topes</span>'+
+      '</div>'+
+      (badges?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">'+badges+'</div>':'')+
+      '<div style="font-size:10px;color:#8b949e;border-top:1px solid #21262d;padding-top:7px">Carga propia: '+x.ses+' ses. · '+x.nDias+' días</div>'+
+    '</div>';
+  }).join('');
+
+  // Tabla completa
+  var filas=cands.map(function(x){
+    var barColor = x.pct>=80?'#3fb950':x.pct>=50?'#f0b429':'#f85149';
+    var afin = x.mismaFamilia?'<span style="color:'+(CATC[x.catDom]||'#388bfd')+';font-weight:700">'+esc(x.catDom)+'</span>':(x.catComun?'<span style="color:#8b949e">común</span>':'<span style="color:#6e7681">—</span>');
+    var sedeTxt = x.mismaSedeDom?'<span style="color:#22d3ee;font-weight:700">'+esc(x.sedeDom||'')+'</span>':(x.sedeComun?'<span style="color:#8b949e">común</span>':'<span style="color:#6e7681">—</span>');
+    return '<tr style="border-top:1px solid #21262d">'+
+      '<td style="padding:8px 12px;font-weight:700;color:#f0f6ff;white-space:nowrap">'+esc(x.nombre)+'</td>'+
+      '<td style="padding:8px 12px;text-align:center"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="flex:1;max-width:60px;height:6px;background:#0d1117;border-radius:20px;overflow:hidden"><div style="width:'+x.pct+'%;height:100%;background:'+barColor+'"></div></div><span style="font-weight:800;color:'+barColor+';min-width:34px;text-align:right">'+x.pct+'%</span></div></td>'+
+      '<td style="padding:8px 12px;text-align:center;color:#3fb950;font-weight:700">'+x.libres+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;color:#f0b429;font-weight:700">'+x.compatibles+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;color:#f85149;font-weight:700">'+x.topes+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;font-size:10px">'+afin+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;font-size:10px">'+sedeTxt+'</td>'+
+      '<td style="padding:8px 12px;text-align:center;color:#8b949e">'+x.ses+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var tabla=
+    '<div style="margin-top:18px;border:1px solid #21262d;border-radius:10px;overflow:hidden">'+
+      '<div style="padding:10px 14px;background:#161b22;font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.3px">Ranking completo de cobertura</div>'+
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'+
+        '<thead><tr style="background:#0d1117">'+
+          '<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Candidata</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Cobertura</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#3fb950;text-transform:uppercase">Días libres</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Compat.</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#f85149;text-transform:uppercase">Topes</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Afinidad</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Sede</th>'+
+          '<th style="padding:8px 12px;text-align:center;font-size:9px;font-weight:700;color:#8b949e;text-transform:uppercase">Carga</th>'+
+        '</tr></thead><tbody>'+filas+'</tbody>'+
+      '</table></div>'+
+    '</div>';
+
+  // Leyenda
+  var leyenda=
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:#8b949e">'+
+      '<span><b style="color:#3fb950">Días libres</b>: la candidata no tiene clases ese día → disponible.</span>'+
+      '<span><b style="color:#f0b429">Compatibles</b>: tiene clases pero sin choque de horario.</span>'+
+      '<span><b style="color:#f85149">Topes</b>: su horario choca → no puede cubrir ese día.</span>'+
+    '</div>';
+
+  wrap.innerHTML=head+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">'+cards+'</div>'+
+    tabla+leyenda;
+}
+
+/* Exportar cobertura a Excel */
+function _coordCovExcel(){
+  if(typeof XLSX==='undefined'){ if(typeof showToast==='function')showToast('XLSX no disponible','err'); return; }
+  var res=_coordCalcCobertura(_coordCovSel);
+  if(!res||!res.candidatas.length){ if(typeof showToast==='function')showToast('Sin datos de cobertura','err'); return; }
+  var rows=res.candidatas.map(function(x){
+    return {
+      'Coordinadora ausente':res.ausente,
+      'Candidata a cubrir':x.nombre,
+      'Cobertura %':x.pct,
+      'Dias libres':x.libres,
+      'Dias compatibles':x.compatibles,
+      'Dias con tope':x.topes,
+      'Misma familia':x.mismaFamilia?'Si':'No',
+      'Categoria en comun':x.catComun?'Si':'No',
+      'Misma sede':x.mismaSedeDom?'Si':(x.sedeComun?'Comun':'No'),
+      'Carga propia (ses)':x.ses,
+      'Dias a cubrir':res.totalDias,
+      'Periodo desde':_covFmtISO(res.desde||res.minISO),
+      'Periodo hasta':_covFmtISO(res.hasta||res.maxISO)
+    };
+  });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:26},{wch:26},{wch:12},{wch:12},{wch:16},{wch:14},{wch:14},{wch:16},{wch:14},{wch:16},{wch:14},{wch:14},{wch:14}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Cobertura');
+  XLSX.writeFile(wb,'Cobertura_'+String(res.ausente).replace(/[^a-zA-Z0-9]+/g,'_')+'.xlsx');
+  if(typeof showToast==='function')showToast('Cobertura exportada','ok');
+}
+
 function updCoord() {
+
   let df = (typeof _coordAllUnitsDF==='function') ? _coordAllUnitsDF() : getDF();
   // Aplicar filtros
   const sy=getDF_sel('cYear'),sm=getDF_sel('cMes'),ss=getDF_sel('cSede');
@@ -5864,8 +6171,40 @@ function updCoord() {
     if(r['SEDE'])     cd.coords[co].sedes.add(r['SEDE']);
   });
 
+  // ── Cobertura: datos enriquecidos por coordinadora ──
+  // Para cada coord: días (fecha -> [{ini,fin,prog,sede}]), categorías, sedes, carga
+  var covData = {};
+  df.forEach(function(r){
+    var co=r['COORDINADORA RESPONSABLE']; var d=r['DIAS/FECHAS'];
+    if(!co) return;
+    if(!covData[co]) covData[co]={nombre:co, dias:{}, cats:{}, sedes:{}, ses:0, progs:new Set()};
+    var m=covData[co]; m.ses++;
+    if(r['PROGRAMA']){ m.progs.add(r['PROGRAMA']); var cat=_coordCategoria(r['PROGRAMA']); m.cats[cat]=(m.cats[cat]||0)+1; }
+    if(r['SEDE']) m.sedes[r['SEDE']]=(m.sedes[r['SEDE']]||0)+1;
+    var dNorm=_covToDate(d);
+    if(dNorm){
+      var k=fmtDate(dNorm);
+      if(!m.dias[k]) m.dias[k]={fecha:dNorm, slots:[]};
+      var hor=(typeof _docParseHorario==='function')?_docParseHorario(r['HORARIO']):null;
+      m.dias[k].slots.push({ini:hor?hor.ini:null, fin:hor?hor.fin:null, prog:r['PROGRAMA']||'', sede:r['SEDE']||''});
+    }
+  });
+  // Categoría dominante y sede dominante por coord
+  Object.keys(covData).forEach(function(co){
+    var m=covData[co];
+    var catE=Object.entries(m.cats).sort(function(a,b){return b[1]-a[1];});
+    m.catDom = catE.length?catE[0][0]:'Curso';
+    m.catSet = new Set(Object.keys(m.cats));
+    var sedeE=Object.entries(m.sedes).sort(function(a,b){return b[1]-a[1];});
+    m.sedeDom = sedeE.length?sedeE[0][0]:'';
+    m.sedeSet = new Set(Object.keys(m.sedes));
+    m.nDias = Object.keys(m.dias).length;
+  });
+  window._coordCovData = covData;
+
   _coordRenderRadar();
   _coordRenderCalendario();
+  _coordRenderCobertura();
 
   // ── Gráfico días ─────────────────────────────────────────────
   const top25 = Object.values(diaMap).sort((a,b)=>b.progs.size-a.progs.size).slice(0,25);
@@ -17160,7 +17499,7 @@ var _ch = {
   activePeriods: [], progActivePeriods: [],
   totals: {}, tipos: [], programas: [], progMaps: {}, changed: [], docentes: [],
   vista: 'resumen',  // resumen | programas | tabla | docentes
-  filtEstado: '', filtEstados: [], filtTipo: '', filtProg: '', buscar: '',
+  filtEstado: '', filtEstados: [], filtTipo: '', filtProg: '', buscar: '', catSel:'', ordCambios:'deltaAbs', respBuscar:'',
   topN: 20, progSel: [],
   docBuscar: '', docTipo: '', docOrder: '', docLimit: 30,
   agrFiltTipo: '', agrFiltProg: '', agrBuscar: '', agrSoloNoReal: false
@@ -18362,7 +18701,7 @@ function _chHandleFile(file) {
         _ch.allKeys = allKeys;
         _ch.periodDates = periodDates;
         _ch.activePeriods = allKeys.slice();      // todos activos
-        _ch.filtEstado=''; _ch.filtEstados=[]; _ch.filtTipo=''; _ch.filtProg=''; _ch.buscar='';
+        _ch.filtEstado=''; _ch.filtEstados=[]; _ch.filtTipo=''; _ch.filtProg=''; _ch.buscar=''; _ch.catSel=''; _ch.ordCambios='deltaAbs'; _ch.respBuscar='';
         _ch.topN = 20; _ch.progSel = []; _ch.progActivePeriods = allKeys.slice();
         _ch.docBuscar=''; _ch.docTipo=''; _ch.docOrder=realKeys[realKeys.length-1]||'ppt'; _ch.docLimit=30;
         _ch.vista = 'resumen';
@@ -18498,7 +18837,213 @@ function _chPersNice(p){
   var user=String(p).split('@')[0];
   return user.split(/[._\-]+/).map(function(w){return w?w.charAt(0).toUpperCase()+w.slice(1):'';}).join(' ');
 }
+/* ══════════════════════════════════════════════════════════════
+   RESPONSABLES SPA — quién modificó en SPA y su impacto vs PPT
+══════════════════════════════════════════════════════════════ */
+/* Cruza cada actividad con: horas PPT, horas último REAL, responsable, fecha y descripción del cambio.
+   Devuelve la lista de actividades con delta (SPA vs PPT) + un agrupado por persona. */
+function _chSPACambios(){
+  var pptKey=_ch.pptKey, realKeys=_ch.realKeys;
+  var lastRk=realKeys[realKeys.length-1];
+  // Mapa por id/nombre de la fila con mejor info de modificación
+  var info={};
+  (_ch.rows||[]).forEach(function(r){
+    var key=(r.id!=null&&r.id!=='')?('id:'+r.id):('nm:'+(r.nombre||''));
+    if(key==='nm:') return;
+    var pc=_chParseFC(r.fechaMod); var fd=pc.d;
+    var pers=(r.modPor||pc.persona||'').trim();
+    if(!info[key]) info[key]={persona:pers, fechaD:fd, fecha:r.fechaMod, cambios:r.cambios||''};
+    else{
+      if(fd && (!info[key].fechaD || fd>info[key].fechaD)){ info[key].fechaD=fd; info[key].fecha=r.fechaMod; if(pers) info[key].persona=pers; if(r.cambios) info[key].cambios=r.cambios; }
+      if(!info[key].persona && pers) info[key].persona=pers;
+      if(!info[key].cambios && r.cambios) info[key].cambios=r.cambios;
+    }
+  });
+  // Recorrer las actividades con cambio detectado y anexar delta + responsable
+  var acts=(_ch.changed||[]).map(function(ch){
+    var key=(ch.id!=null&&ch.id!=='')?('id:'+ch.id):('nm:'+(ch.nombre||''));
+    var meta=info[key]||{};
+    var ppt = ch.ppt;                              // horas presupuestadas (puede ser null si es nuevo)
+    var real = _chUltimoValor(ch, realKeys);       // horas vigentes en el último corte real
+    var delta = (real||0) - (ppt||0);
+    return {
+      id:ch.id, nombre:ch.nombre, tipo:ch.tipo, programa:ch.programa, cc:ch.cc,
+      estado:ch.estado, ppt:ppt, real:real, delta:delta,
+      persona:meta.persona||'', fechaD:meta.fechaD||null, fecha:meta.fecha||null, cambios:meta.cambios||''
+    };
+  });
+  return acts;
+}
+
+/* Agrupa los cambios SPA por responsable */
+function _chSPAporPersona(){
+  var acts=_chSPACambios();
+  var byP={};
+  acts.forEach(function(a){
+    var p=a.persona||'(sin responsable)';
+    if(!byP[p]) byP[p]={persona:p, n:0, aum:0, dis:0, nuevos:0, elim:0, sumAum:0, sumDis:0, ultima:null, acts:[]};
+    var g=byP[p]; g.n++; g.acts.push(a);
+    if(/nuevo|solo en real/i.test(a.estado)) g.nuevos++;
+    if(/eliminado/i.test(a.estado)) g.elim++;
+    if(a.delta>0){ g.aum++; g.sumAum+=a.delta; }
+    else if(a.delta<0){ g.dis++; g.sumDis+=a.delta; }
+    if(a.fechaD && (!g.ultima || a.fechaD>g.ultima)) g.ultima=a.fechaD;
+  });
+  var arr=Object.keys(byP).map(function(k){return byP[k];});
+  // ordenar: más actividades modificadas primero
+  arr.sort(function(a,b){ return b.n-a.n; });
+  return arr;
+}
+
+/* ── Vista: Cambios por Responsable (SPA vs PPT) ── */
+function _chVistaResponsables(el){
+  var acts=_chSPACambios();
+  var conResp=acts.filter(function(a){return a.persona;}).length;
+  if(!acts.length){
+    el.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:26px;text-align:center;color:var(--t3);font-size:12px">No hay actividades con cambios entre PPT y los cortes REAL.</div>';
+    return;
+  }
+  var grupos=_chSPAporPersona();
+  var totMod=acts.length;
+  var totAum=acts.filter(function(a){return a.delta>0;}).length;
+  var totDis=acts.filter(function(a){return a.delta<0;}).length;
+  var sinResp=acts.filter(function(a){return !a.persona;}).length;
+
+  // Guía + KPIs
+  var guia=
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-left:4px solid #a78bfa;border-radius:9px;padding:11px 15px;margin-bottom:14px;font-size:11.5px;color:var(--t2);line-height:1.6">'+
+      '<b style="color:var(--t1)">👤 Quién cambió qué respecto al presupuesto.</b> Esta vista responde: de las diferencias entre el <b style="color:#388bfd">PPT</b> y lo que hoy está en <b style="color:#3fb950">SPA</b> (último corte real), <b>quién es responsable de cada cambio</b>. '+
+      'Cada tarjeta es una persona: cuántas actividades tocó, cuántas horas agregó o quitó frente al presupuesto, y cuándo fue su última modificación. Haz clic en una tarjeta para ver el detalle.'+
+      (conResp===0?'<div style="margin-top:8px;color:#f0b429"><b>⚠ Ojo:</b> el reporte cargado no trae la columna de responsable (“Modificado por”), así que los cambios aparecen agrupados como “sin responsable”. Vuelve a exportar el SPA incluyendo esa columna para ver los nombres.</div>':'')+
+    '</div>';
+
+  var kpis=
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">'+
+      [
+        {ico:'🔄',lbl:'Actividades cambiadas',val:totMod,c:'#a78bfa'},
+        {ico:'👥',lbl:'Responsables',val:grupos.filter(function(g){return g.persona!=='(sin responsable)';}).length,c:'#388bfd'},
+        {ico:'▲',lbl:'Con más horas',val:totAum,c:'#3fb950'},
+        {ico:'▼',lbl:'Con menos horas',val:totDis,c:'#f85149'},
+        {ico:'❓',lbl:'Sin responsable',val:sinResp,c:sinResp?'#f0b429':'#3fb950'}
+      ].map(function(k){
+        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-left:3px solid '+k.c+'">'+
+          '<div style="font-size:14px;margin-bottom:2px">'+k.ico+'</div>'+
+          '<div style="font-size:22px;font-weight:900;color:'+k.c+';line-height:1">'+k.val+'</div>'+
+          '<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;margin-top:3px">'+k.lbl+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+
+  // Buscador
+  var buscador=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+
+      '<input type="text" id="chRespSearch" placeholder="🔍 Buscar responsable o actividad..." value="'+esc(_ch.respBuscar||'')+'" style="flex:1;min-width:220px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
+      '<button onclick="_chResponsablesExcel()" style="padding:7px 14px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">📊 Exportar</button>'+
+    '</div>';
+
+  el.innerHTML=guia+kpis+buscador+'<div id="chRespWrap"></div>';
+  var inp=document.getElementById('chRespSearch'); if(inp) inp.oninput=function(){ _ch.respBuscar=this.value; clearTimeout(window._chRespT); window._chRespT=setTimeout(_chFillResponsables,150); };
+  _chFillResponsables();
+}
+
+function _chFillResponsables(){
+  var wrap=document.getElementById('chRespWrap'); if(!wrap) return;
+  var q=(_ch.respBuscar||'').toLowerCase().trim();
+  var grupos=_chSPAporPersona();
+  if(q){
+    grupos=grupos.filter(function(g){
+      if(_chPersNice(g.persona).toLowerCase().indexOf(q)>=0 || g.persona.toLowerCase().indexOf(q)>=0) return true;
+      return g.acts.some(function(a){ return String(a.nombre).toLowerCase().indexOf(q)>=0; });
+    });
+  }
+  if(!grupos.length){ wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">Sin resultados.</div>'; return; }
+
+  wrap.innerHTML=grupos.map(function(g,gi){
+    var nombre=g.persona==='(sin responsable)'?'<span style="color:#f0b429">❓ Sin responsable</span>':('👤 '+esc(_chPersNice(g.persona)||g.persona));
+    var netd=g.sumAum+g.sumDis;
+    var ultTxt=g.ultima?_chFmtFechaHora(g.ultima):'—';
+    // actividades del grupo (aplicando búsqueda de actividad)
+    var actsF=g.acts.slice();
+    if(q){ var aq=actsF.filter(function(a){return String(a.nombre).toLowerCase().indexOf(q)>=0;}); if(aq.length && _chPersNice(g.persona).toLowerCase().indexOf(q)<0 && g.persona.toLowerCase().indexOf(q)<0) actsF=aq; }
+    actsF.sort(function(a,b){ return Math.abs(b.delta)-Math.abs(a.delta); });
+    var filas=actsF.map(function(a){
+      var dc = a.delta>0?'#3fb950':a.delta<0?'#f85149':'var(--t3)';
+      var dtxt = a.delta>0?('▲ +'+_chFmt(a.delta)):a.delta<0?('▼ '+_chFmt(a.delta)):'=';
+      return '<tr style="border-top:1px solid var(--border)">'+
+        '<td style="padding:6px 10px;color:var(--t1);font-weight:600;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(a.nombre)+'">'+esc(a.nombre)+'</td>'+
+        '<td style="padding:6px 10px;color:var(--t3);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escA(a.programa)+'">'+esc(a.programa)+'</td>'+
+        '<td style="padding:6px 10px;text-align:right;color:#388bfd;font-variant-numeric:tabular-nums">'+(a.ppt!=null?_chFmt(a.ppt):'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:right;color:#3fb950;font-weight:700;font-variant-numeric:tabular-nums">'+(a.real!=null?_chFmt(a.real):'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:right;font-weight:800;color:'+dc+';font-variant-numeric:tabular-nums">'+dtxt+'</td>'+
+        '<td style="padding:6px 10px"><span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:7px;background:var(--surface2);color:var(--t3);white-space:nowrap">'+esc(a.estado)+'</span></td>'+
+        '<td style="padding:6px 10px;color:var(--t3);white-space:nowrap;font-size:10px">'+(a.fechaD?_chFmtFechaHora(a.fechaD):'—')+'</td>'+
+        '<td style="padding:6px 10px">'+(a.cambios?'<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:7px;background:#a78bfa22;color:#a78bfa;border:1px solid #a78bfa44">'+esc(a.cambios)+'</span>':'<span style="color:var(--t4)">—</span>')+'</td>'+
+      '</tr>';
+    }).join('');
+    var open = gi===0;   // primera tarjeta abierta
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:12px">'+
+      '<div onclick="var b=this.nextElementSibling;var c=this.querySelector(\'.rcaret\');b.style.display=b.style.display===\'none\'?\'block\':\'none\';c.style.transform=b.style.display===\'none\'?\'\':\'rotate(90deg)\'" style="padding:12px 15px;background:var(--surface2);cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
+        '<span class="rcaret" style="font-size:11px;color:var(--t4);transition:transform .18s;'+(open?'transform:rotate(90deg)':'')+'">▶</span>'+
+        '<span style="font-size:14px;font-weight:900;color:var(--t1)">'+nombre+'</span>'+
+        '<span style="font-size:11px;font-weight:700;color:#a78bfa;background:#a78bfa18;border-radius:20px;padding:3px 11px">'+g.n+' cambio(s)</span>'+
+        '<div style="display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;align-items:center;font-size:11px">'+
+          (g.aum?'<span style="color:#3fb950;font-weight:700">▲ '+g.aum+' (+'+_chFmtK(g.sumAum)+'h)</span>':'')+
+          (g.dis?'<span style="color:#f85149;font-weight:700">▼ '+g.dis+' ('+_chFmtK(g.sumDis)+'h)</span>':'')+
+          (g.nuevos?'<span style="color:#22d3ee;font-weight:700">🆕 '+g.nuevos+'</span>':'')+
+          (g.elim?'<span style="color:#fb923c;font-weight:700">🗑 '+g.elim+'</span>':'')+
+          '<span style="color:var(--t3)">Neto: <b style="color:'+(netd>=0?'#3fb950':'#f85149')+'">'+(netd>=0?'+':'')+_chFmtK(netd)+'h</b></span>'+
+          '<span style="color:var(--t4);font-size:10px">últ: '+ultTxt+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:'+(open?'block':'none')+';overflow:auto;max-height:400px">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+          '<thead style="position:sticky;top:0"><tr style="background:var(--surface2)">'+
+            '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Actividad</th>'+
+            '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Programa</th>'+
+            '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:#388bfd;text-transform:uppercase">PPT</th>'+
+            '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:#3fb950;text-transform:uppercase">SPA (real)</th>'+
+            '<th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Δ vs PPT</th>'+
+            '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Estado</th>'+
+            '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:#f0b429;text-transform:uppercase">Fecha cambio</th>'+
+            '<th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:#a78bfa;text-transform:uppercase">Detalle</th>'+
+          '</tr></thead><tbody>'+filas+'</tbody>'+
+        '</table>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function _chResponsablesExcel(){
+  if(typeof XLSX==='undefined'){ showToast('XLSX no disponible','err'); return; }
+  var acts=_chSPACambios();
+  if(!acts.length){ showToast('No hay cambios para exportar','err'); return; }
+  var rows=acts.map(function(a){
+    return {
+      'Responsable': _chPersNice(a.persona)||a.persona||'(sin responsable)',
+      'Actividad': a.nombre,
+      'Tipo': a.tipo,
+      'Programa': a.programa,
+      'CC': a.cc,
+      'Horas PPT': a.ppt!=null?Math.round(a.ppt*10)/10:'',
+      'Horas SPA (real)': a.real!=null?Math.round(a.real*10)/10:'',
+      'Delta vs PPT': Math.round(a.delta*10)/10,
+      'Estado': a.estado,
+      'Fecha de cambio': a.fechaD?_chFmtFechaHora(a.fechaD):'',
+      'Detalle del cambio': a.cambios
+    };
+  });
+  // ordenar por responsable y magnitud
+  rows.sort(function(a,b){ return String(a.Responsable).localeCompare(String(b.Responsable),'es') || Math.abs(b['Delta vs PPT'])-Math.abs(a['Delta vs PPT']); });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:24},{wch:46},{wch:24},{wch:30},{wch:10},{wch:11},{wch:14},{wch:12},{wch:24},{wch:18},{wch:30}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Responsables SPA');
+  XLSX.writeFile(wb,'ControlHoras_ResponsablesSPA_'+new Date().toISOString().substring(0,10)+'.xlsx');
+  showToast('Cambios por responsable exportados','ok');
+}
+
 function _chVistaModif(el){
+
   var list=_chModifList();
   var conFecha=list.filter(function(x){return x.fechaD;}).length;
   var conPers=list.filter(function(x){return x.persona;}).length;
@@ -18873,14 +19418,15 @@ function _chRender(){
         '<span style="margin-left:auto;font-size:10px;font-weight:400;color:var(--t3)">clic para ver la guía</span>'+
       '</summary>'+
       '<div style="padding:0 16px 14px;font-size:11.5px;color:var(--t2);line-height:1.6">'+
-        '<p style="margin-bottom:10px">Comparas el <b style="color:#388bfd">PPT</b> (lo presupuestado) contra cada <b style="color:#3fb950">corte REAL</b> que sacaste por fecha. Los KPIs de arriba muestran el total de horas de cada corte y cuánto varió respecto al anterior. Con los <b>chips de período</b> eliges qué cortes comparar en los gráficos y tablas.</p>'+
+        '<p style="margin-bottom:10px"><b style="color:var(--t1)">Objetivo:</b> tener claridad de <b style="color:#a78bfa">quién ha hecho cambios en SPA</b> respecto a lo presupuestado. Comparas el <b style="color:#388bfd">PPT</b> (presupuesto) contra cada <b style="color:#3fb950">corte REAL de SPA</b> que sacaste por fecha, y la pestaña <b style="color:#a78bfa">👤 Quién cambió</b> te dice qué responsable modificó cada actividad y su impacto en horas. Con los <b>chips de período</b> eliges qué cortes comparar.</p>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px">'+
           [
             ['📊 Resumen','Gráficos de horas por tipo de actividad y la variación neta (último REAL − PPT).'],
             ['🏛 Top Programas','Qué programas concentran más horas y cómo cambian entre cortes.'],
-            ['🔄 Cambios','El corazón: cada actividad cuyas horas variaron, con el valor en cada período y qué corte a corte cambió.'],
+            ['🔄 Cambios','Cada actividad cuyas horas variaron, con el valor en cada período y qué corte a corte cambió.'],
+            ['👤 Quién cambió (SPA vs PPT)','⭐ El objetivo: agrupa los cambios por responsable — quién modificó qué en SPA y cuántas horas agregó o quitó frente al PPT.'],
             ['👨‍🏫 Carga Docentes','Total de horas por docente según los cortes reales (reparte las horas cuando hay varios profesores).'],
-            ['🕓 Modificaciones','Quién modificó, qué cambió y cuándo — si el reporte trae esas columnas.'],
+            ['🕓 Bitácora de cambios','Listado cronológico: qué actividad se modificó, cuándo y por quién — tal como viene en el reporte.'],
             ['🆕 Cursos Agregados','Actividades que no venían en el PPT y aparecieron en cortes posteriores.']
           ].map(function(x){return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 10px"><b style="color:var(--t1)">'+esc(x[0])+'</b><div style="color:var(--t3);font-size:10.5px;margin-top:2px">'+esc(x[1])+'</div></div>';}).join('')+
         '</div>'+
@@ -18894,8 +19440,9 @@ function _chRender(){
         {k:'resumen',  l:'📊 Resumen'},
         {k:'programas',l:'🏛 Top Programas'},
         {k:'tabla',    l:'🔄 Cambios ('+_ch.changed.length+')'},
+        {k:'responsables', l:'👤 Quién cambió (SPA vs PPT)'},
         {k:'docentes', l:'👨‍🏫 Carga Docentes ('+_ch.docentes.length+')'},
-        {k:'modif', l:'🕓 Modificaciones'},
+        {k:'modif', l:'🕓 Bitácora de cambios'},
         {k:'agregados', l:'🆕 Cursos Agregados'}
       ].map(function(t){
         var on = _ch.vista === t.k;
@@ -18924,6 +19471,7 @@ function _chRenderVista(){
   if (_ch.vista === 'programas') return _chVistaProgramas(el);
   if (_ch.vista === 'tabla')     return _chVistaTabla(el);
   if (_ch.vista === 'docentes')  return _chVistaDocentes(el);
+  if (_ch.vista === 'responsables') return _chVistaResponsables(el);
   if (_ch.vista === 'modif')     return _chVistaModif(el);
   if (_ch.vista === 'agregados') return _chVistaAgregados(el);
 }
@@ -19135,30 +19683,60 @@ function _chToggleEstado(i){
 }
 
 function _chVistaTabla(el){
-  var estados = [...new Set(_ch.changed.map(function(r){ return r.estado; }))].sort();
-  var tipos = [...new Set(_ch.changed.map(function(r){ return r.tipo; }).filter(Boolean))].sort();
-  var progs = [...new Set(_ch.changed.map(function(r){ return r.programa; }).filter(Boolean))].sort();
-  var selS = 'padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  var realKeys=_ch.realKeys, pptKey=_ch.pptKey;
+  var lastRk=realKeys[realKeys.length-1];
 
-  _ch._estadosList = estados;
-  var bajasSem = _chBajasSemestre();
-  var soloPPT = _chSoloPPT();
-  var bannerEsp = (bajasSem.length || soloPPT.length) ?
-    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
-      (bajasSem.length ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 13px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:8px;font-size:11px;color:var(--t1)"><span style="font-size:14px">📉</span><span><b style="color:#f85149">'+bajasSem.length+'</b> curso(s) estuvieron en el <b>1er semestre</b> ('+esc(_ch.realKeys[0])+') y ya no están en el <b>2do semestre</b> ('+esc(_ch.realKeys[_ch.realKeys.length-1])+')</span></div>' : '')+
-      (soloPPT.length ? '<div style="display:flex;align-items:center;gap:8px;padding:8px 13px;background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.3);border-radius:8px;font-size:11px;color:var(--t1)"><span style="font-size:14px">📋</span><span><b style="color:#f0b429">'+soloPPT.length+'</b> curso(s) estuvieron en el <b>PPT</b> y no aparecen en ningún semestre (REAL)</span></div>' : '')+
-    '</div>' : '';
-  var guiaCambios=
-    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:var(--t2);line-height:1.55">'+
-      '<b style="color:var(--t1)">🔄 Aquí ves solo las actividades que cambiaron</b> entre el PPT y los cortes reales (las que se mantuvieron idénticas no aparecen). '+
-      'Cada actividad muestra sus horas en <b style="color:#388bfd">PPT</b> y en cada <b style="color:#3fb950">REAL</b>; las columnas <b style="color:#a78bfa">Δ</b> indican cuánto subió (▲) o bajó (▼) de un corte al siguiente. '+
-      'La etiqueta de <b>Estado</b> resume qué pasó: cambió horas, se agregó, se eliminó o solo quedó en PPT. Usa los chips de <b>Estados</b> para filtrar por tipo de cambio.'+
+  // Clasificación simple de cada cambio (para tarjetas-resumen y filtro rápido)
+  var cats={subio:[],bajo:[],nueva:[],elim:[],soloppt:[]};
+  _ch.changed.forEach(function(r){
+    var real=_chUltimoValor(r,realKeys);
+    var ppt=r.ppt;
+    if(ppt===null){ // no estaba en PPT
+      if(r.periods[lastRk]==null) cats.elim.push(r); // apareció y luego se fue
+      else cats.nueva.push(r);
+    } else if(ppt!==null && r.periods[lastRk]==null && realKeys.some(function(rk){return r.periods[rk]!=null;})){
+      cats.elim.push(r); // tenía PPT, estuvo en real, ya no está
+    } else if(ppt!==null && realKeys.every(function(rk){return r.periods[rk]==null;})){
+      cats.soloppt.push(r); // quedó solo en PPT
+    } else {
+      var d=(real||0)-(ppt||0);
+      if(d>0) cats.subio.push(r); else if(d<0) cats.bajo.push(r); else cats.subio.push(r); // igual pero cambió intermedio → lo dejamos en subió(0)
+    }
+  });
+  _ch._cats=cats;
+
+  var selS='padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;cursor:pointer';
+  var tipos=[...new Set(_ch.changed.map(function(r){return r.tipo;}).filter(Boolean))].sort();
+  var progs=[...new Set(_ch.changed.map(function(r){return r.programa;}).filter(Boolean))].sort();
+
+  // Tarjetas-resumen (clic = filtro rápido)
+  function card(key,ico,lbl,arr,col,sub){
+    var on=_ch.catSel===key;
+    return '<div onclick="_ch.catSel=(_ch.catSel===\''+key+'\'?\'\':\''+key+'\');_chFillTabla();_chSyncCatCards()" data-cat="'+key+'" '+
+      'style="cursor:pointer;flex:1;min-width:130px;background:'+(on?col+'18':'var(--surface)')+';border:1px solid '+(on?col:'var(--border)')+';border-left:3px solid '+col+';border-radius:10px;padding:11px 13px;transition:all .12s">'+
+      '<div style="font-size:14px;margin-bottom:2px">'+ico+'</div>'+
+      '<div style="font-size:23px;font-weight:900;color:'+col+';line-height:1">'+arr.length+'</div>'+
+      '<div style="font-size:9.5px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.3px;margin-top:3px">'+lbl+'</div>'+
+      '<div style="font-size:9px;color:var(--t3);margin-top:1px">'+sub+'</div>'+
     '</div>';
-  el.innerHTML = bannerEsp+ guiaCambios+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
-      '<span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-right:2px">Estados:</span>'+
-      '<div id="chEstadoChips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+_chEstadoChipsHTML()+'</div>'+
-    '</div>'+
+  }
+  function sumDelta(arr){ return arr.reduce(function(a,r){ return a+((_chUltimoValor(r,realKeys)||0)-(r.ppt||0)); },0); }
+  var cardsHtml=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      card('subio','▲','Subieron horas',cats.subio,'#3fb950','+'+_chFmtK(sumDelta(cats.subio))+'h vs PPT')+
+      card('bajo','▼','Bajaron horas',cats.bajo,'#f85149',_chFmtK(sumDelta(cats.bajo))+'h vs PPT')+
+      card('nueva','🆕','Nuevas (no estaban en PPT)',cats.nueva,'#22d3ee','+'+_chFmtK(cats.nueva.reduce(function(a,r){return a+(_chUltimoValor(r,realKeys)||0);},0))+'h')+
+      card('elim','🗑','Eliminadas',cats.elim,'#fb923c','ya no están en el último corte')+
+      card('soloppt','📋','Solo en PPT',cats.soloppt,'#f0b429','presupuestadas, nunca en real')+
+    '</div>';
+
+  var guia=
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;color:var(--t2);line-height:1.6">'+
+      '<b style="color:var(--t1)">🔄 Qué cambió entre el presupuesto y hoy.</b> Cada fila es una actividad que <b>cambió</b> entre el <b style="color:#388bfd">PPT</b> (lo presupuestado) y el <b style="color:#3fb950">último corte real</b>. '+
+      'Ves <b>de cuánto era → a cuánto es</b> y la diferencia. Haz clic en una fila para ver el detalle corte por corte. Usa las <b>tarjetas de arriba</b> para filtrar (ej: solo las que subieron).'+
+    '</div>';
+
+  el.innerHTML = cardsHtml + guia +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
       '<select onchange="_ch.filtTipo=this.value;_chFillTabla()" style="'+selS+'">'+
         '<option value="">Todos los tipos</option>'+
@@ -19168,9 +19746,12 @@ function _chVistaTabla(el){
         '<option value="">Todos los programas</option>'+
         progs.map(function(p){ return '<option value="'+esc(p)+'"'+(p===_ch.filtProg?' selected':'')+'>'+esc(p)+'</option>'; }).join('')+
       '</select>'+
+      '<select onchange="_ch.ordCambios=this.value;_chFillTabla()" style="'+selS+'">'+
+        [['delta','Mayor cambio (horas)'],['deltaAbs','Mayor cambio absoluto'],['nombre','Nombre A→Z'],['prog','Programa']].map(function(o){ return '<option value="'+o[0]+'"'+((_ch.ordCambios||'deltaAbs')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+
+      '</select>'+
       '<input type="text" id="chSearchIn" placeholder="🔍 Buscar actividad..." value="'+esc(_ch.buscar)+'" '+
         'style="flex:1;min-width:160px;padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--t1);font-size:11px;outline:none">'+
-      '<button onclick="_ch.filtEstado=\'\';_ch.filtEstados=[];_ch.filtTipo=\'\';_ch.filtProg=\'\';_ch.buscar=\'\';_chRenderVista()" style="'+selS+';color:var(--t3)">✕ Limpiar</button>'+
+      '<button onclick="_ch.catSel=\'\';_ch.filtTipo=\'\';_ch.filtProg=\'\';_ch.buscar=\'\';_chVistaTabla(document.getElementById(\'chBody\'))" style="'+selS+';color:var(--t3)">✕ Limpiar</button>'+
       '<span id="chTablaCount" style="font-size:11px;color:var(--t3);font-weight:700"></span>'+
       '<span style="width:1px;height:22px;background:var(--border)"></span>'+
       '<button onclick="_chTablaExcel()" title="Descargar esta tabla (con filtros aplicados) en Excel" style="padding:7px 13px;border-radius:7px;border:1px solid #3fb950;background:rgba(63,185,80,.1);color:#3fb950;font-size:11px;font-weight:800;cursor:pointer">📊 XLSX</button>'+
@@ -19178,12 +19759,19 @@ function _chVistaTabla(el){
     '</div>'+
     '<div id="chTablaWrap"></div>';
 
-  var inp = document.getElementById('chSearchIn');
-  if (inp) inp.oninput = function(){ _ch.buscar=this.value; clearTimeout(window._chT); window._chT=setTimeout(_chFillTabla,150); };
+  var inp=document.getElementById('chSearchIn');
+  if(inp) inp.oninput=function(){ _ch.buscar=this.value; clearTimeout(window._chT); window._chT=setTimeout(_chFillTabla,150); };
   _chFillTabla();
 }
+function _chSyncCatCards(){
+  document.querySelectorAll('[data-cat]').forEach(function(elc){
+    var k=elc.getAttribute('data-cat'); var on=_ch.catSel===k;
+    var col=({subio:'#3fb950',bajo:'#f85149',nueva:'#22d3ee',elim:'#fb923c',soloppt:'#f0b429'})[k]||'#388bfd';
+    elc.style.background=on?col+'18':'var(--surface)';
+    elc.style.borderColor=on?col:'var(--border)';
+  });
+}
 
-/* ── Bajas entre semestres: presente en el primer corte (1er semestre) y ausente en el último (2do semestre) ── */
 function _chBajasSemestre(){
   var realKeys=_ch.realKeys;
   if(!realKeys||realKeys.length<2) return [];
@@ -19231,84 +19819,118 @@ function _chAgregadosFRows(){
   return {s1:filt(d.s1), s2:filt(d.s2), all1:d.s1, all2:d.s2};
 }
 function _chTablaFRows(){
-  return _ch.changed.filter(function(r){
-    if (_ch.filtEstados && _ch.filtEstados.length && _ch.filtEstados.indexOf(r.estado) < 0) return false;
+  var realKeys=_ch.realKeys;
+  var base=_ch.changed;
+  // Filtro por tarjeta-categoría seleccionada
+  if(_ch.catSel && _ch._cats && _ch._cats[_ch.catSel]) base=_ch._cats[_ch.catSel];
+  var rows=base.filter(function(r){
     if (_ch.filtTipo && r.tipo !== _ch.filtTipo) return false;
     if (_ch.filtProg && r.programa !== _ch.filtProg) return false;
     if (_ch.buscar && String(r.nombre).toLowerCase().indexOf(_ch.buscar.toLowerCase()) < 0) return false;
     return true;
   });
+  // Orden
+  var ord=_ch.ordCambios||'deltaAbs';
+  function delta(r){ return (_chUltimoValor(r,realKeys)||0)-(r.ppt||0); }
+  rows=rows.slice();
+  if(ord==='delta') rows.sort(function(a,b){return delta(b)-delta(a);});
+  else if(ord==='deltaAbs') rows.sort(function(a,b){return Math.abs(delta(b))-Math.abs(delta(a));});
+  else if(ord==='nombre') rows.sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre),'es');});
+  else if(ord==='prog') rows.sort(function(a,b){return String(a.programa).localeCompare(String(b.programa),'es');});
+  return rows;
 }
 function _chFillTabla(){
-  var wrap = document.getElementById('chTablaWrap'); if (!wrap) return;
-  var realKeys = _ch.realKeys, pptKey = _ch.pptKey;
+  var wrap=document.getElementById('chTablaWrap'); if(!wrap) return;
+  var realKeys=_ch.realKeys, pptKey=_ch.pptKey;
+  var lastRk=realKeys[realKeys.length-1];
+  var rows=_chTablaFRows();
 
-  var rows = _chTablaFRows();
+  var cnt=document.getElementById('chTablaCount');
+  if(cnt) cnt.textContent=rows.length+' de '+_ch.changed.length+' ítems';
 
-  var cnt = document.getElementById('chTablaCount');
-  if (cnt) cnt.textContent = rows.length+' de '+_ch.changed.length+' ítems';
-
-  var maxH = Math.max(1, ..._ch.changed.map(function(r){ return Math.max(r.ppt||0, ...realKeys.map(function(rk){ return r.periods[rk]||0; })); }));
-
-  var headCols = '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Actividad</th>'+
-    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Tipo</th>'+
-    '<th style="padding:8px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Programa</th>'+
-    '<th style="padding:8px 10px;text-align:right;font-size:9px;font-weight:700;color:#388bfd;text-transform:uppercase;background:rgba(56,139,253,.08)">'+_chPLabel(pptKey)+'</th>';
-  realKeys.forEach(function(rk, i){
-    headCols += '<th style="padding:8px 8px;text-align:right;font-size:9px;font-weight:700;color:#a78bfa;text-transform:uppercase;background:rgba(167,139,250,.08)">Δ '+(i===0?'PPT':_chPLabel(realKeys[i-1]))+'→'+_chPLabel(rk)+'</th>'+
-      '<th style="padding:8px 10px;text-align:right;font-size:9px;font-weight:700;color:#3fb950;text-transform:uppercase;background:rgba(63,185,80,.08)">'+_chPLabel(rk)+'</th>';
-  });
-  headCols += '<th style="padding:8px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Estado</th>';
-
-  function cellHoras(v, color){
-    if (v === null || v === undefined) return '<span style="color:var(--t3);font-size:10px">—</span>';
-    var w = Math.max(2, Math.round((v/maxH)*34));
-    return '<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">'+
-      '<div style="width:36px;height:4px;background:rgba(255,255,255,.08);border-radius:2px"><div style="width:'+w+'px;height:4px;border-radius:2px;background:'+color+'"></div></div>'+
-      '<span style="font-variant-numeric:tabular-nums">'+_chFmt(v)+'</span></div>';
+  // Etiqueta simple de estado
+  function estadoSimple(r){
+    var real=_chUltimoValor(r,realKeys), ppt=r.ppt;
+    if(ppt===null){ return r.periods[lastRk]==null ? {t:'Nueva y quitada',c:'#fb923c',ic:'🗑'} : {t:'Nueva',c:'#22d3ee',ic:'🆕'}; }
+    if(realKeys.every(function(rk){return r.periods[rk]==null;})) return {t:'Solo en PPT',c:'#f0b429',ic:'📋'};
+    if(r.periods[lastRk]==null) return {t:'Eliminada',c:'#fb923c',ic:'🗑'};
+    var d=(real||0)-(ppt||0);
+    if(d>0) return {t:'Subió',c:'#3fb950',ic:'▲'};
+    if(d<0) return {t:'Bajó',c:'#f85149',ic:'▼'};
+    return {t:'Reprogramada',c:'#a78bfa',ic:'↔'};
   }
 
-  var barColors = ['#f0b429','#3fb950','#a78bfa','#f85149'];
+  if(!rows.length){
+    wrap.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;text-align:center;color:var(--t3);font-size:12px">Sin resultados con los filtros actuales.</div>';
+    return;
+  }
 
-  wrap.innerHTML =
+  var body=rows.map(function(r,ri){
+    var ppt=r.ppt, real=_chUltimoValor(r,realKeys);
+    var es=estadoSimple(r);
+    var d=(real||0)-(ppt||0);
+    var dc = d>0?'#3fb950':d<0?'#f85149':'var(--t3)';
+    var dtxt = ppt===null?('nueva'):(d>0?('+'+_chFmt(d)):d<0?_chFmt(d):'sin cambio');
+    var pptTxt = ppt===null?'<span style="color:var(--t4)">—</span>':('<b style="color:#388bfd">'+_chFmt(ppt)+'</b>');
+    var realTxt = real==null||(r.periods[lastRk]==null)?'<span style="color:#fb923c;font-weight:700">retirada</span>':('<b style="color:#3fb950">'+_chFmt(real)+'</b>');
+    var rid='chr_'+ri;
+    // Detalle corte por corte (fila expandible)
+    var chain=[{k:_chPLabel(pptKey),v:ppt,col:'#388bfd'}].concat(realKeys.map(function(rk){return {k:_chPLabel(rk),v:r.periods[rk],col:'#3fb950'};}));
+    var detCells=chain.map(function(seg,i){
+      var prev=i>0?chain[i-1].v:null;
+      var dd=(prev!=null&&seg.v!=null)?+(seg.v-prev).toFixed(1):null;
+      var badge = dd==null?'':dd===0?'':('<span style="font-size:9px;font-weight:700;color:'+(dd>0?'#3fb950':'#f85149')+';margin-left:4px">'+(dd>0?'▲+':'▼')+_chFmt(dd)+'</span>');
+      return '<div style="display:flex;flex-direction:column;align-items:center;min-width:78px;padding:6px 8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border)">'+
+        '<div style="font-size:8.5px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">'+esc(seg.k)+'</div>'+
+        '<div style="font-size:14px;font-weight:800;color:'+(seg.v==null?'var(--t4)':seg.col)+';margin-top:2px">'+(seg.v==null?'—':_chFmt(seg.v))+badge+'</div>'+
+      '</div>';
+    }).join('<div style="display:flex;align-items:center;color:var(--t4);font-size:11px">→</div>');
+
+    return '<tbody style="border-bottom:1px solid var(--border)">'+
+      '<tr onclick="var d=document.getElementById(\''+rid+'\');var c=this.querySelector(\'.chcaret\');d.style.display=d.style.display===\'none\'?\'table-row\':\'none\';c.style.transform=d.style.display===\'none\'?\'\':\'rotate(90deg)\'" style="cursor:pointer;'+(ri%2?'':'background:rgba(255,255,255,.012)')+'">'+
+        '<td style="padding:9px 10px;width:20px"><span class="chcaret" style="font-size:10px;color:var(--t4);display:inline-block;transition:transform .18s">▶</span></td>'+
+        '<td style="padding:9px 10px;color:var(--t1);font-weight:600;max-width:280px" title="'+escA(r.nombre)+'">'+esc(String(r.nombre).slice(0,60))+(String(r.nombre).length>60?'…':'')+
+          '<div style="font-size:9.5px;color:var(--t3);margin-top:1px">'+esc((r.programa||'').replace(/^\d+ /,'').slice(0,40))+'</div></td>'+
+        '<td style="padding:9px 10px"><span style="font-size:9px;background:var(--surface2);color:var(--t3);border-radius:4px;padding:2px 6px;white-space:nowrap">'+esc((r.tipo||'—').replace('Actividad de ','').replace(' de Programa','').replace('Actividad ',''))+'</span></td>'+
+        '<td style="padding:9px 12px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums">'+pptTxt+'</td>'+
+        '<td style="padding:9px 6px;text-align:center;color:var(--t4)">→</td>'+
+        '<td style="padding:9px 12px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums">'+realTxt+'</td>'+
+        '<td style="padding:9px 12px;text-align:right"><span style="font-size:13px;font-weight:800;color:'+dc+';font-variant-numeric:tabular-nums">'+dtxt+(ppt!==null&&d!==0?'h':'')+'</span></td>'+
+        '<td style="padding:9px 10px;text-align:center"><span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:8px;background:'+es.c+'20;color:'+es.c+';white-space:nowrap">'+es.ic+' '+es.t+'</span></td>'+
+      '</tr>'+
+      '<tr id="'+rid+'" style="display:none"><td colspan="8" style="padding:0 14px 14px 40px;background:rgba(56,139,253,.02)">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.3px;margin:10px 0 8px">Historial corte por corte</div>'+
+        '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'+detCells+'</div>'+
+        (r.cc?'<div style="font-size:10px;color:var(--t3);margin-top:10px">CC: <b style="color:var(--t2)">'+esc(r.cc)+'</b></div>':'')+
+      '</td></tr>'+
+    '</tbody>';
+  }).join('');
+
+  // Totales
+  var sumPpt=rows.reduce(function(a,r){return a+(r.ppt||0);},0);
+  var sumReal=rows.reduce(function(a,r){return a+(_chUltimoValor(r,realKeys)||0);},0);
+  var net=sumReal-sumPpt;
+
+  wrap.innerHTML=
     '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:64vh">'+
       '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
-        '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+headCols+'</tr></thead><tbody>'+
-        (rows.length ? rows.map(function(r,ri){
-          var b = _chBadge(r.estado);
-          var chain = [r.ppt].concat(realKeys.map(function(rk){ return r.periods[rk]; }));
-          var html = '<tr style="border-bottom:1px solid var(--border);'+(ri%2?'':'background:rgba(255,255,255,.012)')+'">';
-          html += '<td style="padding:7px 10px;color:var(--t1);max-width:230px" title="'+esc(r.nombre)+'">'+esc(String(r.nombre).slice(0,58))+(String(r.nombre).length>58?'…':'')+'</td>';
-          html += '<td style="padding:7px 10px"><span style="font-size:9px;background:var(--surface2);color:var(--t3);border-radius:4px;padding:2px 6px;white-space:nowrap">'+esc((r.tipo||'—').replace('Actividad de ','').replace(' de Programa','').replace('Actividad ',''))+'</span></td>';
-          html += '<td style="padding:7px 10px;color:var(--t3);font-size:10px" title="'+esc(r.programa)+'">'+esc((r.programa||'—').replace(/^\d+ /,'').slice(0,26))+'</td>';
-          html += '<td style="padding:6px 10px;text-align:right;background:rgba(56,139,253,.05)">'+cellHoras(r.ppt,'#388bfd')+'</td>';
-          realKeys.forEach(function(rk, i){
-            var prev = chain[i], curr = chain[i+1];
-            var d = (prev!==null&&curr!==null&&prev!==undefined&&curr!==undefined) ? +(curr-prev).toFixed(1) : null;
-            var changed = d !== null && d !== 0;
-            html += '<td style="padding:6px 8px;text-align:right;'+(changed?'background:rgba(167,139,250,.07)':'')+'">';
-            if (d === null) html += '<span style="color:var(--t3);font-size:10px">—</span>';
-            else if (d === 0) html += '<span style="font-size:10px;color:var(--t3)">=0</span>';
-            else { var dc = d>0?'#3fb950':'#f85149'; html += '<span style="font-size:10px;font-weight:700;color:'+dc+'">'+(d>0?'▲+':'▼')+_chFmt(d)+'</span>'; }
-            html += '</td>';
-            html += '<td style="padding:6px 10px;text-align:right;'+(changed?'background:rgba(63,185,80,.05);font-weight:700':'')+'">'+cellHoras(curr, barColors[i%barColors.length])+'</td>';
-          });
-          html += '<td style="padding:7px 10px;text-align:center"><span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+b.bg+';color:'+b.c+';white-space:nowrap">'+esc(r.estado)+'</span></td>';
-          html += '</tr>';
-          return html;
-        }).join('') : '<tr><td colspan="'+(4+realKeys.length*2+1)+'" style="padding:28px;text-align:center;color:var(--t3)">Sin resultados</td></tr>')+
-        '</tbody></table>'+
+        '<thead style="position:sticky;top:0;z-index:1"><tr style="background:var(--surface2)">'+
+          '<th style="padding:9px 10px"></th>'+
+          '<th style="padding:9px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Actividad / Programa</th>'+
+          '<th style="padding:9px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Tipo</th>'+
+          '<th style="padding:9px 12px;text-align:right;font-size:9px;font-weight:700;color:#388bfd;text-transform:uppercase">Presupuesto</th>'+
+          '<th style="padding:9px 6px"></th>'+
+          '<th style="padding:9px 12px;text-align:right;font-size:9px;font-weight:700;color:#3fb950;text-transform:uppercase">Hoy (real)</th>'+
+          '<th style="padding:9px 12px;text-align:right;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Diferencia</th>'+
+          '<th style="padding:9px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase">Qué pasó</th>'+
+        '</tr></thead>'+body+
+      '</table>'+
     '</div>'+
-    (rows.length ? (function(){
-      var sumPpt = rows.reduce(function(a,r){ return a+(r.ppt||0); }, 0);
-      var parts = '<span style="color:var(--t3)">Σ PPT: <b style="color:var(--t1)">'+_chFmt(sumPpt)+'h</b></span>';
-      realKeys.forEach(function(rk){ var s = rows.reduce(function(a,r){ return a+(r.periods[rk]||0); }, 0); parts += '<span style="color:var(--t3)">'+_chPLabel(rk)+': <b style="color:var(--t1)">'+_chFmt(s)+'h</b></span>'; });
-      var lastRk = realKeys[realKeys.length-1];
-      var sumLast = rows.reduce(function(a,r){ return a+(r.periods[lastRk]||0); }, 0);
-      var net = sumLast - sumPpt;
-      return '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:10px 14px;font-size:11px">'+parts+
-        '<span style="font-weight:800;padding:2px 10px;border-radius:6px;background:'+(net>=0?'#3fb95022':'#f8514922')+';color:'+(net>=0?'#3fb950':'#f85149')+'">Δ Neta: '+(net>=0?'▲ +':'▼ ')+_chFmt(net)+'h</span></div>';
-    })() : '');
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:10px 14px;font-size:11px">'+
+      '<span style="color:var(--t3)">Σ Presupuesto: <b style="color:#388bfd">'+_chFmt(sumPpt)+'h</b></span>'+
+      '<span style="color:var(--t3)">Σ Hoy: <b style="color:#3fb950">'+_chFmt(sumReal)+'h</b></span>'+
+      '<span style="font-weight:800;padding:2px 10px;border-radius:6px;background:'+(net>=0?'#3fb95022':'#f8514922')+';color:'+(net>=0?'#3fb950':'#f85149')+'">Δ Neta: '+(net>=0?'▲ +':'▼ ')+_chFmt(net)+'h</span>'+
+    '</div>';
 }
 
 /* ── Vista Carga Docentes ──────────────────────────────────── */
