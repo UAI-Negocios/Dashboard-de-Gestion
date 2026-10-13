@@ -7807,7 +7807,7 @@ function _cbGetSesionesEdit(){
    Lee el Calendario General, arma un cronograma claro por programa y lo
    exporta a PDF / Word / .ics (importable a Google/Outlook Calendar).
 ═══════════════════════════════════════════════════════════════════ */
-var _CAL = { prog:'', group:'mes', cols:{prof:true, mod:true, sede:true, sala:true}, nota:'' };
+var _CAL = { prog:'', group:'mes', cols:{tema:false, prof:true, mod:true, sede:true, sala:true, horas:true}, nota:'' };
 var _CAL_DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 var _CAL_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function _calHoras(h){
@@ -7828,7 +7828,8 @@ function _calSesiones(){
       fecha:d, dia:(r['Dia_Semana']||_CAL_DIAS[d.getDay()]||''),
       horario:r['HORARIO']||'', asig:r['ASIGNATURA']||r['SIGLA']||'',
       prof:(r['PROFESOR']&&!IGNORE_NO_ASIG.has(String(r['PROFESOR']).toLowerCase()))?r['PROFESOR']:'',
-      mod:r['Modalidad_Calc']||r['MODALIDAD']||'', sede:r['SEDE']||'', sala:r['SALA']||''
+      mod:r['Modalidad_Calc']||r['MODALIDAD']||'', sede:r['SEDE']||'', sala:r['SALA']||'',
+      tema:r['TEMA']||r['Tema']||'', horas:(r['HORAS']!=null&&r['HORAS']!=='')?r['HORAS']:(r['Nº HORAS']||r['N° HORAS']||r['HORAS LECTIVAS']||'')
     });
   });
   out.sort(function(a,b){ return (a.fecha-b.fecha) || String(a.horario).localeCompare(String(b.horario)); });
@@ -7865,15 +7866,17 @@ function _calBuildHTML(){
         '<td style="padding:7px 9px;white-space:nowrap;color:#45506a">'+esc(s.dia)+'</td>'+
         '<td style="padding:7px 9px;white-space:nowrap;color:#0f2b46;font-weight:600">'+esc(hh||'—')+'</td>'+
         (_CAL.group==='asig'?'':'<td style="padding:7px 9px;color:#1a1a1a">'+esc(s.asig||'—')+'</td>')+
+        (C.tema?'<td style="padding:7px 9px;color:#45506a">'+esc(s.tema||'—')+'</td>':'')+
         (C.prof?'<td style="padding:7px 9px;color:#45506a">'+(s.prof?esc(s.prof):'—')+'</td>':'')+
         (C.mod?'<td style="padding:7px 9px">'+(modBadge(s.mod)||'—')+'</td>':'')+
         (C.sede?'<td style="padding:7px 9px;color:#45506a">'+esc(s.sede||'—')+'</td>':'')+
         (C.sala?'<td style="padding:7px 9px;color:#45506a">'+esc(s.sala||'—')+'</td>':'')+
+        (C.horas?'<td style="padding:7px 9px;white-space:nowrap;text-align:center;color:#0f2b46;font-weight:600">'+(s.horas!==''&&s.horas!=null?esc(String(s.horas)):'—')+'</td>':'')+
       '</tr>';
     }).join('');
     return '<div style="margin-bottom:18px"><div style="font-size:14px;font-weight:800;color:'+teal+';margin:0 0 7px;border-left:4px solid '+teal+';padding-left:9px">'+esc(k)+' <span style="font-size:11px;font-weight:400;color:#8a93a6">· '+groups[k].length+' sesión(es)</span></div>'+
       '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
-      '<thead><tr>'+th('Fecha')+th('Día')+th('Horario')+(_CAL.group==='asig'?'':th('Asignatura'))+(C.prof?th('Profesor'):'')+(C.mod?th('Modalidad'):'')+(C.sede?th('Sede'):'')+(C.sala?th('Sala'):'')+'</tr></thead>'+
+      '<thead><tr>'+th('Fecha')+th('Día')+th('Horario')+(_CAL.group==='asig'?'':th('Asignatura'))+(C.tema?th('Tema'):'')+(C.prof?th('Profesor'):'')+(C.mod?th('Modalidad'):'')+(C.sede?th('Sede'):'')+(C.sala?th('Sala'):'')+(C.horas?th('Horas acad.'):'')+'</tr></thead>'+
       '<tbody>'+rows+'</tbody></table></div>';
   }).join('');
   return '<div style="width:1000px;max-width:100%;margin:0 auto;background:#fff;color:#0f1f3a;border:1px solid '+teal+';border-radius:6px;padding:26px 34px;font-family:Arial,Helvetica,sans-serif;box-sizing:border-box">'+
@@ -7920,7 +7923,7 @@ function renderCalAlumnos(){
           '<select onchange="_calOn(\'group\',this.value)" style="'+iS+';cursor:pointer"><option value="mes"'+(_CAL.group==='mes'?' selected':'')+'>Mes</option><option value="asig"'+(_CAL.group==='asig'?' selected':'')+'>Asignatura</option></select></div>'+
       '</div>'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;align-items:center">'+
-        '<span style="font-size:10px;font-weight:700;color:#6e7681;text-transform:uppercase">Columnas:</span>'+chk('prof','Profesor')+chk('mod','Modalidad')+chk('sede','Sede')+chk('sala','Sala')+
+        '<span style="font-size:10px;font-weight:700;color:#6e7681;text-transform:uppercase">Columnas:</span>'+chk('tema','Tema')+chk('prof','Profesor')+chk('mod','Modalidad')+chk('sede','Sede')+chk('sala','Sala')+chk('horas','Horas académicas')+
       '</div>'+
       '<div style="margin-top:10px"><label style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Nota para los alumnos (opcional)</label>'+
         '<input value="'+escA(_CAL.nota)+'" oninput="_calOn(\'nota\',this.value)" placeholder="Ej: Las clases online se dictan por Zoom; el enlace se enviará por correo." style="'+iS+';width:100%"></div>'+
@@ -7982,7 +7985,7 @@ function _calICS(){
 function _calXLS(){
   if(typeof XLSX==='undefined'){ showToast('XLSX no disponible','err'); return; }
   var ses=_calSesiones(); if(!ses.length){ showToast('Sin sesiones','err'); return; }
-  var rows=ses.map(function(s){ return {Fecha:_calFF(s.fecha),'Día':s.dia,Horario:s.horario,Asignatura:s.asig,Profesor:s.prof,Modalidad:s.mod,Sede:s.sede,Sala:s.sala}; });
+  var rows=ses.map(function(s){ return {Fecha:_calFF(s.fecha),'Día':s.dia,Horario:s.horario,Asignatura:s.asig,Tema:s.tema,Profesor:s.prof,Modalidad:s.mod,Sede:s.sede,Sala:s.sala,'Horas académicas':s.horas}; });
   var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Calendario');
   XLSX.writeFile(wb,'Calendario_'+_calSlug(_CAL.prog)+'.xlsx'); showToast('📊 Excel descargado','ok');
 }
